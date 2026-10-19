@@ -363,7 +363,15 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical;line-
 .specs dd{margin:0;overflow-wrap:anywhere}
 .confirm{display:grid;gap:10px;padding:14px;border-radius:14px;background:var(--bad-soft)}
 .lightbox{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.94);display:grid;place-items:center;padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 16px)}
-.lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+.lightbox img{display:block;width:auto;height:auto;max-width:100%;max-height:calc(100vh - 32px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));object-fit:contain;border-radius:8px}
+@supports (height:100dvh){ .lightbox img{max-height:calc(100dvh - 32px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))} }
+.cash-big{font-family:var(--f-display);font-weight:600;font-size:clamp(28px,8vw,36px);letter-spacing:-.03em;line-height:1.1}
+.cash-mv{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:8px 10px;align-items:center;font-size:13.5px;padding:8px 0;border-top:1px solid var(--line)}
+.cash-mv .d{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.cash-mv .n{min-width:0;overflow-wrap:anywhere;color:var(--ink-2)}
+.cash-mv b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.xbtn{border:0;background:none;color:var(--muted);padding:4px;font-size:12px;font-weight:800;cursor:pointer}
+.xbtn.on{color:var(--bad)}
 .lb-x{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:max(12px,env(safe-area-inset-right,0px));width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center}
 .toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:80;max-width:calc(100% - 32px);width:max-content;background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:12px;font-weight:700;font-size:14px;transition:opacity .2s,transform .2s;text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
@@ -590,7 +598,7 @@ const PS5_KEYS = [['slim_std', 'PS5 Slim Standard'], ['slim_dig', 'PS5 Slim Digi
 /* ---------- État ---------- */
 const S = {
   db: null, assets: null, downloads: null,
-  status: 'loading', items: [], settings: { ...DEFAULTS },
+  status: 'loading', items: [], cash: [], settings: { ...DEFAULTS },
   view: 'accueil', month: thisMonth(), period: '12m', confirmEx: false, chartRows: [],
   f: Object.assign({ q: '', st: 'encours', cat: 'all', sort: 'recent', group: true, view: 'list' }, LS.get('filters', {}), { q: '' }),
 };
@@ -738,6 +746,15 @@ function stateLine(i) {
   if (marketStart(i)) return { t: `en annonce depuis ${marketDays(i)}${NB}j · acheté il y a ${tied(i)}${NB}j`, stale: marketDays(i) > st };
   return { t: `reçu il y a ${held(i)}${NB}j · pas en annonce`, stale: held(i) > 3 };
 }
+// Caisse depuis le début : apports − retraits + ventes encaissées − achats.
+function capital() {
+  const sold = S.items.filter(isSold), open = S.items.filter((i) => !isSold(i));
+  const apports = sum(S.cash.filter((c) => c.type !== 'retrait'), (c) => num(c.amount));
+  const retraits = sum(S.cash.filter((c) => c.type === 'retrait'), (c) => num(c.amount));
+  const invested = sum(S.items, cost), cashed = sum(sold, (i) => num(i.sellPrice) - num(i.sellFees));
+  const stock = sum(open, cost), dispo = apports - retraits + cashed - invested;
+  return { apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock, nSold: sold.length };
+}
 const pills = (i) => (inTransit(i) ? (i.status === 'stock' ? pill('livraison') : pill(i.status) + '<span class="pill st-livraison">Pas encore reçu</span>') : pill(i.status));
 const exb = (i) => (i.example ? '<span class="exb">Exemple</span>' : '');
 const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? u : '');
@@ -784,10 +801,11 @@ function renderAccueil() {
       <div class="goal-note">${note}</div></div>`;
   }
 
+  const stocked = sum(ms.bought.filter((i) => !(isSold(i) && i.sellDate.slice(0, 7) === m)), cost);
   const tiles = [
     ['Chiffre d’affaires', eur(ms.ca), plural(ms.nSold, 'vente')],
     ['Investi', eur(ms.invest), plural(ms.nBought, 'achat')],
-    ['Trésorerie du mois', eurS(ms.cash), 'encaissé − frais − achats', ms.cash < -0.004 ? 'neg' : ''],
+    ['Flux de caisse', eurS(ms.cash), ms.cash < -0.004 && stocked > 0.004 ? `${eur(stocked)} d’achats de ce mois revendus après ou encore en stock : de l’argent placé, pas perdu` : 'encaissé − frais − achats du mois'],
     ['ROI moyen', pctS(ms.roi), 'bénéfice ÷ coût d’achat'],
     ['Bénéfice moyen', ms.avgProfit == null ? '—' : eurS(ms.avgProfit), 'par vente'],
     ['Délai de vente', days(ms.avgDays), 'de la mise en annonce à la vente'],
@@ -818,6 +836,7 @@ function renderAccueil() {
           <div class="hero-sub">${deltaHtml}</div>
           ${goalHtml}
         </section>
+        ${cashCard()}
         <div class="tiles">${tiles.map((t) => `<div class="tile"><span class="k">${t[0]}</span><span class="v ${t[3] || ''}">${t[1]}</span><span class="s">${t[2]}</span></div>`).join('')}</div>
         <button class="strip" data-act="goto" data-view="articles" data-st="encours">
           <span>En ce moment</span><span><b>${open.length}</b> en cours</span><span><b>${eur(capital)}</b> immobilisés</span><span><b>${eurS(pot)}</b> au prix affiché</span>${ic('right')}
@@ -846,6 +865,27 @@ function renderAccueil() {
       <div class="card-h"><h2 class="sec">Journal de ${monthName(m)}</h2><span class="muted" style="font-size:12.5px">achats et ventes, du plus récent au plus ancien</span></div>
       ${journal(m, ms)}
     </section>`;
+}
+
+function cashCard() {
+  const K = capital(), mv = S.cash.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const hint = !K.apports ? '<p class="hint">Déclare l’argent que tu mets dans l’activité avec « Entrée d’argent » : l’appli calcule ce qu’il te reste à investir.</p>'
+    : K.dispo < -0.004 ? '<p class="hint" style="color:var(--warn);font-weight:700">Tu as acheté pour plus que tes apports et tes ventes : déclare l’argent manquant avec « Entrée d’argent ».</p>' : '';
+  return `<section class="card" aria-label="Caisse">
+    <div class="card-h"><h2 class="sec">Caisse</h2><span class="muted" style="font-size:12.5px">depuis le début</span></div>
+    <div class="eyebrow">Disponible pour acheter</div>
+    <div class="cash-big ${K.dispo < -0.004 ? 'neg' : ''}">${eur(K.dispo)}</div>
+    <dl class="kv" style="margin-top:10px">
+      <dt>Apports${K.retraits ? ' − retraits' : ''}</dt><dd>${eur(K.apports - K.retraits)}</dd>
+      <dt>Ventes encaissées (net)</dt><dd>${eurS(K.cashed)}</dd>
+      <dt>Achats (prix + frais)</dt><dd>${eur(-K.invested)}</dd>
+      <dt>Stock à revendre (au coût)</dt><dd>${eur(K.stock)}</dd>
+      <dt><b>Capital total</b> <span class="opt-l">(caisse + stock)</span></dt><dd>${eur(K.total)}</dd>
+    </dl>
+    ${hint}
+    <div class="btns" style="margin-top:12px"><button class="btn sm primary" data-act="cash-add" data-type="apport">${ic('plus')} Entrée d’argent</button><button class="btn sm" data-act="cash-add" data-type="retrait">Retrait</button></div>
+    ${mv.length ? `<details class="tview" ${S.confirmCash ? 'open' : ''}><summary>Mouvements (${mv.length})</summary><div style="margin-top:6px">${mv.map((c) => `<div class="cash-mv"><span class="d">${dShort(c.date)}</span><span class="n">${c.type === 'retrait' ? 'Retrait' : 'Entrée'}${c.note ? ' · ' + esc(c.note) : ''}</span><b class="${c.type === 'retrait' ? '' : 'pos'}">${c.type === 'retrait' ? eur(-num(c.amount)) : eurS(num(c.amount))}</b><button class="xbtn ${S.confirmCash === c.id ? 'on' : ''}" data-act="cash-del" data-id="${esc(c.id)}">${S.confirmCash === c.id ? 'Confirmer' : 'Supprimer'}</button></div>`).join('')}</div></details>` : ''}
+  </section>`;
 }
 
 function onboarding() {
@@ -947,7 +987,7 @@ function journal(m, ms) {
       <span class="lg-a">${e.t === 'achat' ? `<b class="out">${eur(-cost(e.i))}</b>` : `<b>${eurS(num(e.i.sellPrice))}</b><small class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</small>`}</span>
     </div>`;
   }).join('')}</div>
-  <div class="lg-tot"><span>Sorties ${eur(-ms.invest)}</span><span>Entrées ${eurS(ms.ca - ms.fees)}</span><span>Solde ${eurS(ms.cash)}</span></div>`;
+  <div class="lg-tot"><span>Sorties ${eur(-ms.invest)}</span><span>Entrées ${eurS(ms.ca - ms.fees)}</span><span>Flux de caisse ${eurS(ms.cash)}</span></div>`;
 }
 
 /* ---------- Articles ---------- */
@@ -1623,6 +1663,7 @@ function renderSimu() {
         <dl class="kv">
           <dt>Prix max pour garder ${eur(target)}</dt><dd>${maxBuy > 0 ? eur(Math.floor(maxBuy / 5) * 5) : '—'}</dd>
           <dt>Prix d’annonce conseillé</dt><dd>≈ ${eur(listAdv)}</dd>
+          ${capital().apports ? `<dt>Disponible en caisse</dt><dd class="${price > capital().dispo ? 'neg' : ''}">${eur(capital().dispo)}</dd>` : ''}
         </dl>
         ${price > maxBuy && maxBuy > 0 ? `<p class="hint">Propose <b>${eur(Math.floor(maxBuy / 5) * 5)}</b> au vendeur : au-delà, tu passes sous ton bénéfice minimum.</p>` : ''}
         <button class="btn primary" data-act="sim-buy" data-cat="${esc(guessCat(model, g))}">${ic('plus')} Je l’achète : créer la fiche</button>
@@ -1689,6 +1730,19 @@ function drawMonthChart(host, rows) {
     h.addEventListener('blur', hide);
   });
   svg.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') hide(); });
+}
+
+function bilanHtml() {
+  const K = capital(), cs = sum(S.items.filter(isSold), cost);
+  const t = [
+    ['Bénéfice net total', eurS(K.profit), `${plural(K.nSold, 'vente')} · ROI ${pctS(cs ? K.profit / cs : null)}`, K.profit < 0 ? 'neg' : 'pos'],
+    ['Total investi', eur(K.invested), `${plural(S.items.length, 'achat')}, prix + frais`],
+    ['Total encaissé', eur(K.cashed), `CA ${eur(K.ca)} − frais de vente`],
+    ['Apports nets', eur(K.apports - K.retraits), K.apports ? `bénéfice ${pctS((K.apports - K.retraits) > 0 ? K.profit / (K.apports - K.retraits) : null)} des apports` : 'aucun apport déclaré'],
+    ['Disponible', eur(K.dispo), 'pour de nouveaux achats', K.dispo < -0.004 ? 'neg' : ''],
+    ['Capital total', eur(K.total), `caisse + ${eur(K.stock)} de stock au coût`],
+  ];
+  return `<div class="tiles">${t.map((x) => `<div class="tile"><span class="k">${x[0]}</span><span class="v ${x[3] || ''}">${x[1]}</span><span class="s">${x[2]}</span></div>`).join('')}</div>`;
 }
 
 function renderStats() {
@@ -1788,11 +1842,12 @@ function renderStats() {
   el.innerHTML = `
     <div class="ttl-row"><div><div class="eyebrow">Analyse · ${esc(pLabel)}</div><h1 class="h1">Statistiques</h1></div><button class="btn sm" data-act="export">${ic('dl')} Export CSV</button></div>
     <div class="chips" role="toolbar" aria-label="Période">${chips}</div>
+    <section class="card" aria-label="Bilan depuis le début"><div class="card-h"><h2 class="sec">Bilan depuis le début</h2><span class="muted" style="font-size:12.5px">toutes périodes confondues</span></div>${bilanHtml()}</section>
     <div class="tiles t4">${tiles.map((t) => `<div class="tile"><span class="k">${t[0]}</span><span class="v ${t[3] || ''}">${t[1]}</span><span class="s">${t[2]}</span></div>`).join('')}</div>
     <section class="card">
       <div class="card-h"><h2 class="sec">Chiffre d’affaires et bénéfice par mois</h2><div class="legend"><span><i class="k1"></i>Chiffre d’affaires</span><span><i class="k2"></i>Bénéfice net</span></div></div>
       <div class="chart-host" id="mchart"></div>
-      <details class="tview" open><summary>Tableau mois par mois</summary><div class="tbl-wrap"><table><thead><tr><th>Mois</th><th>Achats</th><th>Investi</th><th>Ventes</th><th>CA</th><th>Bénéfice</th><th>ROI</th><th>Trésorerie</th></tr></thead><tbody>
+      <details class="tview" open><summary>Tableau mois par mois</summary><div class="tbl-wrap"><table><thead><tr><th>Mois</th><th>Achats</th><th>Investi</th><th>Ventes</th><th>CA</th><th>Bénéfice</th><th>ROI</th><th>Flux caisse</th></tr></thead><tbody>
         ${mrows.map((r) => `<tr class="click" data-act="goto-month" data-m="${r.ym}"><td>${esc(monthLabel(r.ym))}</td><td>${r.nB}</td><td>${eur(r.invest)}</td><td>${r.nS}</td><td>${eur(r.ca)}</td><td class="${r.profit < 0 ? 'neg' : ''}"><b>${eurS(r.profit)}</b></td><td>${pctS(r.roi)}</td><td>${eurS(r.cash)}</td></tr>`).join('')}
       </tbody></table></div></details>
     </section>
@@ -1859,15 +1914,15 @@ function blobToB64(blob) {
 }
 function normalize(d) {
   d = d && typeof d === 'object' ? d : {};
-  return { format: 1, settings: { ...DEFAULTS, ...(d.settings || {}) }, items: Array.isArray(d.items) ? d.items.filter((i) => i && i.id) : [] };
+  return { format: 1, settings: { ...DEFAULTS, ...(d.settings || {}) }, items: Array.isArray(d.items) ? d.items.filter((i) => i && i.id) : [], cash: Array.isArray(d.cash) ? d.cash.filter((c) => c && c.id) : [] };
 }
 // Une ligne par article : le fichier reste lisible et chaque commit montre exactement ce qui a changé.
 function serialize(d) {
-  return '{\n"format": 1,\n"settings": ' + JSON.stringify(d.settings) + ',\n"items": [\n' + d.items.map((i) => JSON.stringify(i)).join(',\n') + '\n]\n}\n';
+  return '{\n"format": 1,\n"settings": ' + JSON.stringify(d.settings) + ',\n"items": [\n' + d.items.map((i) => JSON.stringify(i)).join(',\n') + '\n],\n"cash": [\n' + (d.cash || []).map((c) => JSON.stringify(c)).join(',\n') + '\n]\n}\n';
 }
 function applyData(d, sha) {
   DATA = d; SHA = sha;
-  S.items = DATA.items; S.settings = DATA.settings;
+  S.items = DATA.items; S.settings = DATA.settings; S.cash = DATA.cash;
   LS.set('cache', { data: DATA, sha: SHA, at: Date.now() });
 }
 async function pull() {
@@ -1949,6 +2004,8 @@ function itemsCol() {
     },
   };
 }
+const addCash = (c) => commit((d) => { d.cash.push({ ...c, id: newId() }); }, `${c.type === 'retrait' ? 'Retrait' : 'Apport'} ${eur(c.amount)}`);
+const delCash = (id) => commit((d) => { d.cash = d.cash.filter((c) => c.id !== id); }, 'Suppression mouvement de caisse');
 const saveSettingsData = (next) => commit((d) => { d.settings = { ...DEFAULTS, ...next }; }, 'Réglages');
 
 /* Photos : envoyées dans photos/, affichées via l'API (dépôt privé) avec un cache local. */
@@ -2015,6 +2072,9 @@ function claudeSummary() {
   const L = [];
   L.push(`COMPTA REVENTE · export du ${today()} · ${items.length} articles (${items.filter(isOpen).length} en cours, ${items.filter(isSold).length} vendus)`);
   L.push(`Réglages : objectif ${num(st.monthlyGoal)} €/mois · bénéfice mini ${num(st.targetProfit)} € · alerte stock ${num(st.staleDays)} j · statut ${st.legal}${num(st.ps5Price) ? ` · cote PS5 ${num(st.ps5Price)} €` : ''}${Object.keys(st.ps5Models || {}).length ? ' · cotes modèles ' + Object.entries(st.ps5Models).map(([k, v]) => `${k}=${v}`).join(',') : ''}`);
+  const K = capital();
+  L.push(`Caisse depuis le début : apports ${n2(K.apports)} · retraits ${n2(K.retraits)} · investi ${n2(K.invested)} · encaissé net ${n2(K.cashed)} · bénéfice ${n2(K.profit)} · disponible ${n2(K.dispo)} · stock au coût ${n2(K.stock)} · capital ${n2(K.total)}`);
+  if (S.cash.length) L.push('MOUVEMENTS DE CAISSE (date;type;montant;note)', ...S.cash.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((c) => [c.date, c.type, n2(num(c.amount)), (c.note || '').replace(/[\n;]/g, ' ')].join(';')));
   L.push('', 'MOIS;achats;investi;ventes;CA;frais_vente;benefice;ROI%');
   months.forEach((m) => { const s = monthStats(m); L.push([m, s.nBought, n2(s.invest), s.nSold, n2(s.ca), n2(s.fees), n2(s.profit), s.roi == null ? '' : Math.round(s.roi * 100)].join(';')); });
   L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;avant_annonce_j;en_annonce_j;argent_bloque_j;notes)');
@@ -2249,6 +2309,32 @@ const ACT = {
   'rm-photo': (a) => removePhoto(a.dataset.key),
   'f-st': (a) => { S.f.st = a.dataset.v; S.f.cat = 'all'; if (S.f.st === 'vendu' && S.f.sort === 'ancien') S.f.sort = 'recent'; saveFilters(); renderArticles(); },
   'f-cat': (a) => { S.f.cat = a.dataset.v; saveFilters(); renderArticles(); },
+  'cash-add': (a) => {
+    const ret = a.dataset.type === 'retrait';
+    openSheet({ kind: 'cash', title: ret ? 'Retrait de caisse' : 'Entrée d’argent', body: `
+      <p class="hint">${ret ? 'Argent que tu sors de l’activité (pour toi, pas pour un achat d’article).' : 'Argent que tu mets dans l’activité pour acheter des articles. Il s’ajoute à ce qui est disponible pour investir.'}</p>
+      ${radios('c-type', [['apport', 'Entrée d’argent'], ['retrait', 'Retrait']], ret ? 'retrait' : 'apport')}
+      <div class="row2">${moneyF('c-amount', 'Montant', null)}${dateF('c-date', 'Date', today())}</div>
+      ${textF('c-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. économies, réinvestissement des ventes…')}`,
+      foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="cash-save">Enregistrer</button>` });
+  },
+  'cash-save': async (a) => {
+    clearErrs();
+    const amount = parseNum(val('c-amount')), date = val('c-date');
+    if (amount == null || amount <= 0) return fieldErr('c-amount', 'Indique un montant.');
+    if (!isDate(date)) return fieldErr('c-date', 'Date requise.');
+    const type = radioVal('c-type') || 'apport';
+    a.disabled = true;
+    const ok = await write(() => addCash({ type, amount, date, note: val('c-note') }));
+    a.disabled = false;
+    if (ok) { closeSheet(); toast(`${type === 'retrait' ? 'Retrait' : 'Entrée'} de ${eur(amount)} enregistré${type === 'retrait' ? '' : 'e'}`); }
+  },
+  'cash-del': async (a) => {
+    const id = a.dataset.id;
+    if (S.confirmCash !== id) { S.confirmCash = id; render(); setTimeout(() => { if (S.confirmCash === id) { S.confirmCash = null; render(); } }, 5000); return; }
+    S.confirmCash = null;
+    if (await write(() => delCash(id))) toast('Mouvement supprimé');
+  },
   'f-view': (a) => { S.f.view = a.dataset.v; saveFilters(); renderArticles(); },
   'clear-filters': () => { S.f.st = 'tous'; S.f.cat = 'all'; S.f.q = ''; $('#q').value = ''; saveFilters(); renderArticles(); },
   copy: (a) => copyText(a.dataset.text, `Réf ${a.dataset.text} copiée`),
