@@ -150,6 +150,18 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .st-annonce{background:var(--accent-soft);color:var(--accent)}
 .st-reserve{background:var(--warn-soft);color:var(--warn)}
 .st-vendu{background:var(--good-soft);color:var(--good)}
+.st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
+.sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
+.sw-t{display:grid;gap:1px;min-width:0}
+.sw-t b{font-size:14.5px}
+.sw-t small{font-size:12px;color:var(--muted)}
+.sw input{position:absolute;opacity:0;pointer-events:none}
+.sw-ui{position:relative;width:50px;height:30px;border-radius:99px;background:var(--axis);transition:background .15s}
+.sw-ui::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+.sw input:checked~.sw-ui{background:var(--good)}
+.sw input:checked~.sw-ui::after{transform:translateX(20px)}
+.sw input:focus-visible~.sw-ui{outline:2px solid var(--accent);outline-offset:2px}
+.sub{display:grid;gap:12px;padding:2px 0 4px 14px;border-left:2px solid var(--line);margin-left:8px}
 .exb{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);border:1px solid currentColor;border-radius:5px;padding:0 5px;line-height:1.5}
 .days{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);font-weight:500}
 .days.stale{color:var(--warn);font-weight:700}
@@ -531,7 +543,8 @@ const CATS = {
 };
 const CAT_ORDER = ['ps5', 'manette', 'jeu', 'pokemon', 'console', 'accessoire', 'autre'];
 const HW = ['ps5', 'console', 'manette', 'accessoire'];
-const STATUS = { stock: 'En stock', annonce: 'En annonce', reserve: 'Réservé', vendu: 'Vendu' };
+const STATUS = { stock: 'En stock', annonce: 'En annonce', reserve: 'Réservé', vendu: 'Vendu', livraison: 'En livraison' };
+const BUY_MODES = [['livraison', 'Livraison (à distance)'], ['main_propre', 'Main propre']];
 const OPEN = ['stock', 'annonce', 'reserve'];
 const CONDS = [['neuf', 'Neuf / scellé'], ['comme_neuf', 'Comme neuf'], ['tres_bon', 'Très bon état'], ['bon', 'Bon état'], ['abime', 'Abîmé / à réparer']];
 const CONTENTS = ['Boîte', 'Manette', 'Câbles', 'Socle', 'Facture', 'Jeu(x)', 'Garantie'];
@@ -556,7 +569,15 @@ const isOpen = (i) => OPEN.includes(i.status);
 const cost = (i) => num(i.buyPrice) + num(i.buyCosts);
 const profit = (i) => (isSold(i) ? num(i.sellPrice) - num(i.sellFees) - cost(i) : null);
 const roi = (i) => { const c = cost(i), p = profit(i); return p == null || !c ? null : p / c; };
-const held = (i) => (isDate(i.buyDate) ? Math.max(0, dayDiff(i.buyDate, isSold(i) ? i.sellDate : today())) : 0);
+// Les anciens articles (sans champ « received ») sont considérés reçus le jour de l'achat.
+const isReceived = (i) => i.received !== false;
+const inTransit = (i) => !isReceived(i) && !isSold(i);
+const availDate = (i) => (isReceived(i) ? (isDate(i.receiveDate) ? i.receiveDate : i.buyDate) : null);
+// held : jours pendant lesquels l'article pouvait être vendu (depuis la réception).
+const held = (i) => { const a = availDate(i); return isDate(a) ? Math.max(0, dayDiff(a, isSold(i) ? i.sellDate : today())) : 0; };
+// tied : jours pendant lesquels l'argent est resté bloqué (depuis l'achat, livraison comprise).
+const tied = (i) => (isDate(i.buyDate) ? Math.max(0, dayDiff(i.buyDate, isSold(i) ? i.sellDate : today())) : 0);
+const shipDays = (i) => (i.buyMode === 'livraison' && isReceived(i) && isDate(i.receiveDate) && isDate(i.buyDate) ? Math.max(0, dayDiff(i.buyDate, i.receiveDate)) : null);
 const listed = (i) => (i.status === 'annonce' || i.status === 'reserve') && i.listPrice != null;
 const potential = (i) => (listed(i) ? num(i.listPrice) - cost(i) : null);
 const byId = (id) => S.items.find((i) => i.id === id);
@@ -572,7 +593,7 @@ function aggregate(bought, sold) {
   return {
     bought, sold, nBought: bought.length, nSold: n, invest, ca, fees, costSold, profit: p,
     cash: ca - fees - invest, roi: costSold > 0 ? p / costSold : null, margin: ca > 0 ? p / ca : null,
-    avgProfit: n ? p / n : null, avgDays: n ? sum(sold, held) / n : null,
+    avgProfit: n ? p / n : null, avgDays: n ? sum(sold, held) / n : null, avgTied: n ? sum(sold, tied) / n : null,
   };
 }
 function monthStats(ym) {
@@ -658,6 +679,7 @@ const IC = {
 const ic = (k, c = '') => `<svg class="ic ${c}" viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
 const tag = (i, c = '') => `<span class="tag ${c}">${esc(i.ref || '—')}</span>`;
 const pill = (st) => `<span class="pill st-${esc(st)}">${esc(STATUS[st] || st)}</span>`;
+const pills = (i) => (inTransit(i) ? (i.status === 'stock' ? pill('livraison') : pill(i.status) + '<span class="pill st-livraison">Pas encore reçu</span>') : pill(i.status));
 const exb = (i) => (i.example ? '<span class="exb">Exemple</span>' : '');
 const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? u : '');
 
@@ -709,7 +731,7 @@ function renderAccueil() {
     ['Trésorerie du mois', eurS(ms.cash), 'encaissé − frais − achats', ms.cash < -0.004 ? 'neg' : ''],
     ['ROI moyen', pctS(ms.roi), 'bénéfice ÷ coût d’achat'],
     ['Bénéfice moyen', ms.avgProfit == null ? '—' : eurS(ms.avgProfit), 'par vente'],
-    ['Délai de vente', days(ms.avgDays), 'de l’achat à la vente'],
+    ['Délai de vente', days(ms.avgDays), 'de la réception à la vente'],
   ];
   if (st.legal === 'micro') {
     const rate = num(st.urssafRate), c = ms.ca * rate / 100;
@@ -774,15 +796,20 @@ function onboarding() {
 
 function alerts() {
   const stale = num(S.settings.staleDays) || 21;
-  const open = S.items.filter(isOpen);
+  const open = S.items.filter(isOpen), recv = open.filter(isReceived);
   const rows = [];
-  open.filter((i) => held(i) > stale).sort((a, b) => held(b) - held(a)).forEach((i) => rows.push({
+  open.filter(inTransit).sort((a, b) => tied(b) - tied(a)).forEach((i) => rows.push({
+    i, t: tied(i) > 7 ? 'warn' : 'info',
+    txt: `En livraison depuis ${tied(i)}${NB}j${tied(i) > 7 ? ' : colis en retard ?' : ''}`,
+    act: ['recv', 'Reçu'],
+  }));
+  recv.filter((i) => held(i) > stale).sort((a, b) => held(b) - held(a)).forEach((i) => rows.push({
     i, t: 'warn',
-    txt: `${i.status === 'stock' ? 'En stock' : i.status === 'reserve' ? 'Réservé' : 'En annonce'} depuis ${held(i)}${NB}j · ${eur(cost(i))} bloqués`,
+    txt: `${i.status === 'stock' ? 'En stock' : i.status === 'reserve' ? 'Réservé' : 'En annonce'} depuis ${held(i)}${NB}j après réception · ${eur(cost(i))} bloqués`,
     act: i.status === 'stock' ? ['list', 'Annonce'] : i.status === 'reserve' ? ['sell', 'Vendu'] : ['price', 'Baisser'],
   }));
-  open.filter((i) => i.status === 'stock' && held(i) >= 2 && held(i) <= stale).forEach((i) => rows.push({ i, t: 'info', txt: `Pas encore en annonce · J+${held(i)}`, act: ['list', 'Annonce'] }));
-  open.filter((i) => i.status === 'reserve' && held(i) <= stale).forEach((i) => rows.push({ i, t: 'info', txt: 'Réservé : pense à finaliser la vente', act: ['sell', 'Vendu'] }));
+  recv.filter((i) => i.status === 'stock' && held(i) >= 2 && held(i) <= stale).forEach((i) => rows.push({ i, t: 'info', txt: `Reçu, pas encore en annonce · J+${held(i)}`, act: ['list', 'Annonce'] }));
+  recv.filter((i) => i.status === 'reserve' && held(i) <= stale).forEach((i) => rows.push({ i, t: 'info', txt: 'Réservé : pense à finaliser la vente', act: ['sell', 'Vendu'] }));
   const noLink = open.filter((i) => i.status !== 'stock' && !safeUrl(i.listUrl)).length;
   return { rows, noLink };
 }
@@ -810,8 +837,13 @@ function insights() {
   }
   const quick = sold.filter((i) => held(i) <= 7), slow = sold.filter((i) => held(i) > 7);
   if (quick.length >= 2 && slow.length >= 2) {
-    const rate = (arr) => sum(arr, profit) / Math.max(1, sum(arr, (i) => Math.max(1, held(i))));
-    out.push({ t: 'info', h: `Revendus en 7 jours ou moins, tes articles rapportent <b>${eur(rate(quick))} par jour</b> de stock, contre ${eur(rate(slow))} pour les autres. Un prix juste qui part vite fait tourner ton capital.` });
+    const rate = (arr) => sum(arr, profit) / Math.max(1, sum(arr, (i) => Math.max(1, tied(i))));
+    out.push({ t: 'info', h: `Revendus en 7 jours ou moins après réception, tes articles rapportent <b>${eur(rate(quick))} par jour</b> d’argent immobilisé, contre ${eur(rate(slow))} pour les autres. Un prix juste qui part vite fait tourner ton capital.` });
+  }
+  const ships = S.items.map(shipDays).filter((d) => d != null);
+  if (ships.length >= 2) {
+    const sd = avg(ships);
+    out.push({ t: 'info', h: `Tes achats à distance mettent en moyenne <b>${days(sd)}</b> à arriver : pendant ce temps ton argent est bloqué sans pouvoir vendre. Compte-le dans ton prix d’achat max.` });
   }
   const tot = sum(sold, profit);
   if (tot > 0 && sold.length >= 4) {
@@ -856,10 +888,12 @@ function journal(m, ms) {
 }
 
 /* ---------- Articles ---------- */
-const ST_OPTS = [['encours', 'En cours'], ['stock', 'En stock'], ['annonce', 'En annonce'], ['reserve', 'Réservés'], ['vendu', 'Vendus'], ['tous', 'Tous']];
+const ST_OPTS = [['encours', 'En cours'], ['livraison', 'En livraison'], ['stock', 'En stock'], ['annonce', 'En annonce'], ['reserve', 'Réservés'], ['vendu', 'Vendus'], ['tous', 'Tous']];
 function statusSet(st) {
   if (st === 'encours') return S.items.filter(isOpen);
   if (st === 'tous') return S.items.slice();
+  if (st === 'livraison') return S.items.filter(inTransit);
+  if (st === 'stock') return S.items.filter((i) => i.status === 'stock' && isReceived(i));
   return S.items.filter((i) => i.status === st);
 }
 function matches(i, q) {
@@ -936,7 +970,7 @@ function renderList() {
 }
 
 function card(i) {
-  const sold = isSold(i), h = held(i), stale = !sold && h > (num(S.settings.staleDays) || 21);
+  const sold = isSold(i), h = held(i), transit = inTransit(i), stale = !sold && !transit && h > (num(S.settings.staleDays) || 21);
   const ph = Array.isArray(i.photos) && i.photos[0];
   const thumb = ph ? imgTag(ph.t || ph.f) : `<span class="glyph">${esc((CATS[i.category] || CATS.autre).glyph)}</span>`;
   const p = profit(i);
@@ -945,16 +979,17 @@ function card(i) {
     : listed(i)
       ? `<span class="it-price">${eur(num(i.listPrice))}</span><span class="it-sub">coût ${eur(cost(i))}</span>`
       : `<span class="it-price">${eur(cost(i))}</span><span class="it-sub">coût total</span>`;
-  const quick = i.status === 'stock' ? `<button class="qbtn" data-act="list" data-id="${esc(i.id)}">Annonce</button>`
+  const quick = transit ? `<button class="qbtn primary" data-act="recv" data-id="${esc(i.id)}">Reçu</button>`
+    : i.status === 'stock' ? `<button class="qbtn" data-act="list" data-id="${esc(i.id)}">Annonce</button>`
     : isOpen(i) ? `<button class="qbtn primary" data-act="sell" data-id="${esc(i.id)}">Vendu</button>` : '';
   const meta = [i.details, condLabel(i.condition), i.serial ? 'SN …' + String(i.serial).slice(-4) : ''].filter(Boolean).join(' · ');
   return `<div class="item" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">
     <span class="thumb">${thumb}</span>
     <span class="it-main">
-      <span class="it-top">${tag(i)}${pill(i.status)}${exb(i)}</span>
+      <span class="it-top">${tag(i)}${pills(i)}${exb(i)}</span>
       <span class="it-name">${esc(i.model || '—')}</span>
       ${meta ? `<span class="it-meta">${esc(meta)}</span>` : ''}
-      <span class="it-dates"><span class="days ${stale ? 'stale' : ''}">${sold ? `vendu en ${h}${NB}j` : `J+${h}${stale ? ' · dort' : ''}`}</span>${safeUrl(i.listUrl) && !sold ? `<span class="lnk">${ic('link')}annonce</span>` : ''}</span>
+      <span class="it-dates"><span class="days ${stale ? 'stale' : ''}">${sold ? `vendu en ${h}${NB}j` : transit ? `en livraison · J+${tied(i)}` : `J+${h}${stale ? ' · dort' : ''}`}</span>${safeUrl(i.listUrl) && !sold ? `<span class="lnk">${ic('link')}annonce</span>` : ''}</span>
     </span>
     <span class="it-side">${right}${quick}</span>
   </div>`;
@@ -1012,17 +1047,24 @@ function detailBody(i) {
     sold ? ['Bénéfice', eurS(p), `ROI ${pctS(roi(i))}`, p >= 0 ? 'pos' : 'neg']
       : listed(i) ? ['Potentiel', eurS(potential(i)), 'au prix affiché', potential(i) >= 0 ? 'pos' : 'neg']
         : ['Potentiel', est ? '≈ ' + eurS(est.net) : '—', est ? (est.market ? `d’après ta cote ${eur(est.resale)}` : `d’après ${plural(est.n, 'vente')} du modèle`) : 'aucune vente ni cote pour ce modèle'],
-    [sold ? 'Vendu en' : 'En stock depuis', `${h}${NB}j`, sold ? `${dShort(i.buyDate)} → ${dShort(i.sellDate)}` : 'acheté le ' + dShort(i.buyDate)],
+    sold ? ['Vendu en', `${h}${NB}j`, shipDays(i) != null ? `après réception · livraison ${shipDays(i)}${NB}j` : 'après réception']
+      : inTransit(i) ? ['En livraison depuis', `${tied(i)}${NB}j`, 'acheté le ' + dShort(i.buyDate)]
+        : ['Dispo depuis', `${h}${NB}j`, 'reçu le ' + dShort(availDate(i))],
   ];
   const tl = [];
   tl.push(`<li><span class="dot ok"></span><div><b>Acheté ${eur(num(i.buyPrice))}${num(i.buyCosts) ? ` + ${eur(num(i.buyCosts))} de frais` : ''}</b><small>${dLong(i.buyDate)}${i.buySource ? ' · ' + esc(i.buySource) : ''}${i.sellerName ? ' · vendeur ' + esc(i.sellerName) : ''}</small></div></li>`);
+  if (i.buyMode === 'livraison' || inTransit(i)) {
+    if (isReceived(i)) tl.push(`<li><span class="dot ok"></span><div><b>Reçu${shipDays(i) != null ? ` · ${shipDays(i)}${NB}j de livraison` : ''}</b><small>${dLong(availDate(i))}</small></div></li>`);
+    else tl.push(`<li><span class="dot on"></span><div><b>En livraison</b><small>depuis ${tied(i)}${NB}j</small></div></li>`);
+  }
   const entries = log.length ? log : (i.listPrice != null && i.status !== 'stock' ? [{ d: i.listDate, p: i.listPrice }] : []);
   entries.forEach((e, k) => tl.push(`<li><span class="dot ${sold || k < entries.length - 1 ? 'ok' : 'on'}"></span><div><b>${k === 0 ? 'Mis en annonce à' : 'Prix passé à'} ${eur(num(e.p))}</b><small>${dLong(e.d)}</small></div></li>`));
   if (i.status === 'reserve') tl.push(`<li><span class="dot on"></span><div><b>Réservé</b><small>en attente de la vente</small></div></li>`);
-  if (sold) tl.push(`<li><span class="dot ok"></span><div><b>Vendu ${eur(num(i.sellPrice))} · <span class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</span></b><small>${dLong(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''}${i.buyerName ? ' · acheteur ' + esc(i.buyerName) : ''} · ${h}${NB}j après l’achat</small></div></li>`);
-  else tl.push(`<li><span class="dot"></span><div><b>${i.status === 'stock' ? 'À mettre en annonce' : 'En attente d’acheteur'}</b><small>J+${h}</small></div></li>`);
+  if (sold) tl.push(`<li><span class="dot ok"></span><div><b>Vendu ${eur(num(i.sellPrice))} · <span class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</span></b><small>${dLong(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''}${i.buyerName ? ' · acheteur ' + esc(i.buyerName) : ''} · ${h}${NB}j après réception</small></div></li>`);
+  else if (!inTransit(i)) tl.push(`<li><span class="dot"></span><div><b>${i.status === 'stock' ? 'À mettre en annonce' : 'En attente d’acheteur'}</b><small>J+${h} depuis la réception</small></div></li>`);
   const specs = [
     ['Catégorie', (CATS[i.category] || CATS.autre).label],
+    ['Mode d’achat', (BUY_MODES.find((m) => m[0] === i.buyMode) || [])[1]],
     ['État', condLabel(i.condition)],
     ['N° de série', i.serial],
     ['Contenu', (i.contents || []).join(', ')],
@@ -1031,7 +1073,7 @@ function detailBody(i) {
   const url = safeUrl(i.listUrl);
   return `
     ${photos.length ? `<div class="photos">${photos.map((x) => `<button class="ph-btn" data-act="photo" data-src="${esc(x.f)}" aria-label="Agrandir la photo">${imgTag(x.t || x.f)}</button>`).join('')}</div>` : ''}
-    <div class="d-title"><div class="it-top">${pill(i.status)}${exb(i)}</div><h2>${esc(i.model || '—')}</h2>${i.details ? `<div class="muted">${esc(i.details)}</div>` : ''}</div>
+    <div class="d-title"><div class="it-top">${pills(i)}${exb(i)}</div><h2>${esc(i.model || '—')}</h2>${i.details ? `<div class="muted">${esc(i.details)}</div>` : ''}</div>
     <div class="figs">${figs.map((f) => `<div class="fig"><span class="k">${f[0]}</span><span class="v ${f[3] || ''}">${f[1]}</span><span class="s">${f[2]}</span></div>`).join('')}</div>
     ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${ic('ext')} Ouvrir l’annonce</a>` : ''}
     <div class="fs"><p class="fs-t">Historique</p><ol class="tl">${tl.join('')}</ol></div>
@@ -1045,6 +1087,7 @@ function detailBody(i) {
 }
 function detailFoot(i) {
   const id = esc(i.id);
+  if (inTransit(i)) return `${i.status === 'stock' ? `<button class="btn grow" data-act="list" data-id="${id}">Mettre en annonce</button>` : `<button class="btn grow" data-act="sell" data-id="${id}">Vendu</button>`}<button class="btn primary grow" data-act="recv" data-id="${id}">Article reçu</button>`;
   if (i.status === 'stock') return `<button class="btn grow" data-act="sell" data-id="${id}">Vendu direct</button><button class="btn primary grow" data-act="list" data-id="${id}">Mettre en annonce</button>`;
   if (i.status === 'annonce') return `<button class="btn grow" data-act="reserve" data-id="${id}">Réservé</button><button class="btn primary grow" data-act="sell" data-id="${id}">Vendu</button>`;
   if (i.status === 'reserve') return `<button class="btn grow" data-act="unreserve" data-id="${id}">Remettre en annonce</button><button class="btn primary grow" data-act="sell" data-id="${id}">Vendu</button>`;
@@ -1099,14 +1142,16 @@ function normUrl(u) { u = (u || '').trim(); if (!u) return ''; if (!/^https?:\/\
 
 /* ---------- Formulaire achat / modification ---------- */
 let F = null;
-function blankItem() { return { category: 'ps5', model: '', details: '', condition: 'tres_bon', contents: [], serial: '', buyDate: today(), buyPrice: null, buyCosts: null, buySource: 'Leboncoin', sellerName: '', status: 'stock', listDate: '', listPrice: null, listUrl: '', sellDate: '', sellPrice: null, sellFees: null, sellChannel: 'LBC main propre', buyerName: '', notes: '' }; }
+function blankItem() { return { buyMode: LS.get('buyMode', 'livraison'), received: false, receiveDate: '', category: 'ps5', model: '', details: '', condition: 'tres_bon', contents: [], serial: '', buyDate: today(), buyPrice: null, buyCosts: null, buySource: 'Leboncoin', sellerName: '', status: 'stock', listDate: '', listPrice: null, listUrl: '', sellDate: '', sellPrice: null, sellFees: null, sellChannel: 'LBC main propre', buyerName: '', notes: '' }; }
 function openForm(mode, item, prefill) {
   let src;
   if (mode === 'edit') src = item;
-  else if (mode === 'dup') src = { ...blankItem(), category: item.category, model: item.model, details: item.details, condition: item.condition, contents: (item.contents || []).slice(), buyPrice: item.buyPrice, buyCosts: item.buyCosts, buySource: item.buySource };
+  else if (mode === 'dup') src = { ...blankItem(), buyMode: item.buyMode || LS.get('buyMode', 'livraison'), category: item.category, model: item.model, details: item.details, condition: item.condition, contents: (item.contents || []).slice(), buyPrice: item.buyPrice, buyCosts: item.buyCosts, buySource: item.buySource };
   else src = { ...blankItem(), ...(prefill || {}) };
   F = { mode, item: mode === 'edit' ? item : null, photos: mode === 'edit' ? (item.photos || []).filter((p) => p && p.f).map((p) => ({ key: uid(), f: p.f, t: p.t, state: 'ok', existing: true })) : [], newAssets: [], removed: [], saved: false, closed: false };
   const st = src.status || 'stock';
+  if (mode !== 'edit') { src.received = src.buyMode === 'main_propre'; src.receiveDate = src.received ? src.buyDate : ''; }
+  const recvOn = src.received !== false, recvDate = recvOn ? (isDate(src.receiveDate) ? src.receiveDate : src.buyDate) : '';
   const body = `
     <div class="fs"><p class="fs-t">Photos</p><div class="ph-grid" id="f-photos"></div></div>
     <div class="fs"><p class="fs-t">Article</p>
@@ -1122,17 +1167,22 @@ function openForm(mode, item, prefill) {
     </div>
     <div class="fs"><p class="fs-t">Achat</p>
       <div class="row2">${dateF('f-buyDate', 'Date d’achat', src.buyDate)}${moneyF('f-buyPrice', 'Prix payé <span class="opt-l">(unitaire)</span>', src.buyPrice)}</div>
+      <div class="field"><span class="lbl">Mode d’achat</span>${radios('f-mode', BUY_MODES, src.buyMode || '')}</div>
       ${moneyF('f-buyCosts', 'Frais d’achat', src.buyCosts, 'Essence, livraison, nettoyage, réparation…')}
       <div class="field"><span class="lbl">Acheté sur</span>${radios('f-src', SOURCES.map((s) => [s, s]), src.buySource || 'Leboncoin')}</div>
       ${textF('f-seller', 'Vendeur <span class="opt-l">(pseudo)</span>', src.sellerName, '')}
     </div>
-    <div class="fs"><p class="fs-t">Statut</p>
-      ${radios('f-status', Object.entries(STATUS), st, 'seg')}
-      <div id="f-sec-list" class="stack" style="gap:12px">
+    <div class="fs"><p class="fs-t">Suivi</p>
+      <label class="sw"><span class="sw-t"><b>Article reçu</b><small>Le délai de vente se compte à partir de la réception</small></span><input type="checkbox" id="f-recv" role="switch" ${recvOn ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
+      <div id="f-sec-recv" class="sub">${dateF('f-recvDate', 'Date de réception', recvDate)}</div>
+      <label class="sw"><span class="sw-t"><b>Mis en annonce</b><small>Leboncoin, Vinted…</small></span><input type="checkbox" id="f-listed" role="switch" ${st !== 'stock' && (st !== 'vendu' || src.listPrice != null) ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
+      <div id="f-sec-list" class="sub">
         <div class="row2">${dateF('f-listDate', 'Mise en ligne', src.listDate)}${moneyF('f-listPrice', 'Prix affiché', src.listPrice)}</div>
         ${textF('f-listUrl', 'Lien de l’annonce', src.listUrl, 'https://www.leboncoin.fr/…', 'inputmode="url" autocapitalize="off"')}
+        <label class="sw"><span class="sw-t"><b>Réservé</b><small>Un acheteur a réservé l’article</small></span><input type="checkbox" id="f-reserved" role="switch" ${st === 'reserve' ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
       </div>
-      <div id="f-sec-sell" class="stack" style="gap:12px">
+      <label class="sw"><span class="sw-t"><b>Vendu</b><small>Prix, date et frais de la vente</small></span><input type="checkbox" id="f-sold" role="switch" ${st === 'vendu' ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
+      <div id="f-sec-sell" class="sub">
         <div class="row2">${dateF('f-sellDate', 'Date de vente', src.sellDate)}${moneyF('f-sellPrice', 'Prix de vente', src.sellPrice)}</div>
         ${moneyF('f-sellFees', 'Frais de vente', src.sellFees, 'Envoi, commission, essence…')}
         <div class="field"><span class="lbl">Vendu via</span>${radios('f-chan', CHANNELS.map((c) => [c, c]), src.sellChannel || 'LBC main propre')}</div>
@@ -1147,11 +1197,12 @@ function openForm(mode, item, prefill) {
   b.addEventListener('input', formPreview);
   b.addEventListener('change', (e) => {
     if (e.target.name === 'f-cat') onCatChange();
-    if (e.target.name === 'f-status') onStatusChange(false);
+    if (['f-recv', 'f-listed', 'f-sold'].includes(e.target.id) || e.target.name === 'f-mode') onTrackChange(false, e.target.id || e.target.name);
+    if (e.target.id === 'f-buyDate' && radioVal('f-mode') === 'main_propre' && $('#f-recv').checked) $('#f-recvDate').value = val('f-buyDate');
     if (e.target.id === 'f-file') { const files = Array.from(e.target.files || []); e.target.value = ''; addPhotos(files); }
     formPreview();
   });
-  onCatChange(); onStatusChange(true); renderPhotos(); formPreview();
+  onCatChange(); onTrackChange(true); renderPhotos(); formPreview();
   if (mode !== 'edit' && !src.model) setTimeout(() => { const m = $('#f-model'); if (m && window.matchMedia('(min-width:700px)').matches) m.focus(); }, 80);
 }
 function onCatChange() {
@@ -1160,26 +1211,36 @@ function onCatChange() {
   $('#f-hw').hidden = !HW.includes(c);
   $('#f-model').placeholder = (CATS[c] || CATS.autre).ph;
 }
-function onStatusChange(init) {
-  const s = radioVal('f-status') || 'stock';
-  $('#f-sec-list').hidden = s === 'stock';
-  $('#f-sec-sell').hidden = s !== 'vendu';
-  if (init) return;
-  if (s !== 'stock' && !$('#f-listDate').value) $('#f-listDate').value = today();
-  if (s === 'vendu') {
-    if (!$('#f-sellDate').value) $('#f-sellDate').value = today();
-    if (!$('#f-sellPrice').value && $('#f-listPrice').value) $('#f-sellPrice').value = $('#f-listPrice').value;
+function onTrackChange(init, changed) {
+  const recv = $('#f-recv'), listedSw = $('#f-listed'), soldSw = $('#f-sold');
+  if (!init) {
+    if (changed === 'f-mode') {
+      const mp = radioVal('f-mode') === 'main_propre';
+      recv.checked = mp || (recv.checked && !!val('f-recvDate') && val('f-recvDate') !== val('f-buyDate'));
+      $('#f-recvDate').value = mp ? val('f-buyDate') : recv.checked ? val('f-recvDate') : '';
+    }
+    if (changed === 'f-recv' && recv.checked && !val('f-recvDate')) $('#f-recvDate').value = radioVal('f-mode') === 'main_propre' ? val('f-buyDate') : today();
+    if (changed === 'f-listed' && listedSw.checked && !val('f-listDate')) $('#f-listDate').value = today();
+    if (changed === 'f-sold' && soldSw.checked) {
+      if (!val('f-sellDate')) $('#f-sellDate').value = today();
+      if (!val('f-sellPrice') && val('f-listPrice')) $('#f-sellPrice').value = val('f-listPrice');
+      if (!recv.checked) { recv.checked = true; if (!val('f-recvDate')) $('#f-recvDate').value = radioVal('f-mode') === 'main_propre' ? val('f-buyDate') : ''; }
+    }
   }
+  $('#f-sec-recv').hidden = !recv.checked;
+  $('#f-sec-list').hidden = !listedSw.checked;
+  $('#f-sec-sell').hidden = !soldSw.checked;
 }
+const formStatus = () => ($('#f-sold').checked ? 'vendu' : $('#f-listed').checked ? ($('#f-reserved').checked ? 'reserve' : 'annonce') : 'stock');
 function formPreview() {
   const el = $('#f-prev'); if (!el) return;
   const c = (parseNum(val('f-buyPrice')) || 0) + (parseNum(val('f-buyCosts')) || 0);
-  const s = radioVal('f-status'), sp = parseNum(val('f-sellPrice')), lp = parseNum(val('f-listPrice'));
+  const s = formStatus(), sp = parseNum(val('f-sellPrice')), lp = parseNum(val('f-listPrice'));
   const fake = { model: val('f-model'), buyPrice: parseNum(val('f-buyPrice')), buyCosts: parseNum(val('f-buyCosts')) };
   if (s === 'vendu' && sp != null) {
-    const p = sp - (parseNum(val('f-sellFees')) || 0) - c, bd = val('f-buyDate'), sd = val('f-sellDate');
-    const d = isDate(bd) && isDate(sd) ? dayDiff(bd, sd) : null;
-    el.innerHTML = `<span class="sm">Bénéfice</span><span class="big ${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</span><span class="sm">ROI ${c ? pctS(p / c) : '—'}${d != null && d >= 0 ? ` · vendu en ${d}${NB}j` : ''}</span>`;
+    const p = sp - (parseNum(val('f-sellFees')) || 0) - c, rdt = $('#f-recv').checked && isDate(val('f-recvDate')) ? val('f-recvDate') : val('f-buyDate'), sd = val('f-sellDate');
+    const d = isDate(rdt) && isDate(sd) ? dayDiff(rdt, sd) : null;
+    el.innerHTML = `<span class="sm">Bénéfice</span><span class="big ${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</span><span class="sm">ROI ${c ? pctS(p / c) : '—'}${d != null && d >= 0 ? ` · vendu ${d}${NB}j après réception` : ''}</span>`;
   } else if (s !== 'stock' && lp != null) {
     el.innerHTML = `<span class="sm">Potentiel au prix affiché</span><span class="big ${lp - c >= 0 ? 'pos' : 'neg'}">${eurS(lp - c)}</span><span class="sm">coût total ${eur(c)}</span>`;
   } else {
@@ -1260,7 +1321,8 @@ async function saveForm(btn) {
     category: radioVal('f-cat') || 'autre', model: val('f-model'), details: val('f-details'), condition: val('f-cond'),
     contents: HW.includes(radioVal('f-cat')) ? checkVals('f-contents') : [], serial: HW.includes(radioVal('f-cat')) ? val('f-serial') : '',
     buyDate: val('f-buyDate'), buyPrice: parseNum(val('f-buyPrice')), buyCosts: parseNum(val('f-buyCosts')) || 0,
-    buySource: radioVal('f-src'), sellerName: val('f-seller'), status: radioVal('f-status') || 'stock',
+    buySource: radioVal('f-src'), sellerName: val('f-seller'), status: formStatus(),
+    buyMode: radioVal('f-mode'), received: $('#f-recv').checked, receiveDate: $('#f-recv').checked ? val('f-recvDate') : '',
     listDate: val('f-listDate'), listPrice: parseNum(val('f-listPrice')), listUrl: normUrl(val('f-listUrl')),
     sellDate: val('f-sellDate'), sellPrice: parseNum(val('f-sellPrice')), sellFees: parseNum(val('f-sellFees')) || 0,
     sellChannel: radioVal('f-chan'), buyerName: val('f-buyer'), notes: val('f-notes'),
@@ -1269,7 +1331,11 @@ async function saveForm(btn) {
   if (!isDate(v.buyDate)) return fieldErr('f-buyDate', 'Date d’achat requise.');
   if (v.buyPrice == null || v.buyPrice < 0) return fieldErr('f-buyPrice', 'Prix d’achat requis.');
   if (v.listUrl === null) return fieldErr('f-listUrl', 'Colle le lien complet de l’annonce (https://…).');
-  if (v.status !== 'stock' && !isDate(v.listDate)) v.listDate = today();
+  if (v.received && !isDate(v.receiveDate)) return fieldErr('f-recvDate', 'Indique la date de réception.');
+  if (v.received && v.receiveDate < v.buyDate) return fieldErr('f-recvDate', 'La réception ne peut pas précéder l’achat.');
+  if (v.status === 'vendu' && isDate(v.sellDate) && v.received && v.sellDate < v.receiveDate) return fieldErr('f-sellDate', 'La vente ne peut pas précéder la réception.');
+  const listedOn = $('#f-listed').checked;
+  if (listedOn && !isDate(v.listDate)) v.listDate = today();
   if (v.status === 'vendu') {
     if (v.sellPrice == null || v.sellPrice < 0) return fieldErr('f-sellPrice', 'Prix de vente requis.');
     if (!isDate(v.sellDate)) return fieldErr('f-sellDate', 'Date de vente requise.');
@@ -1277,13 +1343,14 @@ async function saveForm(btn) {
   } else { v.sellDate = ''; v.sellPrice = null; v.sellFees = 0; v.buyerName = ''; }
   const old = F.item;
   const log = (old && Array.isArray(old.priceLog) ? old.priceLog : []).map((e) => ({ d: e.d, p: e.p }));
-  if (v.status !== 'stock' && v.listPrice != null) {
+  if (listedOn && v.listPrice != null) {
     const last = log[log.length - 1];
     if (!last) log.push({ d: v.listDate, p: v.listPrice });
     else if (last.p !== v.listPrice) log.push({ d: today(), p: v.listPrice });
   }
   const now = new Date().toISOString();
   const doc = { ...v, photos: F.photos.filter((p) => p.state === 'ok' && p.f).map((p) => ({ f: p.f, t: p.t || p.f })), priceLog: log, updatedAt: now };
+  if (v.buyMode) LS.set('buyMode', v.buyMode);
   btn.disabled = true;
   let ok, msg;
   if (F.mode === 'edit') {
@@ -1313,14 +1380,18 @@ async function saveForm(btn) {
 function lastChannel() { const s = S.items.filter(isSold).sort((a, b) => b.sellDate.localeCompare(a.sellDate))[0]; return (s && s.sellChannel) || 'LBC main propre'; }
 function openQuick(mode, id) {
   const i = byId(id); if (!i) return;
-  const head = `<div class="fs" style="padding:12px"><div class="it-top">${tag(i)}${pill(i.status)}</div><b>${esc(i.model)}</b><span class="muted" style="font-size:13px">Coût total ${eur(cost(i))} · acheté le ${dShort(i.buyDate)} · J+${held(i)}</span></div>`;
+  const head = `<div class="fs" style="padding:12px"><div class="it-top">${tag(i)}${pills(i)}</div><b>${esc(i.model)}</b><span class="muted" style="font-size:13px">Coût total ${eur(cost(i))} · acheté le ${dShort(i.buyDate)} · ${inTransit(i) ? `en livraison depuis ${tied(i)}${NB}j` : `J+${held(i)} depuis la réception`}</span></div>`;
   let title, body, btn;
-  if (mode === 'sell') {
+  if (mode === 'recv') {
+    title = `Réception ${i.ref}`; btn = 'Marquer reçu';
+    body = `${head}${dateF('q-recv', 'Date de réception', today())}<p class="hint">À partir de cette date, l’article compte comme disponible à la vente : le délai de vente et l’alerte de stock dormant démarrent ici.</p>`;
+  } else if (mode === 'sell') {
     title = `Vente ${i.ref}`; btn = 'Enregistrer la vente';
     body = `${head}<div class="row2">${moneyF('q-price', 'Prix de vente', listed(i) ? i.listPrice : null)}${dateF('q-date', 'Date de vente', today())}</div>
       ${moneyF('q-fees', 'Frais de vente', null, 'Envoi, commission, essence…')}
       <div class="field"><span class="lbl">Vendu via</span>${radios('q-chan', CHANNELS.map((c) => [c, c]), lastChannel())}</div>
-      ${textF('q-buyer', 'Acheteur <span class="opt-l">(pseudo)</span>', '', '')}`;
+      ${textF('q-buyer', 'Acheteur <span class="opt-l">(pseudo)</span>', '', '')}
+      ${inTransit(i) ? dateF('q-recv', 'Reçu le <span class="opt-l">(pas encore indiqué)</span>', '') : ''}`;
   } else if (mode === 'list') {
     title = `Mettre en annonce ${i.ref}`; btn = 'Mettre en annonce';
     const sug = suggestedList(i);
@@ -1331,13 +1402,14 @@ function openQuick(mode, id) {
     title = `Nouveau prix ${i.ref}`; btn = 'Enregistrer le prix';
     body = `${head}${moneyF('q-price', 'Nouveau prix affiché', i.listPrice, i.listPrice != null ? `Prix actuel ${eur(num(i.listPrice))}` : '')}`;
   }
-  body += `<div class="preview" id="q-prev" aria-live="polite"></div>`;
+  if (mode !== 'recv') body += `<div class="preview" id="q-prev" aria-live="polite"></div>`;
   openSheet({ kind: 'quick', id, title, body, foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="save-quick" data-mode="${mode}" data-id="${esc(id)}">${btn}</button>` });
   const prev = () => {
-    const p = parseNum(val('q-price')), el = $('#q-prev'); if (!el) return;
+    const el = $('#q-prev'); if (!el) return;
+    const p = parseNum(val('q-price'));
     if (p == null) { el.innerHTML = `<span class="sm">Indique un prix pour voir le résultat.</span>`; return; }
     if (mode === 'sell') {
-      const r = p - (parseNum(val('q-fees')) || 0) - cost(i), d = isDate(val('q-date')) ? dayDiff(i.buyDate, val('q-date')) : null;
+      const from = isDate(val('q-recv')) ? val('q-recv') : availDate(i), r = p - (parseNum(val('q-fees')) || 0) - cost(i), d = isDate(val('q-date')) && isDate(from) ? dayDiff(from, val('q-date')) : null;
       el.innerHTML = `<span class="sm">Bénéfice</span><span class="big ${r >= 0 ? 'pos' : 'neg'}">${eurS(r)}</span><span class="sm">ROI ${cost(i) ? pctS(r / cost(i)) : '—'}${d != null && d >= 0 ? ` · en ${d}${NB}j` : ''}${listed(i) && p < num(i.listPrice) ? ` · ${pct((num(i.listPrice) - p) / num(i.listPrice))} sous le prix affiché` : ''}</span>`;
     } else {
       el.innerHTML = `<span class="sm">Potentiel</span><span class="big ${p - cost(i) >= 0 ? 'pos' : 'neg'}">${eurS(p - cost(i))}</span><span class="sm">avant négociation</span>`;
@@ -1349,15 +1421,31 @@ async function saveQuick(btn) {
   const mode = btn.dataset.mode, i = byId(btn.dataset.id);
   if (!i) { closeSheet(); return; }
   clearErrs();
+  let patch, msg;
+  if (mode === 'recv') {
+    const d = val('q-recv');
+    if (!isDate(d)) return fieldErr('q-recv', 'Date de réception requise.');
+    if (isDate(i.buyDate) && d < i.buyDate) return fieldErr('q-recv', `La réception ne peut pas précéder l’achat (${dShort(i.buyDate)}).`);
+    btn.disabled = true;
+    const ok = await upd(i.id, { received: true, receiveDate: d, buyMode: i.buyMode || 'livraison' });
+    btn.disabled = false;
+    if (ok) { closeSheet(); toast(`${i.ref} reçu : ${dayDiff(i.buyDate, d)}${NB}j de livraison`); }
+    return;
+  }
   const price = parseNum(val('q-price'));
   if (price == null || price < 0) return fieldErr('q-price', 'Indique un prix.');
-  let patch, msg;
   if (mode === 'sell') {
     const d = val('q-date');
     if (!isDate(d)) return fieldErr('q-date', 'Date de vente requise.');
     if (isDate(i.buyDate) && d < i.buyDate) return fieldErr('q-date', `La vente ne peut pas précéder l’achat (${dShort(i.buyDate)}).`);
     const fees = parseNum(val('q-fees')) || 0;
     patch = { status: 'vendu', sellPrice: price, sellDate: d, sellFees: fees, sellChannel: radioVal('q-chan'), buyerName: val('q-buyer') };
+    if (inTransit(i)) {
+      const r = val('q-recv');
+      if (!isDate(r)) return fieldErr('q-recv', 'Indique quand tu as reçu l’article.');
+      if (r < i.buyDate || r > d) return fieldErr('q-recv', 'La réception doit être entre l’achat et la vente.');
+      Object.assign(patch, { received: true, receiveDate: r });
+    }
     msg = `${i.ref} vendu : ${eurS(price - fees - cost(i))} de bénéfice`;
   } else {
     const log = (Array.isArray(i.priceLog) ? i.priceLog : []).map((e) => ({ d: e.d, p: e.p }));
@@ -1426,7 +1514,7 @@ function renderSimu() {
         <dt>Ventes enregistrées</dt><dd>${g.n}</dd>
         <dt>Coût d’achat moyen</dt><dd>${eur(g.avgCost)}</dd>
         <dt>Bénéfice moyen</dt><dd class="${g.avgProfit >= 0 ? 'pos' : 'neg'}">${eurS(g.avgProfit)}</dd>
-        <dt>Délai moyen de vente</dt><dd>${days(g.avgDays)}</dd>
+        <dt>Délai de vente (après réception)</dt><dd>${days(g.avgDays)}</dd>
         ${fees ? `<dt>Frais de vente moyens</dt><dd>${eur(fees)}</dd>` : ''}
       </dl>`
     : `<p class="muted" style="margin:0">Aucune vente de « ${esc(model)} » pour l’instant. ${resaleIn != null ? 'Estimation basée sur ta revente visée.' : mk ? 'Estimation basée sur ta cote réglée.' : 'Indique une revente visée pour estimer le bénéfice, ou règle la cote PS5 dans les réglages.'}</p>`;
@@ -1528,16 +1616,17 @@ function renderStats() {
   S.chartRows = rows;
   const pLabel = P === '12m' ? '12 derniers mois' : P === 'all' ? 'depuis le début' : P;
   const chips = [['12m', '12 derniers mois'], ...years.map((y) => [y, y]), ['all', 'Depuis le début']].map(([v, l]) => `<button class="chip" data-act="period" data-v="${v}" aria-pressed="${P === v}">${l}</button>`).join('');
-  const dayRate = sold.length ? sum(sold, profit) / Math.max(1, sum(sold, (i) => Math.max(1, held(i)))) : null;
+  const dayRate = sold.length ? sum(sold, profit) / Math.max(1, sum(sold, (i) => Math.max(1, tied(i)))) : null;
+  const ships = bought.map(shipDays).filter((d) => d != null), avgShip = ships.length ? avg(ships) : null;
   const tiles = [
     ['Chiffre d’affaires', eur(A.ca), plural(A.nSold, 'vente')],
     ['Bénéfice net', eurS(A.profit), `après ${eur(A.fees)} de frais de vente`, A.profit < 0 ? 'neg' : 'pos'],
     ['Investi', eur(A.invest), plural(A.nBought, 'achat')],
     ['ROI moyen', pctS(A.roi), 'bénéfice ÷ coût d’achat'],
-    ['Taux de marge', pct(A.margin), 'bénéfice ÷ CA'],
+    ['Livraison moyenne', days(avgShip), ships.length ? `achat → réception, ${plural(ships.length, 'colis', 'colis')}` : 'achats à distance'],
     ['Bénéfice moyen', A.avgProfit == null ? '—' : eurS(A.avgProfit), 'par vente'],
-    ['Délai moyen', days(A.avgDays), 'de l’achat à la vente'],
-    ['Gain par jour', dayRate == null ? '—' : eur(dayRate), 'par article et par jour de stock'],
+    ['Délai de vente', days(A.avgDays), `après réception · argent bloqué ${days(A.avgTied)}`],
+    ['Gain par jour', dayRate == null ? '—' : eur(dayRate), 'par article et par jour d’argent immobilisé'],
   ];
 
   const target = num(S.settings.targetProfit);
@@ -1551,18 +1640,18 @@ function renderStats() {
   const maxP = Math.max(1, ...byCat.map((x) => Math.max(0, x.p)));
   const catHtml = byCat.length ? `<div class="hbars">${byCat.sort((a, b) => b.p - a.p).map((x) => `<div class="hbar"><span class="hb-l">${esc(CATS[x.c].label)}<small>${plural(x.n, 'vente')} · CA ${eur(x.ca)}</small></span><span class="hb-t"><span class="hb-f" style="width:${(Math.max(0, x.p) / maxP * 100).toFixed(1)}%"></span></span><span class="hb-v">${eurS(x.p)}</span></div>`).join('')}</div>` : '<p class="muted" style="margin:0">Pas encore de vente sur la période.</p>';
 
-  const open = S.items.filter(isOpen), lst = open.filter(listed);
-  const buckets = [['0 – 7 jours', 0, 7], ['8 – 14 jours', 8, 14], ['15 – 30 jours', 15, 30], ['Plus de 30 jours', 31, 1e9]].map(([l, a, b]) => { const s = open.filter((i) => held(i) >= a && held(i) <= b); return { l, n: s.length, c: sum(s, cost) }; });
+  const open = S.items.filter(isOpen), lst = open.filter(listed), recvOpen = open.filter(isReceived), transitOpen = open.filter(inTransit);
+  const buckets = [['0 – 7 jours', 0, 7], ['8 – 14 jours', 8, 14], ['15 – 30 jours', 15, 30], ['Plus de 30 jours', 31, 1e9]].map(([l, a, b]) => { const s = recvOpen.filter((i) => held(i) >= a && held(i) <= b); return { l, n: s.length, c: sum(s, cost) }; });
   const maxB = Math.max(1, ...buckets.map((b) => b.n));
-  const stockHtml = `<dl class="kv"><dt>Articles en cours</dt><dd>${open.length}</dd><dt>Capital immobilisé</dt><dd>${eur(sum(open, cost))}</dd><dt>Valeur affichée (${lst.length} annonces)</dt><dd>${eur(sum(lst, (i) => num(i.listPrice)))}</dd><dt>Bénéfice potentiel affiché</dt><dd class="pos">${eurS(sum(lst, potential))}</dd><dt>Pas encore en annonce</dt><dd>${open.filter((i) => i.status === 'stock').length}</dd><dt>Âge moyen du stock</dt><dd>${open.length ? days(sum(open, held) / open.length) : '—'}</dd></dl>
+  const stockHtml = `<dl class="kv"><dt>Articles en cours</dt><dd>${open.length}</dd><dt>Dont en livraison</dt><dd>${transitOpen.length} · ${eur(sum(transitOpen, cost))}</dd><dt>Capital immobilisé</dt><dd>${eur(sum(open, cost))}</dd><dt>Valeur affichée (${lst.length} annonces)</dt><dd>${eur(sum(lst, (i) => num(i.listPrice)))}</dd><dt>Bénéfice potentiel affiché</dt><dd class="pos">${eurS(sum(lst, potential))}</dd><dt>Pas encore en annonce</dt><dd>${open.filter((i) => i.status === 'stock').length}</dd><dt>Âge moyen depuis réception</dt><dd>${recvOpen.length ? days(sum(recvOpen, held) / recvOpen.length) : '—'}</dd></dl>
     <div class="hbars" style="margin-top:14px">${buckets.map((b) => `<div class="hbar"><span class="hb-l">${b.l}<small>${eur(b.c)}</small></span><span class="hb-t"><span class="hb-f" style="width:${(b.n / maxB * 100).toFixed(1)}%"></span></span><span class="hb-v">${b.n}</span></div>`).join('')}</div>`;
 
-  const bySrc = Object.entries(groupBy(bought, (i) => i.buySource || 'Non renseigné')).map(([k, a]) => { const s = a.filter(isSold); return { k, n: a.length, sn: s.length, ap: s.length ? sum(s, profit) / s.length : null, inv: sum(a, cost) }; }).sort((a, b) => b.n - a.n);
+  const bySrc = Object.entries(groupBy(bought, (i) => i.buySource || 'Non renseigné')).map(([k, a]) => { const s = a.filter(isSold); const sh = a.map(shipDays).filter((d) => d != null); return { k, n: a.length, sn: s.length, ap: s.length ? sum(s, profit) / s.length : null, inv: sum(a, cost), ship: sh.length ? avg(sh) : null }; }).sort((a, b) => b.n - a.n);
   const byChan = Object.entries(groupBy(sold, (i) => i.sellChannel || 'Non renseigné')).map(([k, a]) => ({ k, n: a.length, ca: sum(a, (i) => num(i.sellPrice)), ap: sum(a, profit) / a.length, d: sum(a, held) / a.length })).sort((a, b) => b.n - a.n);
   const disc = avgDiscount(sold), atAsk = sold.filter((i) => num(i.listPrice) > 0 && num(i.sellPrice) >= num(i.listPrice)).length, withList = sold.filter((i) => num(i.listPrice) > 0).length;
   const drops = sold.length ? sum(sold, (i) => Math.max(0, (Array.isArray(i.priceLog) ? i.priceLog.length : 0) - 1)) / sold.length : null;
   const flowHtml = `
-    ${bySrc.length ? `<div class="tbl-wrap"><table><thead><tr><th>Acheté sur</th><th>Achats</th><th>Investi</th><th>Revendus</th><th>Bénéf. moy.</th></tr></thead><tbody>${bySrc.map((r) => `<tr><td>${esc(r.k)}</td><td>${r.n}</td><td>${eur(r.inv)}</td><td>${r.sn}</td><td>${r.ap == null ? '—' : eurS(r.ap)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    ${bySrc.length ? `<div class="tbl-wrap"><table><thead><tr><th>Acheté sur</th><th>Achats</th><th>Investi</th><th>Livraison</th><th>Revendus</th><th>Bénéf. moy.</th></tr></thead><tbody>${bySrc.map((r) => `<tr><td>${esc(r.k)}</td><td>${r.n}</td><td>${eur(r.inv)}</td><td>${r.ship == null ? '—' : days(r.ship)}</td><td>${r.sn}</td><td>${r.ap == null ? '—' : eurS(r.ap)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     ${byChan.length ? `<div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>Vendu via</th><th>Ventes</th><th>CA</th><th>Bénéf. moy.</th><th>Délai</th></tr></thead><tbody>${byChan.map((r) => `<tr><td>${esc(r.k)}</td><td>${r.n}</td><td>${eur(r.ca)}</td><td>${eurS(r.ap)}</td><td>${days(r.d)}</td></tr>`).join('')}</tbody></table></div>` : ''}
     <dl class="kv" style="margin-top:14px"><dt>Remise moyenne vs prix affiché</dt><dd>${disc ? pct(disc.d) : '—'}</dd><dt>Vendus au prix affiché</dt><dd>${withList ? `${atAsk}/${withList}` : '—'}</dd><dt>Baisses de prix avant vente</dt><dd>${drops == null ? '—' : drops.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}</dd></dl>`;
 
@@ -1729,6 +1818,7 @@ function msgFor(prev, next) {
   const ref = (next && next.ref) || (prev && prev.ref) || '?';
   if (!prev) return `Ajout ${ref} · ${next.model || ''}`.trim();
   if (next.status === 'vendu' && prev.status !== 'vendu') return `Vente ${ref} · ${eurS(num(next.sellPrice) - num(next.sellFees) - cost(next))}`;
+  if (next.received && prev.received === false) return `${ref} · reçu`;
   if (next.status !== prev.status) return `${ref} · ${STATUS[next.status] || next.status}`;
   if (next.listPrice !== prev.listPrice) return `${ref} · prix ${eur(num(next.listPrice))}`;
   return `Modification ${ref}`;
@@ -1821,11 +1911,11 @@ function claudeSummary() {
   L.push(`Réglages : objectif ${num(st.monthlyGoal)} €/mois · bénéfice mini ${num(st.targetProfit)} € · alerte stock ${num(st.staleDays)} j · statut ${st.legal}${num(st.ps5Price) ? ` · cote PS5 ${num(st.ps5Price)} €` : ''}${Object.keys(st.ps5Models || {}).length ? ' · cotes modèles ' + Object.entries(st.ps5Models).map(([k, v]) => `${k}=${v}`).join(',') : ''}`);
   L.push('', 'MOIS;achats;investi;ventes;CA;frais_vente;benefice;ROI%');
   months.forEach((m) => { const s = monthStats(m); L.push([m, s.nBought, n2(s.invest), s.nSold, n2(s.ca), n2(s.fees), n2(s.profit), s.roi == null ? '' : Math.round(s.roi * 100)].join(';')); });
-  L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;jours;notes)');
-  items.forEach((i) => L.push([i.ref, i.category, i.model, i.details, i.condition, i.buyDate, n2(num(i.buyPrice)), n2(num(i.buyCosts)), i.buySource, i.status,
+  L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;jours_en_vente;jours_argent_bloque;notes)');
+  items.forEach((i) => L.push([i.ref, i.category, i.model, i.details, i.condition, i.buyDate, n2(num(i.buyPrice)), n2(num(i.buyCosts)), i.buySource, i.buyMode || '', isReceived(i) ? availDate(i) : 'en livraison', shipDays(i) ?? '', i.status,
     i.status !== 'stock' ? i.listDate : '', i.status !== 'stock' ? n2(i.listPrice) : '', Math.max(0, (i.priceLog || []).length - 1),
     isSold(i) ? i.sellDate : '', isSold(i) ? n2(num(i.sellPrice)) : '', isSold(i) ? n2(num(i.sellFees)) : '', isSold(i) ? i.sellChannel : '',
-    n2(profit(i)), held(i), (i.notes || '').replace(/[\n;]/g, ' ')].map((v) => String(v ?? '').replace(/;/g, ',')).join(';')));
+    n2(profit(i)), isReceived(i) ? held(i) : '', tied(i), (i.notes || '').replace(/[\n;]/g, ' ')].map((v) => String(v ?? '').replace(/;/g, ',')).join(';')));
   return L.join('\n');
 }
 
@@ -1943,15 +2033,15 @@ async function saveSettings(btn) {
   if (ok) { S.settings = { ...DEFAULTS, ...next }; closeSheet(); toast('Réglages enregistrés'); render(); }
 }
 function toCSV() {
-  const head = ['Réf', 'Catégorie', 'Article', 'Détails', 'État', 'N° de série', 'Contenu', 'Date achat', 'Prix achat', 'Frais achat', 'Coût total', 'Acheté sur', 'Vendeur', 'Statut', 'Date annonce', 'Prix affiché', 'Lien annonce', 'Date vente', 'Prix vente', 'Frais vente', 'Vendu via', 'Acheteur', 'Bénéfice', 'ROI %', 'Jours en stock', 'Notes'];
+  const head = ['Réf', 'Catégorie', 'Article', 'Détails', 'État', 'N° de série', 'Contenu', 'Date achat', 'Prix achat', 'Frais achat', 'Coût total', 'Acheté sur', 'Vendeur', 'Mode d’achat', 'Date réception', 'Jours de livraison', 'Statut', 'Date annonce', 'Prix affiché', 'Lien annonce', 'Date vente', 'Prix vente', 'Frais vente', 'Vendu via', 'Acheteur', 'Bénéfice', 'ROI %', 'Jours en vente (depuis réception)', 'Jours d’argent bloqué', 'Notes'];
   const n = (v) => (v == null || v === '' || !isFinite(v) ? '' : String(Math.round(v * 100) / 100).replace('.', ','));
   const t = (v) => { const s = String(v ?? ''); return /^[=+\-@]/.test(s) ? "'" + s : s; };
   const cell = (v) => { const s = String(v ?? ''); return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const rows = S.items.slice().sort((a, b) => (a.buyDate || '').localeCompare(b.buyDate || '')).map((i) => [
     t(i.ref), (CATS[i.category] || CATS.autre).label, t(i.model), t(i.details), condLabel(i.condition), t(i.serial), (i.contents || []).join(', '),
-    i.buyDate, n(num(i.buyPrice)), n(num(i.buyCosts)), n(cost(i)), t(i.buySource), t(i.sellerName), STATUS[i.status] || i.status,
+    i.buyDate, n(num(i.buyPrice)), n(num(i.buyCosts)), n(cost(i)), t(i.buySource), t(i.sellerName), (BUY_MODES.find((m) => m[0] === i.buyMode) || [])[1] || '', isReceived(i) ? availDate(i) : 'en livraison', shipDays(i) ?? '', STATUS[i.status] || i.status,
     i.listDate, n(i.listPrice), safeUrl(i.listUrl), i.sellDate, n(i.sellPrice), isSold(i) ? n(num(i.sellFees)) : '', t(i.sellChannel && isSold(i) ? i.sellChannel : ''), t(i.buyerName),
-    n(profit(i)), roi(i) == null ? '' : n(roi(i) * 100), held(i), t(i.notes),
+    n(profit(i)), roi(i) == null ? '' : n(roi(i) * 100), isReceived(i) ? held(i) : '', tied(i), t(i.notes),
   ]);
   return '﻿' + [head, ...rows].map((r) => r.map(cell).join(';')).join('\r\n');
 }
@@ -2032,6 +2122,7 @@ const ACT = {
   goto: (a) => { if (a.dataset.st) S.f.st = a.dataset.st; if (a.dataset.sort) S.f.sort = a.dataset.sort; S.f.cat = 'all'; saveFilters(); setView(a.dataset.view); },
   open: (a) => openDetail(a.dataset.id),
   sell: (a) => openQuick('sell', a.dataset.id),
+  recv: (a) => openQuick('recv', a.dataset.id),
   list: (a) => openQuick('list', a.dataset.id),
   price: (a) => openQuick('price', a.dataset.id),
   reserve: async (a) => { if (await upd(a.dataset.id, { status: 'reserve' })) toast('Marqué réservé'); },
