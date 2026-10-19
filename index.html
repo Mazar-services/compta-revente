@@ -28,7 +28,7 @@ img{max-width:100%}
   --accent:#2347DA; --accent-ink:#FFFFFF; --accent-soft:#DCE3FB;
   --good:#0F7F39; --good-soft:#DCF1E3; --bad:#C22F2A; --bad-soft:#F8DFDD; --warn:#8F5B00; --warn-soft:#FAEAC6;
   --tag:#FFDC5E; --tag-ink:#1B1603;
-  --series-1:#2a78d6; --series-2:#1baf7a; --grid:#E6EAF0; --axis:#BCC5D2;
+  --series-1:#2a78d6; --series-2:#1baf7a; --series-3:#eb6834; --grid:#E6EAF0; --axis:#BCC5D2;
   --scrim:rgba(9,13,20,.48); --shadow:0 1px 2px rgba(14,19,27,.05),0 10px 30px rgba(14,19,27,.08);
   --f-display:"Unbounded","Avenir Next","Segoe UI",system-ui,sans-serif;
   --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -40,7 +40,7 @@ img{max-width:100%}
     --accent:#7B95FF; --accent-ink:#0A0D12; --accent-soft:#1E2A4D;
     --good:#43CF77; --good-soft:#123020; --bad:#FF7A73; --bad-soft:#3B1816; --warn:#F2B740; --warn-soft:#382909;
     --tag:#EBD064; --tag-ink:#1B1603;
-    --series-1:#3987e5; --series-2:#199e70; --grid:#1F2734; --axis:#3A4456;
+    --series-1:#3987e5; --series-2:#199e70; --series-3:#d95926; --grid:#1F2734; --axis:#3A4456;
     --scrim:rgba(0,0,0,.62); --shadow:0 10px 30px rgba(0,0,0,.4);
     color-scheme:dark;
   }
@@ -50,7 +50,7 @@ img{max-width:100%}
   --accent:#7B95FF; --accent-ink:#0A0D12; --accent-soft:#1E2A4D;
   --good:#43CF77; --good-soft:#123020; --bad:#FF7A73; --bad-soft:#3B1816; --warn:#F2B740; --warn-soft:#382909;
   --tag:#EBD064; --tag-ink:#1B1603;
-  --series-1:#3987e5; --series-2:#199e70; --grid:#1F2734; --axis:#3A4456;
+  --series-1:#3987e5; --series-2:#199e70; --series-3:#d95926; --grid:#1F2734; --axis:#3A4456;
   --scrim:rgba(0,0,0,.62); --shadow:0 10px 30px rgba(0,0,0,.4);
   color-scheme:dark;
 }
@@ -161,6 +161,37 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .sw input:checked~.sw-ui{background:var(--good)}
 .sw input:checked~.sw-ui::after{transform:translateX(20px)}
 .sw input:focus-visible~.sw-ui{outline:2px solid var(--accent);outline-offset:2px}
+.mini{width:44px;height:44px;border-radius:9px;background:var(--surface-2);overflow:hidden;display:grid;place-items:center;flex:none}
+.mini[data-act]{cursor:zoom-in}
+.mini img{width:100%;height:100%;object-fit:cover;display:block}
+.mini .glyph{font-size:9.5px}
+.row.wi{grid-template-columns:44px minmax(0,1fr) auto}
+.cellm{display:flex;gap:10px;align-items:center;white-space:normal;min-width:150px}
+.qhead{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;align-items:center}
+.qhead .mini{width:64px;height:64px;border-radius:11px}
+.vtog{display:inline-flex;gap:4px}
+.vtog .chip{height:32px;padding:0 11px;font-size:12.5px}
+.gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (min-width:640px){ .gallery{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (min-width:900px){ .gallery{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.gcard{position:relative;display:grid;align-content:start;border-radius:14px;overflow:hidden;background:var(--surface);border:1px solid var(--line);cursor:pointer;min-width:0}
+.gimg{position:relative;display:grid;place-items:center;aspect-ratio:1;max-width:100%;overflow:hidden;background:var(--surface-2)}
+.gimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.gbody .days{font-family:var(--f-body);font-size:12px;line-height:1.35}
+.gtag{position:absolute;top:8px;left:8px}
+.gbody{display:grid;gap:3px;padding:8px 10px 10px;min-width:0}
+.gname{font-weight:800;font-size:13.5px;line-height:1.25;overflow-wrap:anywhere}
+.gprice{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums}
+.gprice small{font-size:12px;margin-left:4px}
+.phase-bar{display:flex;gap:2px;height:14px;border-radius:5px;overflow:hidden;background:var(--surface-2)}
+.phase-bar span{min-width:3px;height:100%}
+.ph-ship{background:var(--series-3)} .ph-prep{background:var(--series-2)} .ph-mkt{background:var(--series-1)}
+.durs{display:grid;gap:9px;margin-top:12px}
+.dur{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:10px;align-items:baseline;font-size:13.5px}
+.dur i{width:12px;height:12px;border-radius:3px;align-self:center}
+.dur small{display:block;font-size:12px;color:var(--muted)}
+.dur b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dur.tot{border-top:1px solid var(--line);padding-top:9px}
 .sub{display:grid;gap:12px;padding:2px 0 4px 14px;border-left:2px solid var(--line);margin-left:8px}
 .exb{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);border:1px solid currentColor;border-radius:5px;padding:0 5px;line-height:1.5}
 .days{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);font-weight:500}
@@ -191,9 +222,9 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .group-h span{font-size:12.5px;color:var(--muted);font-weight:600}
 .items{display:grid;gap:8px}
 @media (min-width:900px){ .items{grid-template-columns:repeat(2,minmax(0,1fr))} }
-.item{display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px 10px 10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;cursor:pointer;text-align:left;min-width:0}
+.item{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px 10px 10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;cursor:pointer;text-align:left;min-width:0}
 .item:hover{border-color:var(--axis)}
-.thumb{width:58px;height:58px;border-radius:10px;background:var(--surface-2);overflow:hidden;display:grid;place-items:center}
+.thumb{width:72px;height:72px;border-radius:12px;cursor:zoom-in;background:var(--surface-2);overflow:hidden;display:grid;place-items:center}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 img.broken{display:none}
 .glyph{font-family:var(--f-mono);font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em}
@@ -221,7 +252,7 @@ img.broken{display:none}
 .row-s{font-size:12.5px;color:var(--muted)}
 .row-s.warn{color:var(--warn);font-weight:700}
 .ledger{display:grid}
-.lg-row{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+.lg-row{display:grid;grid-template-columns:46px 44px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
 .lg-row:first-child{border-top:0}
 .lg-d{font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
 .lg-m{display:flex;gap:6px;align-items:center;flex-wrap:wrap;min-width:0;font-size:13.5px}
@@ -286,7 +317,7 @@ textarea.inp{height:auto;min-height:84px;padding:10px 12px;resize:vertical;line-
 .preview .sm{font-size:13px;color:var(--ink-2)}
 .ph-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px}
 .ph{position:relative;aspect-ratio:1;max-width:100%;border-radius:11px;overflow:hidden;background:var(--surface-2)}
-.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .ph.up img{opacity:.45}
 .ph-s{position:absolute;left:4px;right:4px;bottom:4px;font-size:10.5px;font-weight:800;text-align:center;background:rgba(0,0,0,.65);color:#fff;border-radius:6px;padding:2px}
 .ph-x{position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;display:grid;place-items:center;padding:0}
@@ -427,6 +458,7 @@ tr.click{cursor:pointer}
     <div class="list-bar">
       <span id="list-sum" class="list-sum"></span>
       <div class="list-ctl">
+        <span class="vtog" id="vtog" role="group" aria-label="Affichage"><button class="chip" data-act="f-view" data-v="list">Liste</button><button class="chip" data-act="f-view" data-v="photos">Photos</button></span>
         <label class="switch" for="grp"><input type="checkbox" id="grp"> Grouper par modèle</label>
         <span class="selw"><select id="sort" class="sel" aria-label="Trier">
           <option value="recent">Plus récents</option>
@@ -560,7 +592,7 @@ const S = {
   db: null, assets: null, downloads: null,
   status: 'loading', items: [], settings: { ...DEFAULTS },
   view: 'accueil', month: thisMonth(), period: '12m', confirmEx: false, chartRows: [],
-  f: Object.assign({ q: '', st: 'encours', cat: 'all', sort: 'recent', group: true }, LS.get('filters', {}), { q: '' }),
+  f: Object.assign({ q: '', st: 'encours', cat: 'all', sort: 'recent', group: true, view: 'list' }, LS.get('filters', {}), { q: '' }),
 };
 
 /* ---------- Calculs ---------- */
@@ -577,6 +609,21 @@ const availDate = (i) => (isReceived(i) ? (isDate(i.receiveDate) ? i.receiveDate
 const held = (i) => { const a = availDate(i); return isDate(a) ? Math.max(0, dayDiff(a, isSold(i) ? i.sellDate : today())) : 0; };
 // tied : jours pendant lesquels l'argent est resté bloqué (depuis l'achat, livraison comprise).
 const tied = (i) => (isDate(i.buyDate) ? Math.max(0, dayDiff(i.buyDate, isSold(i) ? i.sellDate : today())) : 0);
+// Mise en annonce : la date compte seulement si l'article est (ou a été) en annonce.
+const listedOn = (i) => (isDate(i.listDate) && (isSold(i) || i.status === 'annonce' || i.status === 'reserve') ? i.listDate : null);
+// Début de la mise en vente réelle : l'annonce, mais pas avant la réception.
+const marketStart = (i) => { const l = listedOn(i), a = availDate(i); return !l ? null : isDate(a) && a > l ? a : l; };
+const marketDays = (i) => { const s = marketStart(i); return s ? Math.max(0, dayDiff(s, isSold(i) ? i.sellDate : today())) : null; };
+// Délai de vente d'un article vendu : depuis la mise en annonce (sinon depuis la réception, s'il a été vendu sans annonce).
+const saleDays = (i) => (isSold(i) ? (marketStart(i) ? marketDays(i) : held(i)) : null);
+const ago = (d) => (isDate(d) ? Math.max(0, dayDiff(d, today())) : null);
+// Découpe le temps d'argent bloqué en livraison + avant annonce + en annonce (la somme fait toujours tied).
+function phaseSplit(i) {
+  const t = tied(i), a = availDate(i), m = marketStart(i);
+  const ship = Math.min(t, isDate(a) ? Math.max(0, dayDiff(i.buyDate, a)) : t);
+  const prep = Math.min(t - ship, m ? Math.max(0, dayDiff(isDate(a) ? a : i.buyDate, m)) : isSold(i) ? 0 : t - ship);
+  return { ship, prep, market: Math.max(0, t - ship - prep), total: t };
+}
 const shipDays = (i) => (i.buyMode === 'livraison' && isReceived(i) && isDate(i.receiveDate) && isDate(i.buyDate) ? Math.max(0, dayDiff(i.buyDate, i.receiveDate)) : null);
 const listed = (i) => (i.status === 'annonce' || i.status === 'reserve') && i.listPrice != null;
 const potential = (i) => (listed(i) ? num(i.listPrice) - cost(i) : null);
@@ -593,7 +640,8 @@ function aggregate(bought, sold) {
   return {
     bought, sold, nBought: bought.length, nSold: n, invest, ca, fees, costSold, profit: p,
     cash: ca - fees - invest, roi: costSold > 0 ? p / costSold : null, margin: ca > 0 ? p / ca : null,
-    avgProfit: n ? p / n : null, avgDays: n ? sum(sold, held) / n : null, avgTied: n ? sum(sold, tied) / n : null,
+    avgProfit: n ? p / n : null, avgDays: n ? sum(sold, saleDays) / n : null, avgTied: n ? sum(sold, tied) / n : null,
+    phases: n ? ['ship', 'prep', 'market'].reduce((o, k) => { o[k] = sum(sold, (i) => phaseSplit(i)[k]) / n; return o; }, {}) : null,
   };
 }
 function monthStats(ym) {
@@ -679,6 +727,17 @@ const IC = {
 const ic = (k, c = '') => `<svg class="ic ${c}" viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
 const tag = (i, c = '') => `<span class="tag ${c}">${esc(i.ref || '—')}</span>`;
 const pill = (st) => `<span class="pill st-${esc(st)}">${esc(STATUS[st] || st)}</span>`;
+const firstPhoto = (i) => (Array.isArray(i.photos) && i.photos[0] && i.photos[0].f ? i.photos[0] : null);
+const glyphOf = (i) => `<span class="glyph">${esc((CATS[i.category] || CATS.autre).glyph)}</span>`;
+// Miniature cliquable : un toucher sur la photo l'ouvre en grand.
+const mini = (i, cls = 'mini') => { const ph = firstPhoto(i); return ph ? `<span class="${cls}" data-act="photo" data-src="${esc(ph.f)}" role="button" aria-label="Voir la photo de ${esc(i.ref || '')}">${imgTag(ph.t || ph.f)}</span>` : `<span class="${cls}">${glyphOf(i)}</span>`; };
+function stateLine(i) {
+  const st = num(S.settings.staleDays) || 21;
+  if (isSold(i)) return { t: marketStart(i) ? `vendu en ${marketDays(i)}${NB}j d’annonce` : `vendu ${held(i)}${NB}j après réception`, stale: false };
+  if (inTransit(i)) return { t: `acheté il y a ${tied(i)}${NB}j · en livraison`, stale: tied(i) > 7 };
+  if (marketStart(i)) return { t: `en annonce depuis ${marketDays(i)}${NB}j · acheté il y a ${tied(i)}${NB}j`, stale: marketDays(i) > st };
+  return { t: `reçu il y a ${held(i)}${NB}j · pas en annonce`, stale: held(i) > 3 };
+}
 const pills = (i) => (inTransit(i) ? (i.status === 'stock' ? pill('livraison') : pill(i.status) + '<span class="pill st-livraison">Pas encore reçu</span>') : pill(i.status));
 const exb = (i) => (i.example ? '<span class="exb">Exemple</span>' : '');
 const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? u : '');
@@ -731,7 +790,7 @@ function renderAccueil() {
     ['Trésorerie du mois', eurS(ms.cash), 'encaissé − frais − achats', ms.cash < -0.004 ? 'neg' : ''],
     ['ROI moyen', pctS(ms.roi), 'bénéfice ÷ coût d’achat'],
     ['Bénéfice moyen', ms.avgProfit == null ? '—' : eurS(ms.avgProfit), 'par vente'],
-    ['Délai de vente', days(ms.avgDays), 'de la réception à la vente'],
+    ['Délai de vente', days(ms.avgDays), 'de la mise en annonce à la vente'],
   ];
   if (st.legal === 'micro') {
     const rate = num(st.urssafRate), c = ms.ca * rate / 100;
@@ -768,7 +827,8 @@ function renderAccueil() {
         <section class="card" aria-label="À traiter">
           <div class="card-h"><h2 class="sec">À traiter</h2>${al.rows.length ? `<span class="muted" style="font-size:12.5px">${plural(al.rows.length, 'point')}</span>` : ''}</div>
           ${al.rows.length || al.noLink ? `<div class="rows">${al.rows.slice(0, 5).map((r) => `
-            <div class="row" role="button" tabindex="0" data-act="open" data-id="${esc(r.i.id)}">
+            <div class="row wi" role="button" tabindex="0" data-act="open" data-id="${esc(r.i.id)}">
+              ${mini(r.i)}
               <div class="row-m"><div class="row-t">${tag(r.i)} <span>${esc(r.i.model)}</span></div><div class="row-s ${r.t === 'warn' ? 'warn' : ''}">${r.txt}</div></div>
               <button class="qbtn ${r.act[0] === 'sell' ? 'primary' : ''}" data-act="${r.act[0]}" data-id="${esc(r.i.id)}">${r.act[1]}</button>
             </div>`).join('')}
@@ -800,16 +860,16 @@ function alerts() {
   const rows = [];
   open.filter(inTransit).sort((a, b) => tied(b) - tied(a)).forEach((i) => rows.push({
     i, t: tied(i) > 7 ? 'warn' : 'info',
-    txt: `En livraison depuis ${tied(i)}${NB}j${tied(i) > 7 ? ' : colis en retard ?' : ''}`,
+    txt: `Acheté il y a ${tied(i)}${NB}j, toujours en livraison${tied(i) > 7 ? ' : colis en retard ?' : ''}`,
     act: ['recv', 'Reçu'],
   }));
-  recv.filter((i) => held(i) > stale).sort((a, b) => held(b) - held(a)).forEach((i) => rows.push({
+  recv.filter((i) => marketStart(i) && marketDays(i) > stale).sort((a, b) => marketDays(b) - marketDays(a)).forEach((i) => rows.push({
     i, t: 'warn',
-    txt: `${i.status === 'stock' ? 'En stock' : i.status === 'reserve' ? 'Réservé' : 'En annonce'} depuis ${held(i)}${NB}j après réception · ${eur(cost(i))} bloqués`,
-    act: i.status === 'stock' ? ['list', 'Annonce'] : i.status === 'reserve' ? ['sell', 'Vendu'] : ['price', 'Baisser'],
+    txt: `${i.status === 'reserve' ? 'Réservé' : 'En annonce'} depuis ${marketDays(i)}${NB}j sans vente · ${eur(cost(i))} bloqués`,
+    act: i.status === 'reserve' ? ['sell', 'Vendu'] : ['price', 'Baisser'],
   }));
-  recv.filter((i) => i.status === 'stock' && held(i) >= 2 && held(i) <= stale).forEach((i) => rows.push({ i, t: 'info', txt: `Reçu, pas encore en annonce · J+${held(i)}`, act: ['list', 'Annonce'] }));
-  recv.filter((i) => i.status === 'reserve' && held(i) <= stale).forEach((i) => rows.push({ i, t: 'info', txt: 'Réservé : pense à finaliser la vente', act: ['sell', 'Vendu'] }));
+  recv.filter((i) => i.status === 'stock' && held(i) >= 2).sort((a, b) => held(b) - held(a)).forEach((i) => rows.push({ i, t: held(i) > stale ? 'warn' : 'info', txt: `Reçu il y a ${held(i)}${NB}j, pas encore en annonce`, act: ['list', 'Annonce'] }));
+  recv.filter((i) => i.status === 'reserve' && !(marketDays(i) > stale)).forEach((i) => rows.push({ i, t: 'info', txt: 'Réservé : pense à finaliser la vente', act: ['sell', 'Vendu'] }));
   const noLink = open.filter((i) => i.status !== 'stock' && !safeUrl(i.listUrl)).length;
   return { rows, noLink };
 }
@@ -835,11 +895,13 @@ function insights() {
       out.push({ t: 'info', h: `Entre le prix affiché et le prix final, tu cèdes en moyenne <b>${pct(disc.d)}</b>. Pour encaisser ${eur(target)}, affiche autour de <b>${eur(roundTo(target / (1 - disc.d), 5))}</b>.` });
     } else out.push({ t: 'good', h: `Tu vends quasiment au prix affiché (${pct(Math.max(0, disc.d))} de remise moyenne) : tu peux tester des prix un peu plus hauts.` });
   }
-  const quick = sold.filter((i) => held(i) <= 7), slow = sold.filter((i) => held(i) > 7);
+  const quick = sold.filter((i) => saleDays(i) <= 7), slow = sold.filter((i) => saleDays(i) > 7);
   if (quick.length >= 2 && slow.length >= 2) {
     const rate = (arr) => sum(arr, profit) / Math.max(1, sum(arr, (i) => Math.max(1, tied(i))));
-    out.push({ t: 'info', h: `Revendus en 7 jours ou moins après réception, tes articles rapportent <b>${eur(rate(quick))} par jour</b> d’argent immobilisé, contre ${eur(rate(slow))} pour les autres. Un prix juste qui part vite fait tourner ton capital.` });
+    out.push({ t: 'info', h: `Vendus en 7 jours d’annonce ou moins, tes articles rapportent <b>${eur(rate(quick))} par jour</b> d’argent immobilisé, contre ${eur(rate(slow))} pour les autres. Un prix juste qui part vite fait tourner ton capital.` });
   }
+  const preps = sold.map((i) => (marketStart(i) && isReceived(i) ? phaseSplit(i).prep : null)).filter((d) => d != null);
+  if (preps.length >= 2 && avg(preps) >= 1) out.push({ t: 'warn', h: `Entre la réception et la mise en annonce, tu laisses passer <b>${days(avg(preps))}</b> en moyenne. Chacun de ces jours, ton argent est bloqué sans qu’aucun acheteur puisse voir l’article.` });
   const ships = S.items.map(shipDays).filter((d) => d != null);
   if (ships.length >= 2) {
     const sd = avg(ships);
@@ -880,6 +942,7 @@ function journal(m, ms) {
     const p = profit(e.i);
     return `<div class="lg-row" role="button" tabindex="0" data-act="open" data-id="${esc(e.i.id)}">
       <span class="lg-d">${dShort(e.d)}</span>
+      ${mini(e.i)}
       <span class="lg-m"><span class="lg-t ${e.t}">${e.t === 'achat' ? 'Achat' : 'Vente'}</span>${tag(e.i)}<span class="lg-n">${esc(e.i.model)}</span></span>
       <span class="lg-a">${e.t === 'achat' ? `<b class="out">${eur(-cost(e.i))}</b>` : `<b>${eurS(num(e.i.sellPrice))}</b><small class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</small>`}</span>
     </div>`;
@@ -937,6 +1000,7 @@ function renderArticles() {
     : '';
   $('#chips-cat').hidden = !$('#chips-cat').innerHTML;
   $('#grp').checked = !!S.f.group;
+  $$('#vtog .chip').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.v === (S.f.view || 'list'))));
   $('#sort').value = S.f.sort;
   renderList();
 }
@@ -957,7 +1021,8 @@ function renderList() {
       : `<div class="card empty"><b>Aucun article pour l’instant</b><span class="muted">Ajoute ton premier achat : il apparaîtra ici avec sa réf.</span><button class="btn primary sm" data-act="add">${ic('plus')} Ajouter un achat</button></div>`;
     return;
   }
-  if (!S.f.group) { el.innerHTML = `<div class="items">${arr.map(card).join('')}</div>`; return; }
+  const one = S.f.view === 'photos' ? gcard : card, wrapCls = S.f.view === 'photos' ? 'gallery' : 'items';
+  if (!S.f.group) { el.innerHTML = `<div class="${wrapCls}">${arr.map(one).join('')}</div>`; return; }
   const groups = new Map();
   arr.forEach((i) => { const k = norm(i.model) || '—'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
   el.innerHTML = [...groups.values()].sort((a, b) => b.length - a.length).map((g) => {
@@ -965,14 +1030,13 @@ function renderList() {
     const meta = [plural(g.length, 'article')];
     if (o.length) meta.push(`${eur(sum(o, cost))} immobilisés`);
     if (s.length) meta.push(`${eurS(sum(s, profit))} de bénéfice`);
-    return `<div class="group"><div class="group-h"><b>${esc(g[0].model || '—')}</b><span>${meta.join(' · ')}</span></div><div class="items">${g.map(card).join('')}</div></div>`;
+    return `<div class="group"><div class="group-h"><b>${esc(g[0].model || '—')}</b><span>${meta.join(' · ')}</span></div><div class="${wrapCls}">${g.map(one).join('')}</div></div>`;
   }).join('');
 }
 
 function card(i) {
   const sold = isSold(i), h = held(i), transit = inTransit(i), stale = !sold && !transit && h > (num(S.settings.staleDays) || 21);
-  const ph = Array.isArray(i.photos) && i.photos[0];
-  const thumb = ph ? imgTag(ph.t || ph.f) : `<span class="glyph">${esc((CATS[i.category] || CATS.autre).glyph)}</span>`;
+  const sl = stateLine(i);
   const p = profit(i);
   const right = sold
     ? `<span class="it-price">${eur(num(i.sellPrice))}</span><span class="it-sub ${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</span>`
@@ -984,14 +1048,24 @@ function card(i) {
     : isOpen(i) ? `<button class="qbtn primary" data-act="sell" data-id="${esc(i.id)}">Vendu</button>` : '';
   const meta = [i.details, condLabel(i.condition), i.serial ? 'SN …' + String(i.serial).slice(-4) : ''].filter(Boolean).join(' · ');
   return `<div class="item" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">
-    <span class="thumb">${thumb}</span>
+    ${mini(i, 'thumb')}
     <span class="it-main">
       <span class="it-top">${tag(i)}${pills(i)}${exb(i)}</span>
       <span class="it-name">${esc(i.model || '—')}</span>
       ${meta ? `<span class="it-meta">${esc(meta)}</span>` : ''}
-      <span class="it-dates"><span class="days ${stale ? 'stale' : ''}">${sold ? `vendu en ${h}${NB}j` : transit ? `en livraison · J+${tied(i)}` : `J+${h}${stale ? ' · dort' : ''}`}</span>${safeUrl(i.listUrl) && !sold ? `<span class="lnk">${ic('link')}annonce</span>` : ''}</span>
+      <span class="it-dates"><span class="days ${sl.stale ? 'stale' : ''}">${sl.t}</span>${safeUrl(i.listUrl) && !sold ? `<span class="lnk">${ic('link')}annonce</span>` : ''}</span>
     </span>
     <span class="it-side">${right}${quick}</span>
+  </div>`;
+}
+
+function gcard(i) {
+  const sl = stateLine(i), p = profit(i), ph = firstPhoto(i);
+  const price = isSold(i) ? `${eur(num(i.sellPrice))}<small class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</small>` : listed(i) ? eur(num(i.listPrice)) : `${eur(cost(i))}<small class="muted">coût</small>`;
+  return `<div class="gcard" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">
+    <span class="gimg">${ph ? imgTag(ph.t || ph.f) : glyphOf(i)}</span>
+    <span class="gtag">${tag(i)}</span>
+    <span class="gbody"><span class="it-top">${pills(i)}</span><span class="gname">${esc(i.model || '—')}</span><span class="gprice">${price}</span><span class="days ${sl.stale ? 'stale' : ''}">${sl.t}</span></span>
   </div>`;
 }
 
@@ -1047,9 +1121,10 @@ function detailBody(i) {
     sold ? ['Bénéfice', eurS(p), `ROI ${pctS(roi(i))}`, p >= 0 ? 'pos' : 'neg']
       : listed(i) ? ['Potentiel', eurS(potential(i)), 'au prix affiché', potential(i) >= 0 ? 'pos' : 'neg']
         : ['Potentiel', est ? '≈ ' + eurS(est.net) : '—', est ? (est.market ? `d’après ta cote ${eur(est.resale)}` : `d’après ${plural(est.n, 'vente')} du modèle`) : 'aucune vente ni cote pour ce modèle'],
-    sold ? ['Vendu en', `${h}${NB}j`, shipDays(i) != null ? `après réception · livraison ${shipDays(i)}${NB}j` : 'après réception']
+    sold ? ['Vendu en', `${saleDays(i)}${NB}j`, marketStart(i) ? 'après la mise en annonce' : 'après réception, sans annonce']
       : inTransit(i) ? ['En livraison depuis', `${tied(i)}${NB}j`, 'acheté le ' + dShort(i.buyDate)]
-        : ['Dispo depuis', `${h}${NB}j`, 'reçu le ' + dShort(availDate(i))],
+        : marketStart(i) ? ['En annonce depuis', `${marketDays(i)}${NB}j`, 'sans vente pour l’instant', marketDays(i) > (num(S.settings.staleDays) || 21) ? 'neg' : '']
+          : ['Reçu il y a', `${h}${NB}j`, 'pas encore en annonce'],
   ];
   const tl = [];
   tl.push(`<li><span class="dot ok"></span><div><b>Acheté ${eur(num(i.buyPrice))}${num(i.buyCosts) ? ` + ${eur(num(i.buyCosts))} de frais` : ''}</b><small>${dLong(i.buyDate)}${i.buySource ? ' · ' + esc(i.buySource) : ''}${i.sellerName ? ' · vendeur ' + esc(i.sellerName) : ''}</small></div></li>`);
@@ -1076,6 +1151,7 @@ function detailBody(i) {
     <div class="d-title"><div class="it-top">${pills(i)}${exb(i)}</div><h2>${esc(i.model || '—')}</h2>${i.details ? `<div class="muted">${esc(i.details)}</div>` : ''}</div>
     <div class="figs">${figs.map((f) => `<div class="fig"><span class="k">${f[0]}</span><span class="v ${f[3] || ''}">${f[1]}</span><span class="s">${f[2]}</span></div>`).join('')}</div>
     ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${ic('ext')} Ouvrir l’annonce</a>` : ''}
+    ${durationsBlock(i)}
     <div class="fs"><p class="fs-t">Historique</p><ol class="tl">${tl.join('')}</ol></div>
     ${specs.length ? `<div class="fs"><p class="fs-t">Détails</p><dl class="specs">${specs.map((s) => `<dt>${s[0]}</dt><dd>${esc(s[1])}</dd>`).join('')}</dl></div>` : ''}
     <div id="d-more" class="btns">
@@ -1084,6 +1160,21 @@ function detailBody(i) {
       ${listed(i) ? `<button class="btn sm" data-act="price" data-id="${esc(i.id)}">Changer le prix</button>` : ''}
       <button class="btn sm danger" data-act="del" data-id="${esc(i.id)}">Supprimer</button>
     </div>`;
+}
+function durationsBlock(i) {
+  if (!isDate(i.buyDate)) return '';
+  const ps = phaseSplit(i), sold = isSold(i), m = marketStart(i), a = availDate(i);
+  const seg = (k, cls) => (ps[k] > 0 ? `<span class="${cls}" style="flex:${ps[k]}"></span>` : '');
+  const line = (cls, label, val, note) => `<div class="dur"><i class="${cls}"></i><span>${label}<small>${note}</small></span><b>${val}</b></div>`;
+  const rows = [
+    line('ph-ship', 'Livraison', inTransit(i) ? `${ps.ship}${NB}j…` : `${ps.ship}${NB}j`, inTransit(i) ? 'colis pas encore reçu' : isDate(a) ? `reçu le ${dLong(a)}${sold ? '' : ` · il y a ${ago(a)}${NB}j`}` : ''),
+    line('ph-prep', 'Avant la mise en annonce', inTransit(i) ? '—' : `${ps.prep}${NB}j${!m && !sold ? '…' : ''}`, m ? `en annonce le ${dLong(listedOn(i))}` : sold ? 'vendu sans annonce' : inTransit(i) ? '' : 'pas encore en annonce'),
+    line('ph-mkt', sold ? 'En annonce jusqu’à la vente' : 'En annonce sans vente', !m && !sold ? '—' : `${ps.market}${NB}j${sold ? '' : '…'}`, sold ? `vendu le ${dLong(i.sellDate)}` : m ? 'toujours en vente' : ''),
+  ];
+  return `<div class="fs"><p class="fs-t">Durées</p>
+    ${ps.total > 0 ? `<div class="phase-bar" role="img" aria-label="Livraison ${ps.ship} jours, avant annonce ${ps.prep} jours, en annonce ${ps.market} jours">${seg('ship', 'ph-ship')}${seg('prep', 'ph-prep')}${seg('market', 'ph-mkt')}</div>` : ''}
+    <div class="durs">${rows.join('')}<div class="dur tot"><i></i><span>Argent bloqué<small>acheté le ${dLong(i.buyDate)}${sold ? ' · jusqu’à la vente' : ` · il y a ${ps.total}${NB}j`}</small></span><b>${ps.total}${NB}j</b></div></div>
+  </div>`;
 }
 function detailFoot(i) {
   const id = esc(i.id);
@@ -1380,7 +1471,7 @@ async function saveForm(btn) {
 function lastChannel() { const s = S.items.filter(isSold).sort((a, b) => b.sellDate.localeCompare(a.sellDate))[0]; return (s && s.sellChannel) || 'LBC main propre'; }
 function openQuick(mode, id) {
   const i = byId(id); if (!i) return;
-  const head = `<div class="fs" style="padding:12px"><div class="it-top">${tag(i)}${pills(i)}</div><b>${esc(i.model)}</b><span class="muted" style="font-size:13px">Coût total ${eur(cost(i))} · acheté le ${dShort(i.buyDate)} · ${inTransit(i) ? `en livraison depuis ${tied(i)}${NB}j` : `J+${held(i)} depuis la réception`}</span></div>`;
+  const head = `<div class="fs qhead" style="padding:12px">${mini(i)}<div style="display:grid;gap:3px;min-width:0"><div class="it-top">${tag(i)}${pills(i)}</div><b>${esc(i.model)}</b><span class="muted" style="font-size:13px">Coût total ${eur(cost(i))} · ${stateLine(i).t}</span></div></div>`;
   let title, body, btn;
   if (mode === 'recv') {
     title = `Réception ${i.ref}`; btn = 'Marquer reçu';
@@ -1514,7 +1605,7 @@ function renderSimu() {
         <dt>Ventes enregistrées</dt><dd>${g.n}</dd>
         <dt>Coût d’achat moyen</dt><dd>${eur(g.avgCost)}</dd>
         <dt>Bénéfice moyen</dt><dd class="${g.avgProfit >= 0 ? 'pos' : 'neg'}">${eurS(g.avgProfit)}</dd>
-        <dt>Délai de vente (après réception)</dt><dd>${days(g.avgDays)}</dd>
+        <dt>Délai de vente (depuis l’annonce)</dt><dd>${days(g.avgDays)}</dd>
         ${fees ? `<dt>Frais de vente moyens</dt><dd>${eur(fees)}</dd>` : ''}
       </dl>`
     : `<p class="muted" style="margin:0">Aucune vente de « ${esc(model)} » pour l’instant. ${resaleIn != null ? 'Estimation basée sur ta revente visée.' : mk ? 'Estimation basée sur ta cote réglée.' : 'Indique une revente visée pour estimer le bénéfice, ou règle la cote PS5 dans les réglages.'}</p>`;
@@ -1623,9 +1714,9 @@ function renderStats() {
     ['Bénéfice net', eurS(A.profit), `après ${eur(A.fees)} de frais de vente`, A.profit < 0 ? 'neg' : 'pos'],
     ['Investi', eur(A.invest), plural(A.nBought, 'achat')],
     ['ROI moyen', pctS(A.roi), 'bénéfice ÷ coût d’achat'],
-    ['Livraison moyenne', days(avgShip), ships.length ? `achat → réception, ${plural(ships.length, 'colis', 'colis')}` : 'achats à distance'],
+    ['Argent bloqué', days(A.avgTied), 'de l’achat à la vente'],
     ['Bénéfice moyen', A.avgProfit == null ? '—' : eurS(A.avgProfit), 'par vente'],
-    ['Délai de vente', days(A.avgDays), `après réception · argent bloqué ${days(A.avgTied)}`],
+    ['Délai de vente', days(A.avgDays), 'de la mise en annonce à la vente'],
     ['Gain par jour', dayRate == null ? '—' : eur(dayRate), 'par article et par jour d’argent immobilisé'],
   ];
 
@@ -1647,7 +1738,7 @@ function renderStats() {
     <div class="hbars" style="margin-top:14px">${buckets.map((b) => `<div class="hbar"><span class="hb-l">${b.l}<small>${eur(b.c)}</small></span><span class="hb-t"><span class="hb-f" style="width:${(b.n / maxB * 100).toFixed(1)}%"></span></span><span class="hb-v">${b.n}</span></div>`).join('')}</div>`;
 
   const bySrc = Object.entries(groupBy(bought, (i) => i.buySource || 'Non renseigné')).map(([k, a]) => { const s = a.filter(isSold); const sh = a.map(shipDays).filter((d) => d != null); return { k, n: a.length, sn: s.length, ap: s.length ? sum(s, profit) / s.length : null, inv: sum(a, cost), ship: sh.length ? avg(sh) : null }; }).sort((a, b) => b.n - a.n);
-  const byChan = Object.entries(groupBy(sold, (i) => i.sellChannel || 'Non renseigné')).map(([k, a]) => ({ k, n: a.length, ca: sum(a, (i) => num(i.sellPrice)), ap: sum(a, profit) / a.length, d: sum(a, held) / a.length })).sort((a, b) => b.n - a.n);
+  const byChan = Object.entries(groupBy(sold, (i) => i.sellChannel || 'Non renseigné')).map(([k, a]) => ({ k, n: a.length, ca: sum(a, (i) => num(i.sellPrice)), ap: sum(a, profit) / a.length, d: sum(a, saleDays) / a.length })).sort((a, b) => b.n - a.n);
   const disc = avgDiscount(sold), atAsk = sold.filter((i) => num(i.listPrice) > 0 && num(i.sellPrice) >= num(i.listPrice)).length, withList = sold.filter((i) => num(i.listPrice) > 0).length;
   const drops = sold.length ? sum(sold, (i) => Math.max(0, (Array.isArray(i.priceLog) ? i.priceLog.length : 0) - 1)) / sold.length : null;
   const flowHtml = `
@@ -1656,7 +1747,7 @@ function renderStats() {
     <dl class="kv" style="margin-top:14px"><dt>Remise moyenne vs prix affiché</dt><dd>${disc ? pct(disc.d) : '—'}</dd><dt>Vendus au prix affiché</dt><dd>${withList ? `${atAsk}/${withList}` : '—'}</dd><dt>Baisses de prix avant vente</dt><dd>${drops == null ? '—' : drops.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}</dd></dl>`;
 
   const ranked = sold.slice().sort((a, b) => profit(b) - profit(a));
-  const dealRow = (i) => `<tr class="click" data-act="open" data-id="${esc(i.id)}"><td>${tag(i)} <span style="white-space:normal">${esc(i.model)}</span><small>${dShort(i.sellDate)} · ${held(i)}${NB}j</small></td><td>${eur(cost(i))}</td><td>${eur(num(i.sellPrice))}</td><td><b class="${profit(i) >= 0 ? 'pos' : 'neg'}">${eurS(profit(i))}</b></td></tr>`;
+  const dealRow = (i) => `<tr class="click" data-act="open" data-id="${esc(i.id)}"><td><span class="cellm">${mini(i)}<span>${tag(i)} <span style="white-space:normal">${esc(i.model)}</span><small>${dShort(i.sellDate)} · ${saleDays(i)}${NB}j d’annonce</small></span></span></td><td>${eur(cost(i))}</td><td>${eur(num(i.sellPrice))}</td><td><b class="${profit(i) >= 0 ? 'pos' : 'neg'}">${eurS(profit(i))}</b></td></tr>`;
   const dealHead = '<thead><tr><th>Article</th><th>Coût</th><th>Vendu</th><th>Bénéfice</th></tr></thead>';
   const dealsHtml = ranked.length ? `<div class="tbl-wrap"><table>${dealHead}<tbody>${ranked.slice(0, 5).map(dealRow).join('')}</tbody></table></div>
     ${ranked.length >= 8 ? `<h3 class="sec" style="margin:16px 0 4px;font-size:13px">Les moins rentables</h3><div class="tbl-wrap"><table>${dealHead}<tbody>${ranked.slice(-3).reverse().map(dealRow).join('')}</tbody></table></div>` : ''}` : '<p class="muted" style="margin:0">Pas encore de vente sur la période.</p>';
@@ -1681,6 +1772,18 @@ function renderStats() {
     ${st.legal === 'micro' && capM > 0 ? `<div style="margin-top:12px"><div class="mt-h"><span>Plafond micro-entreprise</span><span>${eur(caY)} / ${eur(capM)}</span></div><div class="meter ${caY / capM > 0.8 ? 'warn' : ''}"><i style="width:${Math.min(100, caY / capM * 100).toFixed(1)}%"></i></div></div>` : ''}
     ${st.legal === 'micro' ? '<p class="foot">Taux et plafond réglables dans les réglages : vérifie les valeurs en vigueur sur autoentrepreneur.urssaf.fr.</p>' : ''}`;
 
+  const ph = A.phases, phTot = ph ? ph.ship + ph.prep + ph.market : 0;
+  const pseg = (k, cls) => (ph && ph[k] > 0 ? `<span class="${cls}" style="flex:${ph[k].toFixed(2)}"></span>` : '');
+  const pline = (cls, label, v, note) => `<div class="dur"><i class="${cls}"></i><span>${label}<small>${note}</small></span><b>${days(v)}</b></div>`;
+  const mDur = modelTable(sold).filter((g) => g.n).map((g) => { const s3 = ['ship', 'prep', 'market'].map((k) => sum(g.sold, (i) => phaseSplit(i)[k]) / g.n); return { g, s3, tot: s3[0] + s3[1] + s3[2] }; }).sort((x, y) => y.g.n - x.g.n);
+  const dursHtml = ph ? `<div class="phase-bar" role="img" aria-label="Livraison ${days(ph.ship)}, avant annonce ${days(ph.prep)}, en annonce ${days(ph.market)}">${pseg('ship', 'ph-ship')}${pseg('prep', 'ph-prep')}${pseg('market', 'ph-mkt')}</div>
+    <div class="durs">${pline('ph-ship', 'Livraison', ph.ship, 'de l’achat à la réception')}${pline('ph-prep', 'Avant la mise en annonce', ph.prep, 'de la réception à l’annonce')}${pline('ph-mkt', 'En annonce', ph.market, 'de l’annonce à la vente')}<div class="dur tot"><i></i><span>Argent bloqué au total<small>de l’achat à la vente</small></span><b>${days(phTot)}</b></div></div>
+    ${mDur.length ? `<div class="tbl-wrap" style="margin-top:14px"><table class="sticky1"><thead><tr><th>Modèle</th><th>Livraison</th><th>Avant annonce</th><th>En annonce</th><th>Total</th></tr></thead><tbody>${mDur.map((x) => `<tr><td><span class="mdl">${esc(x.g.name)}</span><small>${plural(x.g.n, 'vente')}</small></td><td>${days(x.s3[0])}</td><td>${days(x.s3[1])}</td><td>${days(x.s3[2])}</td><td><b>${days(x.tot)}</b></td></tr>`).join('')}</tbody></table></div>` : ''}`
+    : '<p class="muted" style="margin:0">Pas encore de vente sur la période.</p>';
+  const live = S.items.filter((i) => !isSold(i) && marketStart(i)).sort((x, y) => marketDays(y) - marketDays(x));
+  const stl = num(S.settings.staleDays) || 21;
+  const liveHtml = live.length ? `<div class="rows">${live.map((i) => `<div class="row wi" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">${mini(i)}<div class="row-m"><div class="row-t">${tag(i)} <span>${esc(i.model)}</span></div><div class="row-s ${marketDays(i) > stl ? 'warn' : ''}">en annonce depuis ${marketDays(i)}${NB}j sans vente · ${eur(num(i.listPrice))}${(i.priceLog || []).length > 1 ? ` · ${plural(i.priceLog.length - 1, 'baisse')}` : ''} · acheté il y a ${tied(i)}${NB}j</div></div>${ic('right')}</div>`).join('')}</div>`
+    : '<p class="muted" style="margin:0">Aucune annonce en ligne pour l’instant.</p>';
   const mrows = rows.slice().reverse();
   el.innerHTML = `
     <div class="ttl-row"><div><div class="eyebrow">Analyse · ${esc(pLabel)}</div><h1 class="h1">Statistiques</h1></div><button class="btn sm" data-act="export">${ic('dl')} Export CSV</button></div>
@@ -1693,6 +1796,8 @@ function renderStats() {
         ${mrows.map((r) => `<tr class="click" data-act="goto-month" data-m="${r.ym}"><td>${esc(monthLabel(r.ym))}</td><td>${r.nB}</td><td>${eur(r.invest)}</td><td>${r.nS}</td><td>${eur(r.ca)}</td><td class="${r.profit < 0 ? 'neg' : ''}"><b>${eurS(r.profit)}</b></td><td>${pctS(r.roi)}</td><td>${eurS(r.cash)}</td></tr>`).join('')}
       </tbody></table></div></details>
     </section>
+    <section class="card"><div class="card-h"><h2 class="sec">Où passe le temps</h2><span class="muted" style="font-size:12.5px">moyennes des articles vendus · ${esc(pLabel)}</span></div>${dursHtml}</section>
+    <section class="card"><div class="card-h"><h2 class="sec">Annonces en cours</h2><span class="muted" style="font-size:12.5px">de la plus ancienne à la plus récente</span></div>${liveHtml}</section>
     <section class="card"><div class="card-h"><h2 class="sec">Par modèle</h2><span class="muted" style="font-size:12.5px">classé par bénéfice total</span></div>${modelHtml}</section>
     <div class="cols">
       <section class="card"><div class="card-h"><h2 class="sec">Bénéfice par catégorie</h2></div>${catHtml}</section>
@@ -1873,9 +1978,10 @@ const photoStore = {
 async function photoUrl(path) {
   if (PHOTO_URLS.has(path)) return PHOTO_URLS.get(path);
   let blob = null, cache = null;
-  try { cache = await caches.open('compta-photos'); const hit = await cache.match('/p/' + path); if (hit) blob = await hit.blob(); } catch (e) {}
+  try { cache = await caches.open('compta-photos'); const hit = await cache.match('/p/' + path); if (hit) blob = new Blob([await hit.arrayBuffer()], { type: 'image/jpeg' }); } catch (e) {}
   if (!blob) {
-    blob = await (await gh(`contents/${path}?ref=${GH.branch}`, { headers: { Accept: 'application/vnd.github.raw' } })).blob();
+    // GitHub sert le fichier en « application/vnd.github.raw » : Safari refuse de l'afficher comme image sans le bon type.
+    blob = new Blob([await (await gh(`contents/${path}?ref=${GH.branch}`, { headers: { Accept: 'application/vnd.github.raw' } })).arrayBuffer()], { type: 'image/jpeg' });
     try { if (cache) await cache.put('/p/' + path, new Response(blob, { headers: { 'Content-Type': 'image/jpeg' } })); } catch (e) {}
   }
   const url = URL.createObjectURL(blob);
@@ -1886,7 +1992,7 @@ function hydrateImgs(root) {
   (root || document).querySelectorAll('img[data-gh]:not([src])').forEach((img) => {
     const path = img.getAttribute('data-gh');
     img.setAttribute('src', 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==');
-    photoUrl(path).then((u) => { img.src = u; }).catch(() => img.classList.add('broken'));
+    photoUrl(path).then((u) => { img.src = u; }).catch(() => { img.classList.add('broken'); img.removeAttribute('data-gh'); });
   });
 }
 const imgTag = (path) => `<img data-gh="${esc(path)}" alt="">`;
@@ -1911,11 +2017,11 @@ function claudeSummary() {
   L.push(`Réglages : objectif ${num(st.monthlyGoal)} €/mois · bénéfice mini ${num(st.targetProfit)} € · alerte stock ${num(st.staleDays)} j · statut ${st.legal}${num(st.ps5Price) ? ` · cote PS5 ${num(st.ps5Price)} €` : ''}${Object.keys(st.ps5Models || {}).length ? ' · cotes modèles ' + Object.entries(st.ps5Models).map(([k, v]) => `${k}=${v}`).join(',') : ''}`);
   L.push('', 'MOIS;achats;investi;ventes;CA;frais_vente;benefice;ROI%');
   months.forEach((m) => { const s = monthStats(m); L.push([m, s.nBought, n2(s.invest), s.nSold, n2(s.ca), n2(s.fees), n2(s.profit), s.roi == null ? '' : Math.round(s.roi * 100)].join(';')); });
-  L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;jours_en_vente;jours_argent_bloque;notes)');
+  L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;avant_annonce_j;en_annonce_j;argent_bloque_j;notes)');
   items.forEach((i) => L.push([i.ref, i.category, i.model, i.details, i.condition, i.buyDate, n2(num(i.buyPrice)), n2(num(i.buyCosts)), i.buySource, i.buyMode || '', isReceived(i) ? availDate(i) : 'en livraison', shipDays(i) ?? '', i.status,
     i.status !== 'stock' ? i.listDate : '', i.status !== 'stock' ? n2(i.listPrice) : '', Math.max(0, (i.priceLog || []).length - 1),
     isSold(i) ? i.sellDate : '', isSold(i) ? n2(num(i.sellPrice)) : '', isSold(i) ? n2(num(i.sellFees)) : '', isSold(i) ? i.sellChannel : '',
-    n2(profit(i)), isReceived(i) ? held(i) : '', tied(i), (i.notes || '').replace(/[\n;]/g, ' ')].map((v) => String(v ?? '').replace(/;/g, ',')).join(';')));
+    n2(profit(i)), isReceived(i) && (marketStart(i) || !isSold(i)) ? phaseSplit(i).prep : '', marketStart(i) ? marketDays(i) : '', tied(i), (i.notes || '').replace(/[\n;]/g, ' ')].map((v) => String(v ?? '').replace(/;/g, ',')).join(';')));
   return L.join('\n');
 }
 
@@ -2033,7 +2139,7 @@ async function saveSettings(btn) {
   if (ok) { S.settings = { ...DEFAULTS, ...next }; closeSheet(); toast('Réglages enregistrés'); render(); }
 }
 function toCSV() {
-  const head = ['Réf', 'Catégorie', 'Article', 'Détails', 'État', 'N° de série', 'Contenu', 'Date achat', 'Prix achat', 'Frais achat', 'Coût total', 'Acheté sur', 'Vendeur', 'Mode d’achat', 'Date réception', 'Jours de livraison', 'Statut', 'Date annonce', 'Prix affiché', 'Lien annonce', 'Date vente', 'Prix vente', 'Frais vente', 'Vendu via', 'Acheteur', 'Bénéfice', 'ROI %', 'Jours en vente (depuis réception)', 'Jours d’argent bloqué', 'Notes'];
+  const head = ['Réf', 'Catégorie', 'Article', 'Détails', 'État', 'N° de série', 'Contenu', 'Date achat', 'Prix achat', 'Frais achat', 'Coût total', 'Acheté sur', 'Vendeur', 'Mode d’achat', 'Date réception', 'Jours de livraison', 'Statut', 'Date annonce', 'Prix affiché', 'Lien annonce', 'Date vente', 'Prix vente', 'Frais vente', 'Vendu via', 'Acheteur', 'Bénéfice', 'ROI %', 'Jours avant annonce', 'Jours en annonce', 'Jours d’argent bloqué', 'Notes'];
   const n = (v) => (v == null || v === '' || !isFinite(v) ? '' : String(Math.round(v * 100) / 100).replace('.', ','));
   const t = (v) => { const s = String(v ?? ''); return /^[=+\-@]/.test(s) ? "'" + s : s; };
   const cell = (v) => { const s = String(v ?? ''); return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -2041,7 +2147,7 @@ function toCSV() {
     t(i.ref), (CATS[i.category] || CATS.autre).label, t(i.model), t(i.details), condLabel(i.condition), t(i.serial), (i.contents || []).join(', '),
     i.buyDate, n(num(i.buyPrice)), n(num(i.buyCosts)), n(cost(i)), t(i.buySource), t(i.sellerName), (BUY_MODES.find((m) => m[0] === i.buyMode) || [])[1] || '', isReceived(i) ? availDate(i) : 'en livraison', shipDays(i) ?? '', STATUS[i.status] || i.status,
     i.listDate, n(i.listPrice), safeUrl(i.listUrl), i.sellDate, n(i.sellPrice), isSold(i) ? n(num(i.sellFees)) : '', t(i.sellChannel && isSold(i) ? i.sellChannel : ''), t(i.buyerName),
-    n(profit(i)), roi(i) == null ? '' : n(roi(i) * 100), isReceived(i) ? held(i) : '', tied(i), t(i.notes),
+    n(profit(i)), roi(i) == null ? '' : n(roi(i) * 100), isReceived(i) ? phaseSplit(i).prep : '', marketStart(i) ? marketDays(i) : '', tied(i), t(i.notes),
   ]);
   return '﻿' + [head, ...rows].map((r) => r.map(cell).join(';')).join('\r\n');
 }
@@ -2111,7 +2217,7 @@ function render() {
   else if (S.view === 'simulateur') renderSimu();
   else renderStats();
 }
-const saveFilters = () => LS.set('filters', { st: S.f.st, cat: S.f.cat, sort: S.f.sort, group: S.f.group });
+const saveFilters = () => LS.set('filters', { st: S.f.st, cat: S.f.cat, sort: S.f.sort, group: S.f.group, view: S.f.view });
 
 const ACT = {
   view: (a) => setView(a.dataset.view),
@@ -2143,6 +2249,7 @@ const ACT = {
   'rm-photo': (a) => removePhoto(a.dataset.key),
   'f-st': (a) => { S.f.st = a.dataset.v; S.f.cat = 'all'; if (S.f.st === 'vendu' && S.f.sort === 'ancien') S.f.sort = 'recent'; saveFilters(); renderArticles(); },
   'f-cat': (a) => { S.f.cat = a.dataset.v; saveFilters(); renderArticles(); },
+  'f-view': (a) => { S.f.view = a.dataset.v; saveFilters(); renderArticles(); },
   'clear-filters': () => { S.f.st = 'tous'; S.f.cat = 'all'; S.f.q = ''; $('#q').value = ''; saveFilters(); renderArticles(); },
   copy: (a) => copyText(a.dataset.text, `Réf ${a.dataset.text} copiée`),
   'copy-csv': () => copyText($('#csv-txt').value, 'CSV copié'),
