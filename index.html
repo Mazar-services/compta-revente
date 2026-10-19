@@ -119,6 +119,33 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .tile .k{font-size:12px;font-weight:700;color:var(--ink-2)}
 .tile .v{font-size:21px;font-weight:800;letter-spacing:-.02em;line-height:1.25;overflow-wrap:anywhere}
 .tile .s{font-size:11.5px;color:var(--muted)}
+.tile.c-good{background:var(--good-soft);border-color:transparent} .tile.c-good .v{color:var(--good)}
+.tile.c-bad{background:var(--bad-soft);border-color:transparent} .tile.c-bad .v{color:var(--bad)}
+.tile.c-info{background:var(--accent-soft);border-color:transparent} .tile.c-info .v{color:var(--accent)}
+.tile.c-warn{background:var(--warn-soft);border-color:transparent} .tile.c-warn .v{color:var(--warn)}
+.tile.c-good .s,.tile.c-bad .s,.tile.c-info .s,.tile.c-warn .s{color:var(--ink-2)}
+.cashc{display:grid;gap:12px}
+.cash-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.cc-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.cc{border-radius:12px;padding:10px 12px;display:grid;gap:2px;min-width:0}
+.cc span{font-size:11.5px;font-weight:800;color:var(--ink-2)}
+.cc b{font-size:17px;font-weight:800;letter-spacing:-.02em;overflow-wrap:anywhere}
+.cc.g{background:var(--good-soft)} .cc.g b{color:var(--good)}
+.cc.r{background:var(--bad-soft)} .cc.r b{color:var(--bad)}
+.cc.i{background:var(--accent-soft)} .cc.i b{color:var(--accent)}
+.cc.y{background:var(--tag)} .cc.y b,.cc.y span{color:var(--tag-ink)}
+.be{display:grid;gap:8px;padding:14px 16px;border-radius:16px}
+.be.r{background:var(--bad-soft)} .be.g{background:var(--good-soft)}
+.be-t{font-size:13px;font-weight:800;color:var(--ink-2)}
+.be-v{font-family:var(--f-display);font-weight:600;font-size:clamp(26px,7.5vw,34px);letter-spacing:-.03em;line-height:1.1}
+.be.r .be-v{color:var(--bad)} .be.g .be-v{color:var(--good)}
+.be-s{font-size:13px;color:var(--ink-2)}
+.be .meter{background:color-mix(in srgb,var(--surface) 70%,transparent)}
+.be.r .meter>i{background:var(--bad)} .be.g .meter>i{background:var(--good)}
+.be.small{padding:10px 12px;gap:6px;border-radius:12px} .be.small .be-v{font-size:22px}
+.proj{display:grid;gap:12px}
+.proj-in{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.proj-in .field{width:160px}
 
 .monthnav{display:flex;align-items:center;gap:10px}
 .monthnav .mn-c{flex:1;min-width:0;text-align:center}
@@ -484,6 +511,7 @@ tr.click{cursor:pointer}
       <p class="lead">Tu vois une annonce ? Tape le modèle et le prix demandé : le bénéfice probable est calculé à partir de tes ventes passées.</p></div>
     <div class="dash">
       <div class="card fs" style="border-radius:16px">
+        <div class="field"><label for="s-item">Un article de mon stock <span class="opt-l">(facultatif)</span></label><span class="selw" style="display:block"><select id="s-item" class="inp"><option value="">Nouvel achat à évaluer</option></select></span></div>
         <div class="field"><label for="s-model">Article</label><input id="s-model" class="inp" list="dl-all" placeholder="ex. PS5 Slim Standard" autocomplete="off"></div>
         <div class="row2">
           <div class="field"><label for="s-price">Prix demandé</label><div class="affix"><input id="s-price" class="inp money" inputmode="decimal" placeholder="0" autocomplete="off"></div></div>
@@ -755,6 +783,20 @@ function capital() {
   const stock = sum(open, cost), dispo = apports - retraits + cashed - invested;
   return { apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock, nSold: sold.length };
 }
+// Une tuile : [titre, valeur, sous-titre, classe de la valeur, couleur de fond c-good|c-bad|c-info|c-warn]
+const tileHtml = (t) => `<div class="tile ${t[4] || ''}"><span class="k">${t[0]}</span><span class="v ${t[3] || ''}">${t[1]}</span><span class="s">${t[2]}</span></div>`;
+const sign = (v, pos = 'c-good', neg = 'c-bad') => (v == null ? '' : v < -0.004 ? neg : pos);
+// Point mort : l'argent récupéré par les ventes couvre-t-il l'argent dépensé en achats ?
+function breakEvenHtml(small) {
+  const K = capital(), net = K.cashed - K.invested, ok = net >= -0.004;
+  const pctBack = K.invested > 0 ? Math.min(1, K.cashed / K.invested) : 1;
+  return `<div class="be ${ok ? 'g' : 'r'} ${small ? 'small' : ''}">
+    <span class="be-t">${ok ? 'Rentré dans tes frais' : 'Pas encore rentré dans tes frais'}</span>
+    <span class="be-v">${eurS(net)}</span>
+    <div class="meter" role="meter" aria-label="Argent récupéré sur l’argent dépensé" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pctBack * 100)}"><i style="width:${(pctBack * 100).toFixed(1)}%"></i></div>
+    <span class="be-s">Dépensé ${eur(K.invested)} · récupéré ${eur(K.cashed)} (${Math.round(pctBack * 100)}${NB}%)${!ok && K.stock > 0 ? ` · ton stock (${eur(K.stock)} au coût) doit encore être vendu` : ''}</span>
+  </div>`;
+}
 const pills = (i) => (inTransit(i) ? (i.status === 'stock' ? pill('livraison') : pill(i.status) + '<span class="pill st-livraison">Pas encore reçu</span>') : pill(i.status));
 const exb = (i) => (i.example ? '<span class="exb">Exemple</span>' : '');
 const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? u : '');
@@ -803,11 +845,11 @@ function renderAccueil() {
 
   const stocked = sum(ms.bought.filter((i) => !(isSold(i) && i.sellDate.slice(0, 7) === m)), cost);
   const tiles = [
-    ['Chiffre d’affaires', eur(ms.ca), plural(ms.nSold, 'vente')],
-    ['Investi', eur(ms.invest), plural(ms.nBought, 'achat')],
-    ['Flux de caisse', eurS(ms.cash), ms.cash < -0.004 && stocked > 0.004 ? `${eur(stocked)} d’achats de ce mois revendus après ou encore en stock : de l’argent placé, pas perdu` : 'encaissé − frais − achats du mois'],
-    ['ROI moyen', pctS(ms.roi), 'bénéfice ÷ coût d’achat'],
-    ['Bénéfice moyen', ms.avgProfit == null ? '—' : eurS(ms.avgProfit), 'par vente'],
+    ['Chiffre d’affaires', eur(ms.ca), plural(ms.nSold, 'vente'), '', 'c-info'],
+    ['Investi', eur(ms.invest), plural(ms.nBought, 'achat'), '', 'c-warn'],
+    ['Flux de caisse', eurS(ms.cash), ms.cash < -0.004 && stocked > 0.004 ? `dont ${eur(stocked)} placés en stock, pas perdus` : 'argent entré − argent sorti'],
+    ['ROI moyen', pctS(ms.roi), 'bénéfice ÷ coût d’achat', '', sign(ms.roi)],
+    ['Bénéfice moyen', ms.avgProfit == null ? '—' : eurS(ms.avgProfit), 'par vente', '', sign(ms.avgProfit)],
     ['Délai de vente', days(ms.avgDays), 'de la mise en annonce à la vente'],
   ];
   if (st.legal === 'micro') {
@@ -836,8 +878,8 @@ function renderAccueil() {
           <div class="hero-sub">${deltaHtml}</div>
           ${goalHtml}
         </section>
+        <div class="tiles">${[tiles[0], tiles[1], tiles[3], tiles[4], tiles[5], tiles[2], ...tiles.slice(6)].map(tileHtml).join('')}</div>
         ${cashCard()}
-        <div class="tiles">${tiles.map((t) => `<div class="tile"><span class="k">${t[0]}</span><span class="v ${t[3] || ''}">${t[1]}</span><span class="s">${t[2]}</span></div>`).join('')}</div>
         <button class="strip" data-act="goto" data-view="articles" data-st="encours">
           <span>En ce moment</span><span><b>${open.length}</b> en cours</span><span><b>${eur(capital)}</b> immobilisés</span><span><b>${eurS(pot)}</b> au prix affiché</span>${ic('right')}
         </button>
@@ -869,22 +911,19 @@ function renderAccueil() {
 
 function cashCard() {
   const K = capital(), mv = S.cash.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  const hint = !K.apports ? '<p class="hint">Déclare l’argent que tu mets dans l’activité avec « Entrée d’argent » : l’appli calcule ce qu’il te reste à investir.</p>'
-    : K.dispo < -0.004 ? '<p class="hint" style="color:var(--warn);font-weight:700">Tu as acheté pour plus que tes apports et tes ventes : déclare l’argent manquant avec « Entrée d’argent ».</p>' : '';
-  return `<section class="card" aria-label="Caisse">
-    <div class="card-h"><h2 class="sec">Caisse</h2><span class="muted" style="font-size:12.5px">depuis le début</span></div>
-    <div class="eyebrow">Disponible pour acheter</div>
-    <div class="cash-big ${K.dispo < -0.004 ? 'neg' : ''}">${eur(K.dispo)}</div>
-    <dl class="kv" style="margin-top:10px">
-      <dt>Apports${K.retraits ? ' − retraits' : ''}</dt><dd>${eur(K.apports - K.retraits)}</dd>
-      <dt>Ventes encaissées (net)</dt><dd>${eurS(K.cashed)}</dd>
-      <dt>Achats (prix + frais)</dt><dd>${eur(-K.invested)}</dd>
-      <dt>Stock à revendre (au coût)</dt><dd>${eur(K.stock)}</dd>
-      <dt><b>Capital total</b> <span class="opt-l">(caisse + stock)</span></dt><dd>${eur(K.total)}</dd>
-    </dl>
-    ${hint}
-    <div class="btns" style="margin-top:12px"><button class="btn sm primary" data-act="cash-add" data-type="apport">${ic('plus')} Entrée d’argent</button><button class="btn sm" data-act="cash-add" data-type="retrait">Retrait</button></div>
-    ${mv.length ? `<details class="tview" ${S.confirmCash ? 'open' : ''}><summary>Mouvements (${mv.length})</summary><div style="margin-top:6px">${mv.map((c) => `<div class="cash-mv"><span class="d">${dShort(c.date)}</span><span class="n">${c.type === 'retrait' ? 'Retrait' : 'Entrée'}${c.note ? ' · ' + esc(c.note) : ''}</span><b class="${c.type === 'retrait' ? '' : 'pos'}">${c.type === 'retrait' ? eur(-num(c.amount)) : eurS(num(c.amount))}</b><button class="xbtn ${S.confirmCash === c.id ? 'on' : ''}" data-act="cash-del" data-id="${esc(c.id)}">${S.confirmCash === c.id ? 'Confirmer' : 'Supprimer'}</button></div>`).join('')}</div></details>` : ''}
+  return `<section class="card cashc" aria-label="Caisse">
+    <div class="cash-top"><h2 class="sec">Caisse</h2><div class="btns"><button class="btn sm primary" data-act="cash-add" data-type="apport">${ic('plus')} Argent</button><button class="btn sm" data-act="cash-add" data-type="retrait">Retrait</button></div></div>
+    <div class="cc-row">
+      <div class="cc ${K.dispo < -0.004 ? 'r' : 'g'}"><span>Disponible</span><b>${eur(K.dispo)}</b></div>
+      <div class="cc i"><span>En stock</span><b>${eur(K.stock)}</b></div>
+      <div class="cc y"><span>Capital</span><b>${eur(K.total)}</b></div>
+    </div>
+    ${breakEvenHtml(true)}
+    ${!K.apports ? '<p class="hint" style="margin:0">Ajoute ton argent de départ avec « Argent » pour voir ce qu’il te reste à investir.</p>' : ''}
+    <details class="tview" ${S.confirmCash ? 'open' : ''} style="margin:0"><summary>Détail${mv.length ? ` et mouvements (${mv.length})` : ''}</summary>
+      <dl class="kv" style="margin-top:8px"><dt>Apports${K.retraits ? ' − retraits' : ''}</dt><dd>${eur(K.apports - K.retraits)}</dd><dt>Ventes encaissées (net)</dt><dd>${eurS(K.cashed)}</dd><dt>Achats (prix + frais)</dt><dd>${eur(-K.invested)}</dd><dt>Disponible</dt><dd>${eur(K.dispo)}</dd><dt>Stock au coût</dt><dd>${eur(K.stock)}</dd><dt>Capital (disponible + stock)</dt><dd>${eur(K.total)}</dd></dl>
+      ${mv.map((c) => `<div class="cash-mv"><span class="d">${dShort(c.date)}</span><span class="n">${c.type === 'retrait' ? 'Retrait' : 'Entrée'}${c.note ? ' · ' + esc(c.note) : ''}</span><b class="${c.type === 'retrait' ? '' : 'pos'}">${c.type === 'retrait' ? eur(-num(c.amount)) : eurS(num(c.amount))}</b><button class="xbtn ${S.confirmCash === c.id ? 'on' : ''}" data-act="cash-del" data-id="${esc(c.id)}">${S.confirmCash === c.id ? 'Confirmer' : 'Supprimer'}</button></div>`).join('')}
+    </details>
   </section>`;
 }
 
@@ -1620,6 +1659,13 @@ function renderSimu() {
   const out = $('#simu-out');
   if (S.status !== 'ok') { out.innerHTML = stateBlock(); return; }
   fillAllModels();
+  const sel = $('#s-item'), cur = sel.value;
+  const stock = S.items.filter((i) => !isSold(i)).sort((a, b) => (a.ref || '').localeCompare(b.ref || ''));
+  sel.innerHTML = '<option value="">Nouvel achat à évaluer</option>' + stock.map((i) => `<option value="${esc(i.id)}">${esc(i.ref)} · ${esc(i.model)} · coût ${eur(cost(i))}</option>`).join('');
+  sel.value = stock.some((i) => i.id === cur) ? cur : '';
+  const it = byId(sel.value);
+  $('label[for="s-price"]').textContent = it ? 'Prix payé' : 'Prix demandé';
+  $('label[for="s-resale"]').innerHTML = it ? 'Prix de vente envisagé' : 'Revente visée <span class="opt-l">(facultatif)</span>';
   const tg = $('#s-target');
   if (!tg.dataset.touched) tg.value = numIn(num(S.settings.targetProfit));
   const model = val('s-model'), price = parseNum(val('s-price')), costs = parseNum(val('s-costs')) || 0;
@@ -1666,7 +1712,7 @@ function renderSimu() {
           ${capital().apports ? `<dt>Disponible en caisse</dt><dd class="${price > capital().dispo ? 'neg' : ''}">${eur(capital().dispo)}</dd>` : ''}
         </dl>
         ${price > maxBuy && maxBuy > 0 ? `<p class="hint">Propose <b>${eur(Math.floor(maxBuy / 5) * 5)}</b> au vendeur : au-delà, tu passes sous ton bénéfice minimum.</p>` : ''}
-        <button class="btn primary" data-act="sim-buy" data-cat="${esc(guessCat(model, g))}">${ic('plus')} Je l’achète : créer la fiche</button>
+        ${byId(val('s-item')) ? `<p class="hint">${esc(byId(val('s-item')).ref)} : acheté il y a ${tied(byId(val('s-item')))}${NB}j${listed(byId(val('s-item'))) ? `, affiché ${eur(num(byId(val('s-item')).listPrice))}` : ''}.</p>` : `<button class="btn primary" data-act="sim-buy" data-cat="${esc(guessCat(model, g))}">${ic('plus')} Je l’achète : créer la fiche</button>`}
       </div>`;
     } else {
       verdict = `<div class="card verdict"><div class="eyebrow">Ton prix max</div><div class="hero-num" style="font-size:clamp(34px,9vw,46px)">${maxBuy > 0 ? eur(Math.floor(maxBuy / 5) * 5) : '—'}</div>
@@ -1735,14 +1781,40 @@ function drawMonthChart(host, rows) {
 function bilanHtml() {
   const K = capital(), cs = sum(S.items.filter(isSold), cost);
   const t = [
-    ['Bénéfice net total', eurS(K.profit), `${plural(K.nSold, 'vente')} · ROI ${pctS(cs ? K.profit / cs : null)}`, K.profit < 0 ? 'neg' : 'pos'],
-    ['Total investi', eur(K.invested), `${plural(S.items.length, 'achat')}, prix + frais`],
-    ['Total encaissé', eur(K.cashed), `CA ${eur(K.ca)} − frais de vente`],
+    ['Bénéfice net total', eurS(K.profit), `${plural(K.nSold, 'vente')} · ROI ${pctS(cs ? K.profit / cs : null)}`, '', sign(K.profit)],
+    ['Total investi', eur(K.invested), `${plural(S.items.length, 'achat')}, prix + frais`, '', 'c-warn'],
+    ['Total encaissé', eur(K.cashed), `CA ${eur(K.ca)} − frais de vente`, '', 'c-info'],
     ['Apports nets', eur(K.apports - K.retraits), K.apports ? `bénéfice ${pctS((K.apports - K.retraits) > 0 ? K.profit / (K.apports - K.retraits) : null)} des apports` : 'aucun apport déclaré'],
-    ['Disponible', eur(K.dispo), 'pour de nouveaux achats', K.dispo < -0.004 ? 'neg' : ''],
-    ['Capital total', eur(K.total), `caisse + ${eur(K.stock)} de stock au coût`],
+    ['Disponible', eur(K.dispo), 'pour de nouveaux achats', '', sign(K.dispo)],
+    ['Capital total', eur(K.total), `caisse + ${eur(K.stock)} de stock au coût`, '', sign(K.total - (K.apports - K.retraits))],
   ];
-  return `<div class="tiles">${t.map((x) => `<div class="tile"><span class="k">${x[0]}</span><span class="v ${x[3] || ''}">${x[1]}</span><span class="s">${x[2]}</span></div>`).join('')}</div>`;
+  return `${breakEvenHtml(false)}<div class="tiles" style="margin-top:12px">${t.map(tileHtml).join('')}</div>`;
+}
+
+// Projection : que donnerait la vente de tout le stock ? Les PS5 au prix choisi, le reste au prix affiché (sinon à la cote, sinon au coût).
+function projHtml() {
+  const on = !!LS.get('projOn', false), price = num(S.settings.stockSalePrice) || 420;
+  const open = S.items.filter((i) => !isSold(i));
+  const rows = open.map((i) => {
+    const ps5 = i.category === 'ps5' || /\bps5\b/.test(norm(i.model));
+    const est = estimateFor(i);
+    const sale = ps5 ? price : listed(i) ? num(i.listPrice) : est ? est.resale : cost(i);
+    return { i, sale, p: sale - cost(i), ps5 };
+  });
+  const K = capital(), ca = sum(rows, (r) => r.sale), pr = sum(rows, (r) => r.p), nP = rows.filter((r) => r.ps5).length;
+  const after = K.cashed + ca - K.invested;
+  return `<section class="card proj" aria-label="Projection du stock">
+    <label class="sw"><span class="sw-t"><b>Projection : vendre tout mon stock</b><small>Combien de CA et de bénéfice si tout part au prix que tu choisis</small></span><input type="checkbox" id="proj-on" role="switch" ${on ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
+    ${on ? `<div class="proj-in"><div class="field"><label for="proj-price">Prix de vente d’une PS5</label><div class="affix"><input id="proj-price" class="inp money" inputmode="decimal" value="${esc(numIn(price))}"></div></div><p class="hint" style="margin:0 0 6px">${plural(nP, 'PS5')} à ce prix${rows.length - nP ? `, ${plural(rows.length - nP, 'autre article')} au prix affiché ou à la cote` : ''}.</p></div>
+      ${rows.length ? `<div class="tiles">${[
+        ['CA du stock', eur(ca), plural(rows.length, 'article'), '', 'c-info'],
+        ['Bénéfice du stock', eurS(pr), `ROI ${pctS(K.stock ? pr / K.stock : null)}`, '', sign(pr)],
+        ['Bénéfice total', eurS(K.profit + pr), `${eurS(K.profit)} déjà réalisés + ${eurS(pr)}`, '', sign(K.profit + pr)],
+        ['Récupéré − dépensé', eurS(after), after >= 0 ? 'rentré dans tes frais' : 'toujours pas rentré dans tes frais', '', sign(after)],
+      ].map(tileHtml).join('')}</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Article</th><th>Coût</th><th>Vente</th><th>Bénéfice</th></tr></thead><tbody>${rows.map((r) => `<tr class="click" data-act="open" data-id="${esc(r.i.id)}"><td><span class="cellm">${mini(r.i)}<span>${tag(r.i)} <span style="white-space:normal">${esc(r.i.model)}</span></span></span></td><td>${eur(cost(r.i))}</td><td>${eur(r.sale)}</td><td><b class="${r.p >= 0 ? 'pos' : 'neg'}">${eurS(r.p)}</b></td></tr>`).join('')}</tbody></table></div>`
+      : '<p class="muted" style="margin:0">Aucun article en stock.</p>'}` : ''}
+  </section>`;
 }
 
 function renderStats() {
@@ -1764,14 +1836,14 @@ function renderStats() {
   const dayRate = sold.length ? sum(sold, profit) / Math.max(1, sum(sold, (i) => Math.max(1, tied(i)))) : null;
   const ships = bought.map(shipDays).filter((d) => d != null), avgShip = ships.length ? avg(ships) : null;
   const tiles = [
-    ['Chiffre d’affaires', eur(A.ca), plural(A.nSold, 'vente')],
-    ['Bénéfice net', eurS(A.profit), `après ${eur(A.fees)} de frais de vente`, A.profit < 0 ? 'neg' : 'pos'],
-    ['Investi', eur(A.invest), plural(A.nBought, 'achat')],
-    ['ROI moyen', pctS(A.roi), 'bénéfice ÷ coût d’achat'],
+    ['Chiffre d’affaires', eur(A.ca), plural(A.nSold, 'vente'), '', 'c-info'],
+    ['Bénéfice net', eurS(A.profit), `après ${eur(A.fees)} de frais de vente`, '', sign(A.profit)],
+    ['Investi', eur(A.invest), plural(A.nBought, 'achat'), '', 'c-warn'],
+    ['ROI moyen', pctS(A.roi), 'bénéfice ÷ coût d’achat', '', sign(A.roi)],
     ['Argent bloqué', days(A.avgTied), 'de l’achat à la vente'],
-    ['Bénéfice moyen', A.avgProfit == null ? '—' : eurS(A.avgProfit), 'par vente'],
+    ['Bénéfice moyen', A.avgProfit == null ? '—' : eurS(A.avgProfit), 'par vente', '', sign(A.avgProfit)],
     ['Délai de vente', days(A.avgDays), 'de la mise en annonce à la vente'],
-    ['Gain par jour', dayRate == null ? '—' : eur(dayRate), 'par article et par jour d’argent immobilisé'],
+    ['Gain par jour', dayRate == null ? '—' : eur(dayRate), 'par article et par jour d’argent immobilisé', '', sign(dayRate)],
   ];
 
   const target = num(S.settings.targetProfit);
@@ -1843,7 +1915,7 @@ function renderStats() {
     <div class="ttl-row"><div><div class="eyebrow">Analyse · ${esc(pLabel)}</div><h1 class="h1">Statistiques</h1></div><button class="btn sm" data-act="export">${ic('dl')} Export CSV</button></div>
     <div class="chips" role="toolbar" aria-label="Période">${chips}</div>
     <section class="card" aria-label="Bilan depuis le début"><div class="card-h"><h2 class="sec">Bilan depuis le début</h2><span class="muted" style="font-size:12.5px">toutes périodes confondues</span></div>${bilanHtml()}</section>
-    <div class="tiles t4">${tiles.map((t) => `<div class="tile"><span class="k">${t[0]}</span><span class="v ${t[3] || ''}">${t[1]}</span><span class="s">${t[2]}</span></div>`).join('')}</div>
+    <div class="tiles t4">${tiles.map(tileHtml).join('')}</div>
     <section class="card">
       <div class="card-h"><h2 class="sec">Chiffre d’affaires et bénéfice par mois</h2><div class="legend"><span><i class="k1"></i>Chiffre d’affaires</span><span><i class="k2"></i>Bénéfice net</span></div></div>
       <div class="chart-host" id="mchart"></div>
@@ -1851,6 +1923,7 @@ function renderStats() {
         ${mrows.map((r) => `<tr class="click" data-act="goto-month" data-m="${r.ym}"><td>${esc(monthLabel(r.ym))}</td><td>${r.nB}</td><td>${eur(r.invest)}</td><td>${r.nS}</td><td>${eur(r.ca)}</td><td class="${r.profit < 0 ? 'neg' : ''}"><b>${eurS(r.profit)}</b></td><td>${pctS(r.roi)}</td><td>${eurS(r.cash)}</td></tr>`).join('')}
       </tbody></table></div></details>
     </section>
+    ${projHtml()}
     <section class="card"><div class="card-h"><h2 class="sec">Où passe le temps</h2><span class="muted" style="font-size:12.5px">moyennes des articles vendus · ${esc(pLabel)}</span></div>${dursHtml}</section>
     <section class="card"><div class="card-h"><h2 class="sec">Annonces en cours</h2><span class="muted" style="font-size:12.5px">de la plus ancienne à la plus récente</span></div>${liveHtml}</section>
     <section class="card"><div class="card-h"><h2 class="sec">Par modèle</h2><span class="muted" style="font-size:12.5px">classé par bénéfice total</span></div>${modelHtml}</section>
@@ -2375,6 +2448,24 @@ function bind() {
   $('#q').addEventListener('input', (e) => { S.f.q = e.target.value; renderList(); });
   $('#grp').addEventListener('change', (e) => { S.f.group = e.target.checked; saveFilters(); renderList(); });
   $('#sort').addEventListener('change', (e) => { S.f.sort = e.target.value; saveFilters(); renderList(); });
+  $('#v-simulateur').addEventListener('change', (e) => {
+    if (e.target.id !== 's-item') return;
+    const it = byId(e.target.value);
+    $('#s-model').value = it ? it.model || '' : '';
+    $('#s-price').value = it ? numIn(num(it.buyPrice)) : '';
+    $('#s-costs').value = it ? numIn(num(it.buyCosts)) : '';
+    $('#s-resale').value = it && listed(it) ? numIn(num(it.listPrice)) : '';
+    renderSimu();
+    if (it) $('#s-resale').focus();
+  });
+  $('#v-stats').addEventListener('change', (e) => {
+    if (e.target.id === 'proj-on') { LS.set('projOn', e.target.checked); renderStats(); }
+    if (e.target.id === 'proj-price') {
+      const v = parseNum(e.target.value);
+      if (v == null || v <= 0) return;
+      write(() => saveSettingsData({ ...S.settings, stockSalePrice: v })).then((ok) => { if (ok) toast(`Prix de projection : ${eur(v)}`); });
+    }
+  });
   $('#v-simulateur').addEventListener('input', (e) => { if (e.target.id === 's-target') e.target.dataset.touched = '1'; renderSimu(); });
   let rt;
   window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (S.view === 'stats' && S.status === 'ok') drawMonthChart($('#mchart'), S.chartRows); }, 150); });
