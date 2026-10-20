@@ -137,6 +137,11 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .cl-ic.in{background:var(--good-soft);color:var(--good)} .cl-ic.out{background:var(--bad-soft);color:var(--bad)}
 .mini.lg{width:56px;height:56px;border-radius:11px}
 .row.wl{grid-template-columns:56px minmax(0,1fr) auto}
+.stabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--surface-2);border-radius:14px;padding:4px;margin-bottom:4px}
+.stabs button{height:40px;border:0;border-radius:11px;background:none;font:inherit;font-weight:800;font-size:14.5px;color:var(--ink-2);cursor:pointer}
+.stabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.cl.rp{grid-template-columns:46px minmax(0,1fr) auto}
+.strip.rep{background:var(--good-soft)}
 .sv-list{display:grid;gap:10px}
 .sv{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:16px;cursor:pointer}
 .sv-top{display:grid;grid-template-columns:56px minmax(0,1fr);gap:12px;align-items:start}
@@ -648,7 +653,7 @@ const CONDS = [['neuf', 'Neuf / scellé'], ['comme_neuf', 'Comme neuf'], ['tres_
 const CONTENTS = ['Boîte', 'Manette', 'Câbles', 'Socle', 'Facture', 'Jeu(x)', 'Garantie'];
 const SOURCES = ['Leboncoin', 'Vinted', 'Facebook', 'Particulier', 'Magasin', 'Autre'];
 const CHANNELS = ['LBC main propre', 'LBC livraison', 'Vinted', 'Facebook', 'Particulier', 'Autre'];
-const DEFAULTS = { monthlyGoal: 500, staleDays: 21, targetProfit: 50, legal: 'particulier', urssafRate: 12.3, microCap: 188700, ps5Price: null, ps5Models: {} };
+const DEFAULTS = { monthlyGoal: 500, staleDays: 21, targetProfit: 50, legal: 'particulier', urssafRate: 12.3, microCap: 188700, ps5Price: null, ps5Models: {}, reparoInCash: true };
 const platformOf = (c) => (c === 'LBC livraison' ? 'Leboncoin' : c === 'Vinted' ? 'Vinted' : null);
 const condLabel = (c) => (CONDS.find((x) => x[0] === c) || [])[1] || '';
 const PS5_KEYS = [['slim_std', 'PS5 Slim Standard'], ['slim_dig', 'PS5 Slim Digital'], ['fat_std', 'PS5 Fat Standard'], ['fat_dig', 'PS5 Fat Digital'], ['pro', 'PS5 Pro']];
@@ -656,7 +661,7 @@ const PS5_KEYS = [['slim_std', 'PS5 Slim Standard'], ['slim_dig', 'PS5 Slim Digi
 /* ---------- État ---------- */
 const S = {
   db: null, assets: null, downloads: null,
-  status: 'loading', items: [], cash: [], settings: { ...DEFAULTS },
+  status: 'loading', items: [], cash: [], repairs: [], settings: { ...DEFAULTS }, statsTab: LS.get('statsTab', 'revente'),
   view: 'accueil', month: thisMonth(), period: '12m', confirmEx: false, chartRows: [],
   f: Object.assign({ q: '', st: 'encours', cat: 'all', sort: 'recent', group: true, view: 'list' }, LS.get('filters', {}), { q: '' }),
 };
@@ -805,13 +810,19 @@ function stateLine(i) {
   return { t: `reçu il y a ${held(i)}${NB}j · pas en annonce`, stale: held(i) > 3 };
 }
 // Caisse depuis le début : apports − retraits + ventes encaissées − achats.
+// Réparo : prestations de réparation (montant = quantité × prix, gain = montant − pièces)
+const repQty = (r) => Math.max(1, num(r.qty) || 1);
+const repTotal = (r) => repQty(r) * num(r.unitPrice);
+const repNet = (r) => repTotal(r) - num(r.partsCost);
+const repInCash = () => S.settings.reparoInCash !== false;
 function capital() {
   const sold = S.items.filter(isSold), open = S.items.filter((i) => !isSold(i));
   const apports = sum(S.cash.filter((c) => c.type !== 'retrait'), (c) => num(c.amount));
   const retraits = sum(S.cash.filter((c) => c.type === 'retrait'), (c) => num(c.amount));
   const invested = sum(S.items, cost), cashed = sum(sold, (i) => num(i.sellPrice) - num(i.sellFees));
-  const stock = sum(open, cost), dispo = apports - retraits + cashed - invested;
-  return { apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock, nSold: sold.length };
+  const reparo = repInCash() ? sum(S.repairs, repNet) : 0;
+  const stock = sum(open, cost), dispo = apports - retraits + cashed - invested + reparo;
+  return { reparo, apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock, nSold: sold.length };
 }
 // Une tuile : [titre, valeur, sous-titre, classe de la valeur, couleur de fond c-good|c-bad|c-info|c-warn]
 const tileHtml = (t) => `<div class="tile ${t[4] || ''}"><span class="k">${t[0]}</span><span class="v ${t[3] || ''}">${t[1]}</span><span class="s">${t[2]}</span></div>`;
@@ -834,6 +845,7 @@ function cashLedger() {
     if (isDate(i.buyDate)) ev.push({ d: i.buyDate, k: 1, label: 'Achat', a: -cost(i), i });
     if (isSold(i)) ev.push({ d: i.sellDate, k: 2, label: 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
   });
+  if (repInCash()) S.repairs.forEach((r) => ev.push({ d: r.date || '', k: 3, label: 'Réparo', note: `${r.type}${repQty(r) > 1 ? ' ×' + repQty(r) : ''}`, a: repNet(r) }));
   ev.sort((x, y) => x.d.localeCompare(y.d) || x.k - y.k);
   let bal = 0;
   ev.forEach((e) => { bal += e.a; e.bal = bal; });
@@ -922,6 +934,7 @@ function renderAccueil() {
         </section>
         <div class="tiles">${[tiles[0], tiles[1], tiles[3], tiles[4], tiles[5], tiles[2], ...tiles.slice(6)].map(tileHtml).join('')}</div>
         ${salesCard(m, ms)}
+        ${reparoStrip(m)}
         ${cashCard()}
         <button class="strip" data-act="goto" data-view="articles" data-st="encours">
           <span>En ce moment</span><span><b>${open.length}</b> en cours</span><span><b>${eur(capital)}</b> immobilisés</span><span><b>${eurS(pot)}</b> au prix affiché</span>${ic('right')}
@@ -952,6 +965,12 @@ function renderAccueil() {
     </section>`;
 }
 
+function reparoStrip(m) {
+  if (!S.repairs.length) return '';
+  const R = S.repairs.filter((r) => (r.date || '').slice(0, 7) === m);
+  return `<button class="strip rep" data-act="goto-reparo"><span><b>Réparo</b> · ${monthName(m)}</span><span><b>${sum(R, repQty)}</b> réparation${sum(R, repQty) > 1 ? 's' : ''}</span><span><b>${eurS(sum(R, repNet))}</b> gagnés</span>${ic('right')}</button>`;
+}
+
 function salesCard(m, ms) {
   const sold = ms.sold.slice().sort((a, b) => b.sellDate.localeCompare(a.sellDate));
   return `<section class="card" aria-label="Ventes du mois">
@@ -978,6 +997,7 @@ function cashCard() {
     <div class="cc-calc" aria-label="Calcul de l’argent disponible">
       <span>Argent apporté</span><b class="in">+${eur(K.apports)}</b>
       <span>Ventes encaissées <small>dont ${eurS(K.profit)} de bénéfice</small></span><b class="in">+${eur(K.cashed)}</b>
+      ${K.reparo ? `<span>Réparo</span><b class="in">+${eur(K.reparo)}</b>` : ''}
       <span>Achats</span><b class="out">−${eur(K.invested)}</b>
       ${K.retraits ? `<span>Retraits</span><b class="out">−${eur(K.retraits)}</b>` : ''}
       <span class="tot">Argent disponible</span><b class="tot">${eur(K.dispo)}</b>
@@ -1887,9 +1907,50 @@ function projHtml() {
   </section>`;
 }
 
+const statsTabs = () => `<div class="stabs" role="tablist">${[['revente', 'Revente'], ['reparo', 'Réparo']].map(([v, l]) => `<button role="tab" data-act="stats-tab" data-v="${v}" aria-selected="${S.statsTab === v}">${l}</button>`).join('')}</div>`;
+
+function reparoHtml() {
+  const R = S.repairs.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const cur = thisMonth(), Rm = R.filter((r) => (r.date || '').slice(0, 7) === cur);
+  const nb = sum(R, repQty), ca = sum(R, repTotal), parts = sum(R, (r) => num(r.partsCost)), net = ca - parts;
+  const head = `<div class="ttl-row"><div><div class="eyebrow">Prestations de réparation</div><h1 class="h1">Réparo</h1></div><button class="btn sm primary" data-act="rep-add">${ic('plus')} Prestation</button></div>`;
+  if (!R.length) return head + `<section class="card"><p style="margin:0">Aucune prestation pour l’instant. Ajoute chaque réparation avec « Prestation » : type, nombre, prix. Le total, le gain et les stats se calculent tout seuls.</p></section>`;
+  const tiles = [
+    ['Réparations', String(nb), plural(R.length, 'prestation'), '', 'c-info'],
+    ['Encaissé', eur(ca), 'total facturé', '', 'c-info'],
+    ['Gain net', eurS(net), parts ? `après ${eur(parts)} de pièces` : 'aucune pièce déduite', '', sign(net)],
+    [`${monthName(cur)[0].toUpperCase()}${monthName(cur).slice(1)}`, eurS(sum(Rm, repNet)), `${sum(Rm, repQty)} réparation${sum(Rm, repQty) > 1 ? 's' : ''}`, '', sign(sum(Rm, repNet))],
+    ['Prix moyen', eur(ca / nb), 'par réparation'],
+    ['Gain moyen', eurS(net / R.length), 'par prestation', '', sign(net)],
+  ];
+  const by = (key) => { const g = new Map(); R.forEach((r) => { const k = key(r); const x = g.get(k) || { n: 0, ca: 0, net: 0 }; x.n += repQty(r); x.ca += repTotal(r); x.net += repNet(r); g.set(k, x); }); return [...g.entries()]; };
+  const types = by((r) => r.type || '?').sort((a, b) => b[1].net - a[1].net);
+  const months = by((r) => (r.date || '').slice(0, 7)).sort((a, b) => b[0].localeCompare(a[0]));
+  const table = (rows, first, lab) => `<div class="tbl-wrap"><table><thead><tr><th>${first}</th><th>Nb</th><th>Encaissé</th><th>Gain</th></tr></thead><tbody>${rows.map(([k, x]) => `<tr><td>${esc(lab(k))}</td><td>${x.n}</td><td>${eur(x.ca)}</td><td><b class="${x.net < 0 ? 'neg' : 'pos'}">${eurS(x.net)}</b></td></tr>`).join('')}</tbody></table></div>`;
+  const list = R.map((r) => `<div class="cl rp">
+      <span class="d">${dShort(r.date)}</span>
+      <span class="t">${esc(r.type)}${repQty(r) > 1 ? ` <b>×${repQty(r)}</b>` : ''}<small>${eur(num(r.unitPrice))} l’unité${num(r.partsCost) ? ` · pièces ${eur(num(r.partsCost))}` : ''}${r.client ? ' · ' + esc(r.client) : ''}${r.note ? ' · ' + esc(r.note) : ''} · <button class="xbtn ${S.confirmRep === r.id ? 'on' : ''}" data-act="rep-del" data-id="${esc(r.id)}">${S.confirmRep === r.id ? 'Confirmer la suppression' : 'Supprimer'}</button></small></span>
+      <span class="a"><b class="in">${eurS(repNet(r))}</b>${num(r.partsCost) ? `<small>facturé ${eur(repTotal(r))}</small>` : ''}</span>
+    </div>`).join('');
+  return head + `
+    <div class="tiles t4">${tiles.map(tileHtml).join('')}</div>
+    <section class="card"><div class="card-h"><h2 class="sec">Par type de prestation</h2></div>${table(types, 'Type', (k) => k)}</section>
+    <section class="card"><div class="card-h"><h2 class="sec">Par mois</h2></div>${table(months, 'Mois', (k) => monthLabel(k))}</section>
+    <section class="card"><div class="card-h"><h2 class="sec">Toutes les prestations</h2><span class="muted" style="font-size:12.5px">${plural(R.length, 'prestation')}</span></div><div>${list}</div></section>
+    <section class="card"><label class="sw"><span class="sw-t"><b>Compter Réparo dans la caisse</b><small>L’argent gagné en réparation s’ajoute à l’argent disponible pour acheter</small></span><input type="checkbox" id="rep-cash" role="switch" ${repInCash() ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label></section>`;
+}
+
+function repTypes() {
+  const m = new Map();
+  S.repairs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).forEach((r) => { if (r.type) m.set(r.type, num(r.unitPrice)); });
+  if (!m.size) m.set('Joystick drift (manette PS5)', 15);
+  return m;
+}
+
 function renderStats() {
   const el = $('#v-stats');
   if (S.status !== 'ok') { el.innerHTML = stateBlock(); return; }
+  if (S.statsTab === 'reparo') { el.innerHTML = statsTabs() + reparoHtml(); return; }
   const P = S.period, cur = thisMonth(), start12 = addMonths(cur, -11);
   const years = [...new Set(S.items.flatMap((i) => [i.buyDate, i.sellDate]).filter(isDate).map((d) => d.slice(0, 4)))].sort().reverse();
   const inP = (d) => isDate(d) && (P === 'all' || (P === '12m' ? d.slice(0, 7) >= start12 : d.slice(0, 4) === P));
@@ -1981,7 +2042,7 @@ function renderStats() {
   const liveHtml = live.length ? `<div class="rows">${live.map((i) => `<div class="row wi" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">${mini(i)}<div class="row-m"><div class="row-t">${tag(i)} <span>${esc(i.model)}</span></div><div class="row-s ${marketDays(i) > stl ? 'warn' : ''}">en annonce depuis ${marketDays(i)}${NB}j sans vente · ${eur(num(i.listPrice))}${(i.priceLog || []).length > 1 ? ` · ${plural(i.priceLog.length - 1, 'baisse')}` : ''} · acheté il y a ${tied(i)}${NB}j</div></div>${ic('right')}</div>`).join('')}</div>`
     : '<p class="muted" style="margin:0">Aucune annonce en ligne pour l’instant.</p>';
   const mrows = rows.slice().reverse();
-  el.innerHTML = `
+  el.innerHTML = statsTabs() + `
     <div class="ttl-row"><div><div class="eyebrow">Analyse · ${esc(pLabel)}</div><h1 class="h1">Statistiques</h1></div><button class="btn sm" data-act="export">${ic('dl')} Export CSV</button></div>
     <div class="chips" role="toolbar" aria-label="Période">${chips}</div>
     <section class="card" aria-label="Bilan depuis le début"><div class="card-h"><h2 class="sec">Bilan depuis le début</h2><span class="muted" style="font-size:12.5px">toutes périodes confondues</span></div>${bilanHtml()}</section>
@@ -2057,15 +2118,21 @@ function blobToB64(blob) {
 }
 function normalize(d) {
   d = d && typeof d === 'object' ? d : {};
-  return { format: 1, settings: { ...DEFAULTS, ...(d.settings || {}) }, items: Array.isArray(d.items) ? d.items.filter((i) => i && i.id) : [], cash: Array.isArray(d.cash) ? d.cash.filter((c) => c && c.id) : [] };
+  const list = (a) => (Array.isArray(a) ? a.filter((x) => x && x.id) : []);
+  // Les clés inconnues sont gardées : une future version de l'appli ne perd jamais de données.
+  const { format, settings, items, cash, repairs, ...extra } = d;
+  return { ...extra, format: 1, settings: { ...DEFAULTS, ...(settings || {}) }, items: list(items), cash: list(cash), repairs: list(repairs) };
 }
 // Une ligne par article : le fichier reste lisible et chaque commit montre exactement ce qui a changé.
 function serialize(d) {
-  return '{\n"format": 1,\n"settings": ' + JSON.stringify(d.settings) + ',\n"items": [\n' + d.items.map((i) => JSON.stringify(i)).join(',\n') + '\n],\n"cash": [\n' + (d.cash || []).map((c) => JSON.stringify(c)).join(',\n') + '\n]\n}\n';
+  const arr = (a) => '[\n' + (a || []).map((x) => JSON.stringify(x)).join(',\n') + '\n]';
+  const { format, settings, items, cash, repairs, ...extra } = d;
+  return '{\n"format": 1,\n"settings": ' + JSON.stringify(settings) + ',\n"items": ' + arr(items) + ',\n"cash": ' + arr(cash) + ',\n"repairs": ' + arr(repairs)
+    + Object.entries(extra).map(([k, v]) => ',\n' + JSON.stringify(k) + ': ' + JSON.stringify(v)).join('') + '\n}\n';
 }
 function applyData(d, sha) {
   DATA = d; SHA = sha;
-  S.items = DATA.items; S.settings = DATA.settings; S.cash = DATA.cash;
+  S.items = DATA.items; S.settings = DATA.settings; S.cash = DATA.cash; S.repairs = DATA.repairs;
   LS.set('cache', { data: DATA, sha: SHA, at: Date.now() });
 }
 async function pull() {
@@ -2149,6 +2216,8 @@ function itemsCol() {
 }
 const addCash = (c) => commit((d) => { d.cash.push({ ...c, id: newId() }); }, `${c.type === 'retrait' ? 'Retrait' : 'Apport'} ${eur(c.amount)}`);
 const delCash = (id) => commit((d) => { d.cash = d.cash.filter((c) => c.id !== id); }, 'Suppression mouvement de caisse');
+const addRepair = (r) => commit((d) => { d.repairs.push({ ...r, id: newId() }); }, `Réparo ${r.type} ×${repQty(r)} ${eur(repTotal(r))}`);
+const delRepair = (id) => commit((d) => { d.repairs = d.repairs.filter((r) => r.id !== id); }, 'Suppression prestation Réparo');
 const saveSettingsData = (next) => commit((d) => { d.settings = { ...DEFAULTS, ...next }; }, 'Réglages');
 
 /* Photos : envoyées dans photos/, affichées via l'API (dépôt privé) avec un cache local. */
@@ -2218,6 +2287,8 @@ function claudeSummary() {
   const K = capital();
   L.push(`Caisse depuis le début : apports ${n2(K.apports)} · retraits ${n2(K.retraits)} · investi ${n2(K.invested)} · encaissé net ${n2(K.cashed)} · bénéfice ${n2(K.profit)} · disponible ${n2(K.dispo)} · stock au coût ${n2(K.stock)} · capital ${n2(K.total)}`);
   if (S.cash.length) L.push('MOUVEMENTS DE CAISSE (date;type;montant;note)', ...S.cash.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((c) => [c.date, c.type, n2(num(c.amount)), (c.note || '').replace(/[\n;]/g, ' ')].join(';')));
+  if (S.repairs.length) L.push(`REPARO (réparations, ${repInCash() ? 'comptées' : 'non comptées'} dans la caisse) : ${sum(S.repairs, repQty)} réparations · encaissé ${n2(sum(S.repairs, repTotal))} · pièces ${n2(sum(S.repairs, (r) => num(r.partsCost)))} · gain ${n2(sum(S.repairs, repNet))}`,
+    'REPARO_PRESTATIONS (date;type;quantite;prix_unitaire;pieces;gain;client;note)', ...S.repairs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((r) => [r.date, r.type, repQty(r), n2(num(r.unitPrice)), n2(num(r.partsCost)), n2(repNet(r)), r.client || '', (r.note || '').replace(/[\n;]/g, ' ')].join(';')));
   L.push('', 'MOIS;achats;investi;ventes;CA;frais_vente;benefice;ROI%');
   months.forEach((m) => { const s = monthStats(m); L.push([m, s.nBought, n2(s.invest), s.nSold, n2(s.ca), n2(s.fees), n2(s.profit), s.roi == null ? '' : Math.round(s.roi * 100)].join(';')); });
   L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;avant_annonce_j;en_annonce_j;argent_bloque_j;notes)');
@@ -2399,6 +2470,11 @@ function syncLabel() {
 
 /* ---------- Navigation et rendu ---------- */
 const VIEWS = ['accueil', 'articles', 'simulateur', 'stats'];
+function repPreview() {
+  const el = $('#r-total'); if (!el) return;
+  const q = Number(val('r-qty')) || 1, p = parseNum(val('r-price')) || 0, parts = parseNum(val('r-parts')) || 0;
+  el.innerHTML = `Total facturé <b>${eur(q * p)}</b>${parts ? ` · gain <b>${eurS(q * p - parts)}</b>` : ''}`;
+}
 function setView(v) {
   if (!VIEWS.includes(v)) v = 'accueil';
   S.view = v;
@@ -2429,6 +2505,37 @@ const ACT = {
   month: (a) => { const n = addMonths(S.month, +a.dataset.d); if (n <= thisMonth()) { S.month = n; renderAccueil(); } },
   'goto-month': (a) => { S.month = a.dataset.m; setView('accueil'); },
   'goto-sales': (a) => { S.f.st = 'vendu'; S.f.cat = 'all'; S.f.month = a.dataset.m; S.f.sort = 'recent'; setView('articles'); },
+  'stats-tab': (a) => { S.statsTab = a.dataset.v; LS.set('statsTab', S.statsTab); renderStats(); window.scrollTo(0, 0); },
+  'goto-reparo': () => { S.statsTab = 'reparo'; LS.set('statsTab', 'reparo'); setView('stats'); },
+  'rep-add': () => {
+    const T = repTypes(), last = [...T.keys()].pop();
+    openSheet({ kind: 'rep', title: 'Prestation Réparo', body: `
+      <div class="field"><label for="r-type">Type de prestation</label><input id="r-type" class="inp" list="dl-rep" autocomplete="off" value="${esc(last)}" placeholder="ex. Joystick drift, nettoyage, HDMI…"><datalist id="dl-rep">${[...T.keys()].map((t) => `<option value="${esc(t)}">`).join('')}</datalist>${errSlot('r-type')}</div>
+      <div class="row2"><div class="field"><label for="r-qty">Nombre</label><span class="selw" style="display:block"><select id="r-qty" class="inp">${[1, 2, 3, 4, 5, 6, 8, 10].map((n) => `<option value="${n}">${n}</option>`).join('')}</select></span></div>${moneyF('r-price', 'Prix par unité', T.get(last))}</div>
+      <div class="row2">${dateF('r-date', 'Date', today())}${moneyF('r-parts', 'Pièces achetées <span class="opt-l">(facultatif)</span>', null)}</div>
+      ${textF('r-client', 'Client <span class="opt-l">(facultatif)</span>', '', 'Prénom, pseudo…')}
+      ${textF('r-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. modules Hall, manette blanche…')}
+      <p class="preview" id="r-total"></p>`,
+      foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="rep-save">Enregistrer</button>` });
+    repPreview();
+  },
+  'rep-save': async (a) => {
+    clearErrs();
+    const r = { type: val('r-type').trim(), qty: Number(val('r-qty')) || 1, unitPrice: parseNum(val('r-price')), date: val('r-date'), partsCost: parseNum(val('r-parts')) || 0, client: val('r-client').trim(), note: val('r-note').trim(), createdAt: new Date().toISOString() };
+    if (!r.type) return fieldErr('r-type', 'Indique le type de prestation.');
+    if (r.unitPrice == null || r.unitPrice < 0) return fieldErr('r-price', 'Indique le prix.');
+    if (!isDate(r.date)) return fieldErr('r-date', 'Date requise.');
+    a.disabled = true;
+    const ok = await write(() => addRepair(r));
+    a.disabled = false;
+    if (ok) { closeSheet(); toast(`Réparo : ${eurS(repNet(r))}${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); }
+  },
+  'rep-del': async (a) => {
+    const id = a.dataset.id;
+    if (S.confirmRep !== id) { S.confirmRep = id; render(); setTimeout(() => { if (S.confirmRep === id) { S.confirmRep = null; render(); } }, 5000); return; }
+    S.confirmRep = null;
+    if (await write(() => delRepair(id))) toast('Prestation supprimée');
+  },
   'f-month-clear': () => { S.f.month = null; renderArticles(); },
   'ledger-all': () => { S.ledgerAll = true; S.ledgerOpen = true; renderAccueil(); },
   goto: (a) => { if (a.dataset.st) S.f.st = a.dataset.st; if (a.dataset.sort) S.f.sort = a.dataset.sort; S.f.cat = 'all'; saveFilters(); setView(a.dataset.view); },
@@ -2531,6 +2638,14 @@ function bind() {
     $('#s-resale').value = it && listed(it) ? numIn(num(it.listPrice)) : '';
     renderSimu();
     if (it) $('#s-resale').focus();
+  });
+  document.addEventListener('input', (e) => { if (/^r-(qty|price|parts)$/.test(e.target.id)) repPreview(); });
+  document.addEventListener('change', (e) => {
+    if (e.target.id === 'r-type') { const p = repTypes().get(e.target.value.trim()); if (p != null) { $('#r-price').value = numIn(p); } repPreview(); }
+    if (e.target.id === 'r-qty') repPreview();
+  });
+  $('#v-stats').addEventListener('change', async (e) => {
+    if (e.target.id === 'rep-cash') { const on = e.target.checked; if (await write(() => saveSettingsData({ ...S.settings, reparoInCash: on }))) toast(on ? 'Réparo compté dans la caisse' : 'Réparo retiré de la caisse'); }
   });
   $('#v-accueil').addEventListener('change', (e) => {
     if (e.target.id === 'sv-profit') { LS.set('salesProfit', e.target.checked); renderAccueil(); }
