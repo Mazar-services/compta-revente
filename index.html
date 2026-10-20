@@ -145,6 +145,11 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .sv-nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .sv-nums span{display:grid;gap:2px;padding:8px 10px;border-radius:12px;background:var(--surface-2);font-size:11.5px;font-weight:800;color:var(--ink-2)}
 .sv-nums b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums} .sv-nums b.pos{color:var(--good)} .sv-nums b.neg{color:var(--bad)}
+.sv-total{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;border-radius:16px}
+.sv-total.i{background:var(--accent-soft)} .sv-total.i b{color:var(--accent)} .sv-total.g{background:var(--good-soft)} .sv-total.r{background:var(--bad-soft)}
+.sv-total span{display:grid;font-size:13.5px;font-weight:800;color:var(--ink-2)} .sv-total small{font-weight:600;font-size:12px}
+.sv-total b{font-family:var(--f-display);font-size:clamp(24px,7vw,30px);font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.sv-total.g b{color:var(--good)} .sv-total.r b{color:var(--bad)}
 .sum-line{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--ink-2);border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
 .cash-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .cc-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -955,7 +960,8 @@ function salesCard(m, ms) {
         <div class="sv-top">${mini(i, 'mini lg')}<div class="sv-id"><b>${esc(i.model)}</b>${i.details ? `<small>${esc(i.details)}</small>` : ''}<span>Réf ${tag(i)}</span><small>Vendu le ${dShort(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}</small></div></div>
         <div class="sv-nums"><span>Acheté<b>${eur(cost(i))}</b></span><span>Vendu<b>${eur(num(i.sellPrice))}</b></span><span>Bénéfice<b class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</b></span></div>
       </div>`; }).join('')}</div>
-      <div class="sum-line"><span>${plural(sold.length, 'vente')}</span><span>CA ${eur(ms.ca)}</span><span class="${ms.profit >= 0 ? 'pos' : 'neg'}">bénéfice ${eurS(ms.profit)}</span></div>`
+      ${(() => { const pr = LS.get('salesProfit', false); return `<div class="sv-total ${pr ? (ms.profit < -0.004 ? 'r' : 'g') : 'i'}"><span>${pr ? 'Bénéfice total' : 'Chiffre d’affaires total'}<small>${plural(sold.length, 'vente')} en ${monthName(m)}</small></span><b>${pr ? eurS(ms.profit) : eur(ms.ca)}</b></div>
+      <label class="sw"><span class="sw-t"><b>Voir le bénéfice total</b><small>Au lieu du chiffre d’affaires</small></span><input type="checkbox" id="sv-profit" role="switch" ${pr ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>`; })()}`
       : `<p class="muted" style="margin:0">Aucune vente en ${monthName(m)} pour l’instant.</p>`}
   </section>`;
 }
@@ -2525,6 +2531,9 @@ function bind() {
     $('#s-resale').value = it && listed(it) ? numIn(num(it.listPrice)) : '';
     renderSimu();
     if (it) $('#s-resale').focus();
+  });
+  $('#v-accueil').addEventListener('change', (e) => {
+    if (e.target.id === 'sv-profit') { LS.set('salesProfit', e.target.checked); renderAccueil(); }
   });
   $('#v-stats').addEventListener('change', (e) => {
     if (e.target.id === 'proj-on') { LS.set('projOn', e.target.checked); renderStats(); }
