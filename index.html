@@ -137,6 +137,14 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .cl-ic.in{background:var(--good-soft);color:var(--good)} .cl-ic.out{background:var(--bad-soft);color:var(--bad)}
 .mini.lg{width:56px;height:56px;border-radius:11px}
 .row.wl{grid-template-columns:56px minmax(0,1fr) auto}
+.sv-list{display:grid;gap:10px}
+.sv{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:16px;cursor:pointer}
+.sv-top{display:grid;grid-template-columns:56px minmax(0,1fr);gap:12px;align-items:start}
+.sv-id{display:grid;gap:3px;min-width:0} .sv-id b{font-size:15.5px;font-weight:800} .sv-id span{font-size:13.5px;font-weight:700;color:var(--ink-2)}
+.sv-id small{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.sv-nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.sv-nums span{display:grid;gap:2px;padding:8px 10px;border-radius:12px;background:var(--surface-2);font-size:11.5px;font-weight:800;color:var(--ink-2)}
+.sv-nums b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums} .sv-nums b.pos{color:var(--good)} .sv-nums b.neg{color:var(--bad)}
 .sum-line{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--ink-2);border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
 .cash-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .cc-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -147,6 +155,10 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .cc.r{background:var(--bad-soft)} .cc.r b{color:var(--bad)}
 .cc.i{background:var(--accent-soft)} .cc.i b{color:var(--accent)}
 .cc.y{background:var(--tag)} .cc.y b,.cc.y span{color:var(--tag-ink)}
+.cc-calc{display:grid;grid-template-columns:1fr auto;gap:5px 12px;font-size:13.5px;padding:10px 14px;border-radius:14px;background:var(--surface-2,rgba(127,127,127,.08))}
+.cc-calc span{color:var(--ink-2)} .cc-calc small{display:block;font-size:11.5px;color:var(--good)}
+.cc-calc b{text-align:right;font-variant-numeric:tabular-nums} .cc-calc .in{color:var(--good)} .cc-calc .out{color:var(--bad)}
+.cc-calc .tot{border-top:1px solid var(--line,rgba(127,127,127,.25));padding-top:6px;font-weight:800;color:var(--ink)}
 .be{display:grid;gap:8px;padding:14px 16px;border-radius:16px}
 .be.r{background:var(--bad-soft)} .be.g{background:var(--good-soft)}
 .be-t{font-size:13px;font-weight:800;color:var(--ink-2)}
@@ -904,8 +916,8 @@ function renderAccueil() {
           ${goalHtml}
         </section>
         <div class="tiles">${[tiles[0], tiles[1], tiles[3], tiles[4], tiles[5], tiles[2], ...tiles.slice(6)].map(tileHtml).join('')}</div>
-        ${cashCard()}
         ${salesCard(m, ms)}
+        ${cashCard()}
         <button class="strip" data-act="goto" data-view="articles" data-st="encours">
           <span>En ce moment</span><span><b>${open.length}</b> en cours</span><span><b>${eur(capital)}</b> immobilisés</span><span><b>${eurS(pot)}</b> au prix affiché</span>${ic('right')}
         </button>
@@ -938,8 +950,11 @@ function renderAccueil() {
 function salesCard(m, ms) {
   const sold = ms.sold.slice().sort((a, b) => b.sellDate.localeCompare(a.sellDate));
   return `<section class="card" aria-label="Ventes du mois">
-    <div class="card-h"><h2 class="sec">Ventes de ${monthName(m)}</h2>${sold.length ? `<button class="btn sm" data-act="goto-sales" data-m="${m}">Tout voir</button>` : ''}</div>
-    ${sold.length ? `<div class="rows">${sold.map((i) => { const p = profit(i); return `<div class="row wl" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">${mini(i, 'mini lg')}<div class="row-m"><div class="row-t">${tag(i)} <span>${esc(i.model)}</span></div><div class="row-s">vendu le ${dShort(i.sellDate)} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''}</div></div><span class="lg-a"><b>${eur(num(i.sellPrice))}</b><small class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</small></span></div>`; }).join('')}</div>
+    <div class="card-h"><h2 class="sec">Ventes de ${monthName(m)} : ${sold.length}</h2>${sold.length ? `<button class="btn sm" data-act="goto-sales" data-m="${m}">Tout voir</button>` : ''}</div>
+    ${sold.length ? `<div class="sv-list">${sold.map((i) => { const p = profit(i); return `<div class="sv" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">
+        <div class="sv-top">${mini(i, 'mini lg')}<div class="sv-id"><b>${esc(i.model)}</b>${i.details ? `<small>${esc(i.details)}</small>` : ''}<span>Réf ${tag(i)}</span><small>Vendu le ${dShort(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}</small></div></div>
+        <div class="sv-nums"><span>Acheté<b>${eur(cost(i))}</b></span><span>Vendu<b>${eur(num(i.sellPrice))}</b></span><span>Bénéfice<b class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</b></span></div>
+      </div>`; }).join('')}</div>
       <div class="sum-line"><span>${plural(sold.length, 'vente')}</span><span>CA ${eur(ms.ca)}</span><span class="${ms.profit >= 0 ? 'pos' : 'neg'}">bénéfice ${eurS(ms.profit)}</span></div>`
       : `<p class="muted" style="margin:0">Aucune vente en ${monthName(m)} pour l’instant.</p>`}
   </section>`;
@@ -954,15 +969,22 @@ function cashCard() {
       <div class="cc i"><span>En stock</span><b>${eur(K.stock)}</b></div>
       <div class="cc y"><span>Capital</span><b>${eur(K.total)}</b></div>
     </div>
+    <div class="cc-calc" aria-label="Calcul de l’argent disponible">
+      <span>Argent apporté</span><b class="in">+${eur(K.apports)}</b>
+      <span>Ventes encaissées <small>dont ${eurS(K.profit)} de bénéfice</small></span><b class="in">+${eur(K.cashed)}</b>
+      <span>Achats</span><b class="out">−${eur(K.invested)}</b>
+      ${K.retraits ? `<span>Retraits</span><b class="out">−${eur(K.retraits)}</b>` : ''}
+      <span class="tot">Argent disponible</span><b class="tot">${eur(K.dispo)}</b>
+    </div>
     ${breakEvenHtml(true)}
     ${!K.apports ? '<p class="hint" style="margin:0">Ajoute ton argent de départ avec « Argent » pour voir ce qu’il te reste à investir.</p>' : ''}
-    <details class="tview" ${S.confirmCash || S.ledgerOpen ? 'open' : ''} style="margin:0" data-ledger><summary>Journal de caisse : chaque entrée et sortie</summary>
-      ${(() => { const L = cashLedger(); return L.length ? L.slice(0, 40).map((e) => `<div class="cl"${e.i ? ` role="button" tabindex="0" data-act="open" data-id="${esc(e.i.id)}"` : ''}>
+    <details class="tview" ${S.confirmCash || S.ledgerOpen !== false ? 'open' : ''} style="margin:0" data-ledger><summary>Historique de la caisse (achats, ventes, apports)</summary>
+      ${(() => { const L = cashLedger(); return L.length ? L.slice(0, S.ledgerAll ? 400 : 8).map((e) => `<div class="cl"${e.i ? ` role="button" tabindex="0" data-act="open" data-id="${esc(e.i.id)}"` : ''}>
         <span class="d">${dShort(e.d)}</span>
         ${e.i ? mini(e.i) : `<span class="cl-ic ${e.a >= 0 ? 'in' : 'out'}" aria-hidden="true">${e.a >= 0 ? '+' : '−'}</span>`}
         <span class="t">${e.label}${e.i ? ` ${tag(e.i)}` : ''}<small>${e.i ? esc(e.i.model) : esc(e.note)}${e.cash ? ` · <button class="xbtn ${S.confirmCash === e.cash.id ? 'on' : ''}" data-act="cash-del" data-id="${esc(e.cash.id)}">${S.confirmCash === e.cash.id ? 'Confirmer la suppression' : 'Supprimer'}</button>` : ''}</small></span>
         <span class="a"><b class="${e.a >= 0 ? 'in' : 'out'}">${eurS(e.a)}</b><small>caisse ${eur(e.bal)}</small></span>
-      </div>`).join('') + (L.length > 40 ? `<p class="hint">Et ${plural(L.length - 40, 'mouvement')} plus ancien${L.length - 40 > 1 ? 's' : ''}.</p>` : '') : '<p class="hint">Aucun mouvement.</p>'; })()}
+      </div>`).join('') + (L.length > 8 && !S.ledgerAll ? `<button class="btn sm" data-act="ledger-all" style="margin-top:8px">Voir tout l’historique (${L.length})</button>` : '') : '<p class="hint">Aucun mouvement.</p>'; })()}
     </details>
   </section>`;
 }
@@ -2402,6 +2424,7 @@ const ACT = {
   'goto-month': (a) => { S.month = a.dataset.m; setView('accueil'); },
   'goto-sales': (a) => { S.f.st = 'vendu'; S.f.cat = 'all'; S.f.month = a.dataset.m; S.f.sort = 'recent'; setView('articles'); },
   'f-month-clear': () => { S.f.month = null; renderArticles(); },
+  'ledger-all': () => { S.ledgerAll = true; S.ledgerOpen = true; renderAccueil(); },
   goto: (a) => { if (a.dataset.st) S.f.st = a.dataset.st; if (a.dataset.sort) S.f.sort = a.dataset.sort; S.f.cat = 'all'; saveFilters(); setView(a.dataset.view); },
   open: (a) => openDetail(a.dataset.id),
   sell: (a) => openQuick('sell', a.dataset.id),
