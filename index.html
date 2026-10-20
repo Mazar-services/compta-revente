@@ -137,6 +137,14 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .cl-ic.in{background:var(--good-soft);color:var(--good)} .cl-ic.out{background:var(--bad-soft);color:var(--bad)}
 .mini.lg{width:56px;height:56px;border-radius:11px}
 .row.wl{grid-template-columns:56px minmax(0,1fr) auto}
+.sv-list{display:grid;gap:10px}
+.sv{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:16px;cursor:pointer}
+.sv-top{display:grid;grid-template-columns:56px minmax(0,1fr);gap:12px;align-items:start}
+.sv-id{display:grid;gap:3px;min-width:0} .sv-id b{font-size:15.5px;font-weight:800} .sv-id span{font-size:13.5px;font-weight:700;color:var(--ink-2)}
+.sv-id small{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.sv-nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.sv-nums span{display:grid;gap:2px;padding:8px 10px;border-radius:12px;background:var(--surface-2);font-size:11.5px;font-weight:800;color:var(--ink-2)}
+.sv-nums b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums} .sv-nums b.pos{color:var(--good)} .sv-nums b.neg{color:var(--bad)}
 .sum-line{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--ink-2);border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
 .cash-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .cc-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -908,8 +916,8 @@ function renderAccueil() {
           ${goalHtml}
         </section>
         <div class="tiles">${[tiles[0], tiles[1], tiles[3], tiles[4], tiles[5], tiles[2], ...tiles.slice(6)].map(tileHtml).join('')}</div>
-        ${cashCard()}
         ${salesCard(m, ms)}
+        ${cashCard()}
         <button class="strip" data-act="goto" data-view="articles" data-st="encours">
           <span>En ce moment</span><span><b>${open.length}</b> en cours</span><span><b>${eur(capital)}</b> immobilisés</span><span><b>${eurS(pot)}</b> au prix affiché</span>${ic('right')}
         </button>
@@ -942,8 +950,11 @@ function renderAccueil() {
 function salesCard(m, ms) {
   const sold = ms.sold.slice().sort((a, b) => b.sellDate.localeCompare(a.sellDate));
   return `<section class="card" aria-label="Ventes du mois">
-    <div class="card-h"><h2 class="sec">Ventes de ${monthName(m)}</h2>${sold.length ? `<button class="btn sm" data-act="goto-sales" data-m="${m}">Tout voir</button>` : ''}</div>
-    ${sold.length ? `<div class="rows">${sold.map((i) => { const p = profit(i); return `<div class="row wl" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">${mini(i, 'mini lg')}<div class="row-m"><div class="row-t">${tag(i)} <span>${esc(i.model)}</span></div><div class="row-s">vendu le ${dShort(i.sellDate)} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''}</div></div><span class="lg-a"><b>${eur(num(i.sellPrice))}</b><small class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</small></span></div>`; }).join('')}</div>
+    <div class="card-h"><h2 class="sec">Ventes de ${monthName(m)} : ${sold.length}</h2>${sold.length ? `<button class="btn sm" data-act="goto-sales" data-m="${m}">Tout voir</button>` : ''}</div>
+    ${sold.length ? `<div class="sv-list">${sold.map((i) => { const p = profit(i); return `<div class="sv" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">
+        <div class="sv-top">${mini(i, 'mini lg')}<div class="sv-id"><b>${esc(i.model)}</b>${i.details ? `<small>${esc(i.details)}</small>` : ''}<span>Réf ${tag(i)}</span><small>Vendu le ${dShort(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}</small></div></div>
+        <div class="sv-nums"><span>Acheté<b>${eur(cost(i))}</b></span><span>Vendu<b>${eur(num(i.sellPrice))}</b></span><span>Bénéfice<b class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</b></span></div>
+      </div>`; }).join('')}</div>
       <div class="sum-line"><span>${plural(sold.length, 'vente')}</span><span>CA ${eur(ms.ca)}</span><span class="${ms.profit >= 0 ? 'pos' : 'neg'}">bénéfice ${eurS(ms.profit)}</span></div>`
       : `<p class="muted" style="margin:0">Aucune vente en ${monthName(m)} pour l’instant.</p>`}
   </section>`;
