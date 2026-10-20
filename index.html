@@ -147,6 +147,10 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .cc.r{background:var(--bad-soft)} .cc.r b{color:var(--bad)}
 .cc.i{background:var(--accent-soft)} .cc.i b{color:var(--accent)}
 .cc.y{background:var(--tag)} .cc.y b,.cc.y span{color:var(--tag-ink)}
+.cc-calc{display:grid;grid-template-columns:1fr auto;gap:5px 12px;font-size:13.5px;padding:10px 14px;border-radius:14px;background:var(--surface-2,rgba(127,127,127,.08))}
+.cc-calc span{color:var(--ink-2)} .cc-calc small{display:block;font-size:11.5px;color:var(--good)}
+.cc-calc b{text-align:right;font-variant-numeric:tabular-nums} .cc-calc .in{color:var(--good)} .cc-calc .out{color:var(--bad)}
+.cc-calc .tot{border-top:1px solid var(--line,rgba(127,127,127,.25));padding-top:6px;font-weight:800;color:var(--ink)}
 .be{display:grid;gap:8px;padding:14px 16px;border-radius:16px}
 .be.r{background:var(--bad-soft)} .be.g{background:var(--good-soft)}
 .be-t{font-size:13px;font-weight:800;color:var(--ink-2)}
@@ -953,6 +957,13 @@ function cashCard() {
       <div class="cc ${K.dispo < -0.004 ? 'r' : 'g'}"><span>Argent disponible</span><b>${eur(K.dispo)}</b></div>
       <div class="cc i"><span>En stock</span><b>${eur(K.stock)}</b></div>
       <div class="cc y"><span>Capital</span><b>${eur(K.total)}</b></div>
+    </div>
+    <div class="cc-calc" aria-label="Calcul de l’argent disponible">
+      <span>Argent apporté</span><b class="in">+${eur(K.apports)}</b>
+      <span>Ventes encaissées <small>dont ${eurS(K.profit)} de bénéfice</small></span><b class="in">+${eur(K.cashed)}</b>
+      <span>Achats</span><b class="out">−${eur(K.invested)}</b>
+      ${K.retraits ? `<span>Retraits</span><b class="out">−${eur(K.retraits)}</b>` : ''}
+      <span class="tot">Argent disponible</span><b class="tot">${eur(K.dispo)}</b>
     </div>
     ${breakEvenHtml(true)}
     ${!K.apports ? '<p class="hint" style="margin:0">Ajoute ton argent de départ avec « Argent » pour voir ce qu’il te reste à investir.</p>' : ''}
