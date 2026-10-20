@@ -147,6 +147,10 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .cc.r{background:var(--bad-soft)} .cc.r b{color:var(--bad)}
 .cc.i{background:var(--accent-soft)} .cc.i b{color:var(--accent)}
 .cc.y{background:var(--tag)} .cc.y b,.cc.y span{color:var(--tag-ink)}
+.cc-calc{display:grid;grid-template-columns:1fr auto;gap:5px 12px;font-size:13.5px;padding:10px 14px;border-radius:14px;background:var(--surface-2,rgba(127,127,127,.08))}
+.cc-calc span{color:var(--ink-2)} .cc-calc small{display:block;font-size:11.5px;color:var(--good)}
+.cc-calc b{text-align:right;font-variant-numeric:tabular-nums} .cc-calc .in{color:var(--good)} .cc-calc .out{color:var(--bad)}
+.cc-calc .tot{border-top:1px solid var(--line,rgba(127,127,127,.25));padding-top:6px;font-weight:800;color:var(--ink)}
 .be{display:grid;gap:8px;padding:14px 16px;border-radius:16px}
 .be.r{background:var(--bad-soft)} .be.g{background:var(--good-soft)}
 .be-t{font-size:13px;font-weight:800;color:var(--ink-2)}
@@ -954,15 +958,22 @@ function cashCard() {
       <div class="cc i"><span>En stock</span><b>${eur(K.stock)}</b></div>
       <div class="cc y"><span>Capital</span><b>${eur(K.total)}</b></div>
     </div>
+    <div class="cc-calc" aria-label="Calcul de l’argent disponible">
+      <span>Argent apporté</span><b class="in">+${eur(K.apports)}</b>
+      <span>Ventes encaissées <small>dont ${eurS(K.profit)} de bénéfice</small></span><b class="in">+${eur(K.cashed)}</b>
+      <span>Achats</span><b class="out">−${eur(K.invested)}</b>
+      ${K.retraits ? `<span>Retraits</span><b class="out">−${eur(K.retraits)}</b>` : ''}
+      <span class="tot">Argent disponible</span><b class="tot">${eur(K.dispo)}</b>
+    </div>
     ${breakEvenHtml(true)}
     ${!K.apports ? '<p class="hint" style="margin:0">Ajoute ton argent de départ avec « Argent » pour voir ce qu’il te reste à investir.</p>' : ''}
-    <details class="tview" ${S.confirmCash || S.ledgerOpen ? 'open' : ''} style="margin:0" data-ledger><summary>Journal de caisse : chaque entrée et sortie</summary>
-      ${(() => { const L = cashLedger(); return L.length ? L.slice(0, 40).map((e) => `<div class="cl"${e.i ? ` role="button" tabindex="0" data-act="open" data-id="${esc(e.i.id)}"` : ''}>
+    <details class="tview" ${S.confirmCash || S.ledgerOpen !== false ? 'open' : ''} style="margin:0" data-ledger><summary>Historique de la caisse (achats, ventes, apports)</summary>
+      ${(() => { const L = cashLedger(); return L.length ? L.slice(0, S.ledgerAll ? 400 : 8).map((e) => `<div class="cl"${e.i ? ` role="button" tabindex="0" data-act="open" data-id="${esc(e.i.id)}"` : ''}>
         <span class="d">${dShort(e.d)}</span>
         ${e.i ? mini(e.i) : `<span class="cl-ic ${e.a >= 0 ? 'in' : 'out'}" aria-hidden="true">${e.a >= 0 ? '+' : '−'}</span>`}
         <span class="t">${e.label}${e.i ? ` ${tag(e.i)}` : ''}<small>${e.i ? esc(e.i.model) : esc(e.note)}${e.cash ? ` · <button class="xbtn ${S.confirmCash === e.cash.id ? 'on' : ''}" data-act="cash-del" data-id="${esc(e.cash.id)}">${S.confirmCash === e.cash.id ? 'Confirmer la suppression' : 'Supprimer'}</button>` : ''}</small></span>
         <span class="a"><b class="${e.a >= 0 ? 'in' : 'out'}">${eurS(e.a)}</b><small>caisse ${eur(e.bal)}</small></span>
-      </div>`).join('') + (L.length > 40 ? `<p class="hint">Et ${plural(L.length - 40, 'mouvement')} plus ancien${L.length - 40 > 1 ? 's' : ''}.</p>` : '') : '<p class="hint">Aucun mouvement.</p>'; })()}
+      </div>`).join('') + (L.length > 8 && !S.ledgerAll ? `<button class="btn sm" data-act="ledger-all" style="margin-top:8px">Voir tout l’historique (${L.length})</button>` : '') : '<p class="hint">Aucun mouvement.</p>'; })()}
     </details>
   </section>`;
 }
@@ -2402,6 +2413,7 @@ const ACT = {
   'goto-month': (a) => { S.month = a.dataset.m; setView('accueil'); },
   'goto-sales': (a) => { S.f.st = 'vendu'; S.f.cat = 'all'; S.f.month = a.dataset.m; S.f.sort = 'recent'; setView('articles'); },
   'f-month-clear': () => { S.f.month = null; renderArticles(); },
+  'ledger-all': () => { S.ledgerAll = true; S.ledgerOpen = true; renderAccueil(); },
   goto: (a) => { if (a.dataset.st) S.f.st = a.dataset.st; if (a.dataset.sort) S.f.sort = a.dataset.sort; S.f.cat = 'all'; saveFilters(); setView(a.dataset.view); },
   open: (a) => openDetail(a.dataset.id),
   sell: (a) => openQuick('sell', a.dataset.id),
