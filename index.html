@@ -125,6 +125,19 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .tile.c-warn{background:var(--warn-soft);border-color:transparent} .tile.c-warn .v{color:var(--warn)}
 .tile.c-good .s,.tile.c-bad .s,.tile.c-info .s,.tile.c-warn .s{color:var(--ink-2)}
 .cashc{display:grid;gap:12px}
+.cl{display:grid;grid-template-columns:46px 36px minmax(0,1fr) auto;gap:8px 10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.cl .mini{width:36px;height:36px;border-radius:8px}
+.cl .d{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.cl .t{min-width:0;overflow-wrap:anywhere}
+.cl .t small{display:block;color:var(--muted);font-size:11.5px}
+.cl .a{display:grid;justify-items:end;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cl .a b.in{color:var(--good)} .cl .a b.out{color:var(--bad)}
+.cl .a small{font-size:11px;color:var(--muted)}
+.cl-ic{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:15px}
+.cl-ic.in{background:var(--good-soft);color:var(--good)} .cl-ic.out{background:var(--bad-soft);color:var(--bad)}
+.mini.lg{width:56px;height:56px;border-radius:11px}
+.row.wl{grid-template-columns:56px minmax(0,1fr) auto}
+.sum-line{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--ink-2);border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
 .cash-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .cc-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .cc{border-radius:12px;padding:10px 12px;display:grid;gap:2px;min-width:0}
@@ -797,6 +810,18 @@ function breakEvenHtml(small) {
     <span class="be-s">Dépensé ${eur(K.invested)} · récupéré ${eur(K.cashed)} (${Math.round(pctBack * 100)}${NB}%)${!ok && K.stock > 0 ? ` · ton stock (${eur(K.stock)} au coût) doit encore être vendu` : ''}</span>
   </div>`;
 }
+function cashLedger() {
+  const ev = [];
+  S.cash.forEach((c) => ev.push({ d: c.date || '', k: 0, label: c.type === 'retrait' ? 'Retrait' : 'Entrée d’argent', note: c.note || '', a: c.type === 'retrait' ? -num(c.amount) : num(c.amount), cash: c }));
+  S.items.forEach((i) => {
+    if (isDate(i.buyDate)) ev.push({ d: i.buyDate, k: 1, label: 'Achat', a: -cost(i), i });
+    if (isSold(i)) ev.push({ d: i.sellDate, k: 2, label: 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
+  });
+  ev.sort((x, y) => x.d.localeCompare(y.d) || x.k - y.k);
+  let bal = 0;
+  ev.forEach((e) => { bal += e.a; e.bal = bal; });
+  return ev.reverse();
+}
 const pills = (i) => (inTransit(i) ? (i.status === 'stock' ? pill('livraison') : pill(i.status) + '<span class="pill st-livraison">Pas encore reçu</span>') : pill(i.status));
 const exb = (i) => (i.example ? '<span class="exb">Exemple</span>' : '');
 const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? u : '');
@@ -880,6 +905,7 @@ function renderAccueil() {
         </section>
         <div class="tiles">${[tiles[0], tiles[1], tiles[3], tiles[4], tiles[5], tiles[2], ...tiles.slice(6)].map(tileHtml).join('')}</div>
         ${cashCard()}
+        ${salesCard(m, ms)}
         <button class="strip" data-act="goto" data-view="articles" data-st="encours">
           <span>En ce moment</span><span><b>${open.length}</b> en cours</span><span><b>${eur(capital)}</b> immobilisés</span><span><b>${eurS(pot)}</b> au prix affiché</span>${ic('right')}
         </button>
@@ -909,20 +935,34 @@ function renderAccueil() {
     </section>`;
 }
 
+function salesCard(m, ms) {
+  const sold = ms.sold.slice().sort((a, b) => b.sellDate.localeCompare(a.sellDate));
+  return `<section class="card" aria-label="Ventes du mois">
+    <div class="card-h"><h2 class="sec">Ventes de ${monthName(m)}</h2>${sold.length ? `<button class="btn sm" data-act="goto-sales" data-m="${m}">Tout voir</button>` : ''}</div>
+    ${sold.length ? `<div class="rows">${sold.map((i) => { const p = profit(i); return `<div class="row wl" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">${mini(i, 'mini lg')}<div class="row-m"><div class="row-t">${tag(i)} <span>${esc(i.model)}</span></div><div class="row-s">vendu le ${dShort(i.sellDate)} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''}</div></div><span class="lg-a"><b>${eur(num(i.sellPrice))}</b><small class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</small></span></div>`; }).join('')}</div>
+      <div class="sum-line"><span>${plural(sold.length, 'vente')}</span><span>CA ${eur(ms.ca)}</span><span class="${ms.profit >= 0 ? 'pos' : 'neg'}">bénéfice ${eurS(ms.profit)}</span></div>`
+      : `<p class="muted" style="margin:0">Aucune vente en ${monthName(m)} pour l’instant.</p>`}
+  </section>`;
+}
+
 function cashCard() {
   const K = capital(), mv = S.cash.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   return `<section class="card cashc" aria-label="Caisse">
     <div class="cash-top"><h2 class="sec">Caisse</h2><div class="btns"><button class="btn sm primary" data-act="cash-add" data-type="apport">${ic('plus')} Argent</button><button class="btn sm" data-act="cash-add" data-type="retrait">Retrait</button></div></div>
     <div class="cc-row">
-      <div class="cc ${K.dispo < -0.004 ? 'r' : 'g'}"><span>Disponible</span><b>${eur(K.dispo)}</b></div>
+      <div class="cc ${K.dispo < -0.004 ? 'r' : 'g'}"><span>Argent disponible</span><b>${eur(K.dispo)}</b></div>
       <div class="cc i"><span>En stock</span><b>${eur(K.stock)}</b></div>
       <div class="cc y"><span>Capital</span><b>${eur(K.total)}</b></div>
     </div>
     ${breakEvenHtml(true)}
     ${!K.apports ? '<p class="hint" style="margin:0">Ajoute ton argent de départ avec « Argent » pour voir ce qu’il te reste à investir.</p>' : ''}
-    <details class="tview" ${S.confirmCash ? 'open' : ''} style="margin:0"><summary>Détail${mv.length ? ` et mouvements (${mv.length})` : ''}</summary>
-      <dl class="kv" style="margin-top:8px"><dt>Apports${K.retraits ? ' − retraits' : ''}</dt><dd>${eur(K.apports - K.retraits)}</dd><dt>Ventes encaissées (net)</dt><dd>${eurS(K.cashed)}</dd><dt>Achats (prix + frais)</dt><dd>${eur(-K.invested)}</dd><dt>Disponible</dt><dd>${eur(K.dispo)}</dd><dt>Stock au coût</dt><dd>${eur(K.stock)}</dd><dt>Capital (disponible + stock)</dt><dd>${eur(K.total)}</dd></dl>
-      ${mv.map((c) => `<div class="cash-mv"><span class="d">${dShort(c.date)}</span><span class="n">${c.type === 'retrait' ? 'Retrait' : 'Entrée'}${c.note ? ' · ' + esc(c.note) : ''}</span><b class="${c.type === 'retrait' ? '' : 'pos'}">${c.type === 'retrait' ? eur(-num(c.amount)) : eurS(num(c.amount))}</b><button class="xbtn ${S.confirmCash === c.id ? 'on' : ''}" data-act="cash-del" data-id="${esc(c.id)}">${S.confirmCash === c.id ? 'Confirmer' : 'Supprimer'}</button></div>`).join('')}
+    <details class="tview" ${S.confirmCash || S.ledgerOpen ? 'open' : ''} style="margin:0" data-ledger><summary>Journal de caisse : chaque entrée et sortie</summary>
+      ${(() => { const L = cashLedger(); return L.length ? L.slice(0, 40).map((e) => `<div class="cl"${e.i ? ` role="button" tabindex="0" data-act="open" data-id="${esc(e.i.id)}"` : ''}>
+        <span class="d">${dShort(e.d)}</span>
+        ${e.i ? mini(e.i) : `<span class="cl-ic ${e.a >= 0 ? 'in' : 'out'}" aria-hidden="true">${e.a >= 0 ? '+' : '−'}</span>`}
+        <span class="t">${e.label}${e.i ? ` ${tag(e.i)}` : ''}<small>${e.i ? esc(e.i.model) : esc(e.note)}${e.cash ? ` · <button class="xbtn ${S.confirmCash === e.cash.id ? 'on' : ''}" data-act="cash-del" data-id="${esc(e.cash.id)}">${S.confirmCash === e.cash.id ? 'Confirmer la suppression' : 'Supprimer'}</button>` : ''}</small></span>
+        <span class="a"><b class="${e.a >= 0 ? 'in' : 'out'}">${eurS(e.a)}</b><small>caisse ${eur(e.bal)}</small></span>
+      </div>`).join('') + (L.length > 40 ? `<p class="hint">Et ${plural(L.length - 40, 'mouvement')} plus ancien${L.length - 40 > 1 ? 's' : ''}.</p>` : '') : '<p class="hint">Aucun mouvement.</p>'; })()}
     </details>
   </section>`;
 }
@@ -1060,6 +1100,7 @@ const SORTS = {
 function filteredItems() {
   let arr = statusSet(S.f.st);
   if (S.f.cat !== 'all') arr = arr.filter((i) => i.category === S.f.cat);
+  if (S.f.month) arr = arr.filter((i) => isSold(i) && i.sellDate.slice(0, 7) === S.f.month);
   const q = norm(S.f.q);
   if (q) arr = arr.filter((i) => matches(i, q));
   return arr.sort(SORTS[S.f.sort] || SORTS.recent);
@@ -1069,7 +1110,7 @@ function renderArticles() {
   $('#art-banner').innerHTML = S.status === 'ok' ? exampleBanner() : '';
   const counts = {};
   ST_OPTS.forEach(([v]) => { counts[v] = statusSet(v).length; });
-  $('#chips-st').innerHTML = ST_OPTS.filter(([v]) => ['encours', 'vendu', 'tous'].includes(v) || counts[v] > 0 || S.f.st === v)
+  $('#chips-st').innerHTML = (S.f.month ? `<button class="chip" data-act="f-month-clear" aria-pressed="true">Ventes · ${esc(monthLabel(S.f.month))} ✕</button>` : '') + ST_OPTS.filter(([v]) => ['encours', 'vendu', 'tous'].includes(v) || counts[v] > 0 || S.f.st === v)
     .map(([v, l]) => `<button class="chip" data-act="f-st" data-v="${v}" aria-pressed="${S.f.st === v}">${l} <span class="n">${counts[v]}</span></button>`).join('');
   const base = statusSet(S.f.st);
   const cats = CAT_ORDER.filter((c) => base.some((i) => i.category === c) || S.f.cat === c);
@@ -1541,6 +1582,7 @@ async function saveForm(btn) {
   if (!ok) return;
   F.saved = true;
   const removed = F.removed.slice(), editedId = old && old.id;
+  if (F.mode !== 'edit') msg += ` · caisse ${eur(capital().dispo)}`;
   closeSheet();
   toast(msg);
   if (removed.length) deleteAssets(removed, editedId);
@@ -1635,7 +1677,7 @@ async function saveQuick(btn) {
   btn.disabled = true;
   const ok = await upd(i.id, patch);
   btn.disabled = false;
-  if (ok) { closeSheet(); toast(msg); }
+  if (ok) { closeSheet(); toast(mode === 'sell' ? `${msg} · caisse ${eur(capital().dispo)}` : msg); }
 }
 
 /* ---------- Simulateur ---------- */
@@ -2358,6 +2400,8 @@ const ACT = {
   settings: () => openSettings(),
   month: (a) => { const n = addMonths(S.month, +a.dataset.d); if (n <= thisMonth()) { S.month = n; renderAccueil(); } },
   'goto-month': (a) => { S.month = a.dataset.m; setView('accueil'); },
+  'goto-sales': (a) => { S.f.st = 'vendu'; S.f.cat = 'all'; S.f.month = a.dataset.m; S.f.sort = 'recent'; setView('articles'); },
+  'f-month-clear': () => { S.f.month = null; renderArticles(); },
   goto: (a) => { if (a.dataset.st) S.f.st = a.dataset.st; if (a.dataset.sort) S.f.sort = a.dataset.sort; S.f.cat = 'all'; saveFilters(); setView(a.dataset.view); },
   open: (a) => openDetail(a.dataset.id),
   sell: (a) => openQuick('sell', a.dataset.id),
@@ -2380,7 +2424,7 @@ const ACT = {
   'save-quick': (a) => saveQuick(a),
   'save-settings': (a) => saveSettings(a),
   'rm-photo': (a) => removePhoto(a.dataset.key),
-  'f-st': (a) => { S.f.st = a.dataset.v; S.f.cat = 'all'; if (S.f.st === 'vendu' && S.f.sort === 'ancien') S.f.sort = 'recent'; saveFilters(); renderArticles(); },
+  'f-st': (a) => { S.f.month = null; S.f.st = a.dataset.v; S.f.cat = 'all'; if (S.f.st === 'vendu' && S.f.sort === 'ancien') S.f.sort = 'recent'; saveFilters(); renderArticles(); },
   'f-cat': (a) => { S.f.cat = a.dataset.v; saveFilters(); renderArticles(); },
   'cash-add': (a) => {
     const ret = a.dataset.type === 'retrait';
@@ -2444,6 +2488,7 @@ function bind() {
   new MutationObserver(() => hydrateImgs()).observe(document.body, { childList: true, subtree: true });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
   window.addEventListener('online', () => { S.offline = false; refresh(true); });
+  document.addEventListener('toggle', (e) => { if (e.target.matches && e.target.matches('details[data-ledger]')) S.ledgerOpen = e.target.open; }, true);
   document.addEventListener('error', (e) => { if (e.target && e.target.tagName === 'IMG') e.target.classList.add('broken'); }, true);
   $('#q').addEventListener('input', (e) => { S.f.q = e.target.value; renderList(); });
   $('#grp').addEventListener('change', (e) => { S.f.group = e.target.checked; saveFilters(); renderList(); });
