@@ -212,6 +212,8 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .st-annonce{background:var(--accent-soft);color:var(--accent)}
 .st-reserve{background:var(--warn-soft);color:var(--warn)}
 .st-vendu{background:var(--good-soft);color:var(--good)}
+.st-annule{background:var(--bad-soft);color:var(--bad)} .st-attente{background:var(--warn-soft);color:var(--warn)}
+.item.cancelled{opacity:.75} .item.cancelled .it-name{text-decoration:line-through}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
 .sw-t{display:grid;gap:1px;min-width:0}
@@ -661,7 +663,7 @@ const PS5_KEYS = [['slim_std', 'PS5 Slim Standard'], ['slim_dig', 'PS5 Slim Digi
 /* ---------- État ---------- */
 const S = {
   db: null, assets: null, downloads: null,
-  status: 'loading', items: [], cash: [], repairs: [], settings: { ...DEFAULTS }, statsTab: LS.get('statsTab', 'revente'),
+  status: 'loading', items: [], allItems: [], cancelled: [], cash: [], repairs: [], settings: { ...DEFAULTS }, statsTab: LS.get('statsTab', 'revente'),
   view: 'accueil', month: thisMonth(), period: '12m', confirmEx: false, chartRows: [],
   f: Object.assign({ q: '', st: 'encours', cat: 'all', sort: 'recent', group: true, view: 'list' }, LS.get('filters', {}), { q: '' }),
 };
@@ -675,6 +677,9 @@ const roi = (i) => { const c = cost(i), p = profit(i); return p == null || !c ? 
 // Les anciens articles (sans champ « received ») sont considérés reçus le jour de l'achat.
 const isReceived = (i) => i.received !== false;
 const inTransit = (i) => !isReceived(i) && !isSold(i);
+const isCancelled = (i) => i.cancelled === true;
+// Achat à distance pas encore envoyé par le vendeur (case « Envoyé » pas cochée)
+const awaitingShip = (i) => inTransit(i) && i.buyMode === 'livraison' && !i.shipped && !isCancelled(i);
 const availDate = (i) => (isReceived(i) ? (isDate(i.receiveDate) ? i.receiveDate : i.buyDate) : null);
 // held : jours pendant lesquels l'article pouvait être vendu (depuis la réception).
 const held = (i) => { const a = availDate(i); return isDate(a) ? Math.max(0, dayDiff(a, isSold(i) ? i.sellDate : today())) : 0; };
@@ -698,7 +703,7 @@ function phaseSplit(i) {
 const shipDays = (i) => (i.buyMode === 'livraison' && isReceived(i) && isDate(i.receiveDate) && isDate(i.buyDate) ? Math.max(0, dayDiff(i.buyDate, i.receiveDate)) : null);
 const listed = (i) => (i.status === 'annonce' || i.status === 'reserve') && i.listPrice != null;
 const potential = (i) => (listed(i) ? num(i.listPrice) - cost(i) : null);
-const byId = (id) => S.items.find((i) => i.id === id);
+const byId = (id) => S.allItems.find((i) => i.id === id);
 const photoIds = (i) => (Array.isArray(i.photos) ? i.photos.flatMap((p) => [p && p.f, p && p.t]).filter(Boolean) : []);
 
 function aggregate(bought, sold) {
@@ -756,7 +761,7 @@ function nextRef(cat, offset = 0) {
   const code = (CATS[cat] || CATS.autre).code;
   const re = new RegExp('^' + code + '-(\\d+)$');
   let max = 0;
-  S.items.forEach((i) => { if (i.example) return; const m = re.exec(i.ref || ''); if (m) max = Math.max(max, +m[1]); });
+  S.allItems.forEach((i) => { if (i.example) return; const m = re.exec(i.ref || ''); if (m) max = Math.max(max, +m[1]); });
   return `${code}-${String(max + 1 + offset).padStart(3, '0')}`;
 }
 // Cote du marché réglée par l'utilisateur : prix par modèle PS5, sinon prix PS5 général.
@@ -841,6 +846,10 @@ function breakEvenHtml(small) {
 function cashLedger() {
   const ev = [];
   S.cash.forEach((c) => ev.push({ d: c.date || '', k: 0, label: c.type === 'retrait' ? 'Retrait' : 'Entrée d’argent', note: c.note || '', a: c.type === 'retrait' ? -num(c.amount) : num(c.amount), cash: c }));
+  S.cancelled.forEach((i) => {
+    if (isDate(i.buyDate)) ev.push({ d: i.buyDate, k: 1, label: 'Achat', a: -cost(i), i });
+    ev.push({ d: i.cancelDate || i.buyDate || '', k: 2, label: 'Achat annulé, remboursé', a: cost(i), i });
+  });
   S.items.forEach((i) => {
     if (isDate(i.buyDate)) ev.push({ d: i.buyDate, k: 1, label: 'Achat', a: -cost(i), i });
     if (isSold(i)) ev.push({ d: i.sellDate, k: 2, label: 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
@@ -851,7 +860,9 @@ function cashLedger() {
   ev.forEach((e) => { bal += e.a; e.bal = bal; });
   return ev.reverse();
 }
-const pills = (i) => (inTransit(i) ? (i.status === 'stock' ? pill('livraison') : pill(i.status) + '<span class="pill st-livraison">Pas encore reçu</span>') : pill(i.status));
+const pills = (i) => (isCancelled(i) ? '<span class="pill st-annule">Achat annulé</span>'
+  : awaitingShip(i) ? (i.status === 'stock' ? '' : pill(i.status)) + '<span class="pill st-attente">Pas encore envoyé</span>'
+  : inTransit(i) ? (i.status === 'stock' ? pill('livraison') : pill(i.status) + '<span class="pill st-livraison">Pas encore reçu</span>') : pill(i.status));
 const exb = (i) => (i.example ? '<span class="exb">Exemple</span>' : '');
 const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? u : '');
 
@@ -1025,7 +1036,12 @@ function alerts() {
   const stale = num(S.settings.staleDays) || 21;
   const open = S.items.filter(isOpen), recv = open.filter(isReceived);
   const rows = [];
-  open.filter(inTransit).sort((a, b) => tied(b) - tied(a)).forEach((i) => rows.push({
+  open.filter(awaitingShip).sort((a, b) => tied(b) - tied(a)).forEach((i) => rows.push({
+    i, t: tied(i) >= 3 ? 'warn' : 'info',
+    txt: `Acheté il y a ${tied(i)}${NB}j : le vendeur a-t-il envoyé ? Sinon, « Achat annulé » rend l’argent à la caisse`,
+    act: ['ship', 'Envoyé'],
+  }));
+  open.filter((i) => inTransit(i) && !awaitingShip(i)).sort((a, b) => tied(b) - tied(a)).forEach((i) => rows.push({
     i, t: tied(i) > 7 ? 'warn' : 'info',
     txt: `Acheté il y a ${tied(i)}${NB}j, toujours en livraison${tied(i) > 7 ? ' : colis en retard ?' : ''}`,
     act: ['recv', 'Reçu'],
@@ -1118,11 +1134,12 @@ function journal(m, ms) {
 }
 
 /* ---------- Articles ---------- */
-const ST_OPTS = [['encours', 'En cours'], ['livraison', 'En livraison'], ['stock', 'En stock'], ['annonce', 'En annonce'], ['reserve', 'Réservés'], ['vendu', 'Vendus'], ['tous', 'Tous']];
+const ST_OPTS = [['encours', 'En cours'], ['livraison', 'En livraison'], ['stock', 'En stock'], ['annonce', 'En annonce'], ['reserve', 'Réservés'], ['vendu', 'Vendus'], ['tous', 'Tous'], ['annule', 'Annulés']];
 function statusSet(st) {
   if (st === 'encours') return S.items.filter(isOpen);
   if (st === 'tous') return S.items.slice();
   if (st === 'livraison') return S.items.filter(inTransit);
+  if (st === 'annule') return S.cancelled.slice();
   if (st === 'stock') return S.items.filter((i) => i.status === 'stock' && isReceived(i));
   return S.items.filter((i) => i.status === st);
 }
@@ -1202,7 +1219,16 @@ function renderList() {
   }).join('');
 }
 
+function cancelledCard(i) {
+  return `<div class="item cancelled" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">
+    ${mini(i, 'thumb')}
+    <span class="it-main"><span class="it-top">${tag(i)}${pills(i)}</span><span class="it-name">${esc(i.model || '—')}</span>
+      <span class="it-dates"><span class="days">acheté le ${dShort(i.buyDate)} · annulé le ${dShort(i.cancelDate || i.buyDate)}</span></span></span>
+    <span class="it-side"><span class="it-price"><s>${eur(cost(i))}</s></span><span class="it-sub pos">remboursé</span></span>
+  </div>`;
+}
 function card(i) {
+  if (isCancelled(i)) return cancelledCard(i);
   const sold = isSold(i), h = held(i), transit = inTransit(i), stale = !sold && !transit && h > (num(S.settings.staleDays) || 21);
   const sl = stateLine(i);
   const p = profit(i);
@@ -1211,7 +1237,8 @@ function card(i) {
     : listed(i)
       ? `<span class="it-price">${eur(num(i.listPrice))}</span><span class="it-sub">coût ${eur(cost(i))}</span>`
       : `<span class="it-price">${eur(cost(i))}</span><span class="it-sub">coût total</span>`;
-  const quick = transit ? `<button class="qbtn primary" data-act="recv" data-id="${esc(i.id)}">Reçu</button>`
+  const quick = awaitingShip(i) ? `<button class="qbtn primary" data-act="ship" data-id="${esc(i.id)}">Envoyé</button>`
+    : transit ? `<button class="qbtn primary" data-act="recv" data-id="${esc(i.id)}">Reçu</button>`
     : i.status === 'stock' ? `<button class="qbtn" data-act="list" data-id="${esc(i.id)}">Annonce</button>`
     : isOpen(i) ? `<button class="qbtn primary" data-act="sell" data-id="${esc(i.id)}">Vendu</button>` : '';
   const meta = [i.details, condLabel(i.condition), i.serial ? 'SN …' + String(i.serial).slice(-4) : ''].filter(Boolean).join(' · ');
@@ -1296,15 +1323,20 @@ function detailBody(i) {
   ];
   const tl = [];
   tl.push(`<li><span class="dot ok"></span><div><b>Acheté ${eur(num(i.buyPrice))}${num(i.buyCosts) ? ` + ${eur(num(i.buyCosts))} de frais` : ''}</b><small>${dLong(i.buyDate)}${i.buySource ? ' · ' + esc(i.buySource) : ''}${i.sellerName ? ' · vendeur ' + esc(i.sellerName) : ''}</small></div></li>`);
-  if (i.buyMode === 'livraison' || inTransit(i)) {
+  if (i.buyMode === 'livraison' && (i.shipped || inTransit(i))) {
+    if (i.shipped) tl.push(`<li><span class="dot ok"></span><div><b>Envoyé par le vendeur</b><small>${isDate(i.shipDate) ? dLong(i.shipDate) : 'date non notée'}</small></div></li>`);
+    else if (!isCancelled(i)) tl.push(`<li><span class="dot on"></span><div><b>En attente d’envoi par le vendeur</b><small>acheté il y a ${tied(i)}${NB}j</small></div></li>`);
+  }
+  if (isCancelled(i)) tl.push(`<li><span class="dot"></span><div><b>Achat annulé · ${eur(cost(i))} remboursés dans la caisse</b><small>${dLong(i.cancelDate || i.buyDate)}</small></div></li>`);
+  else if (i.buyMode === 'livraison' || inTransit(i)) {
     if (isReceived(i)) tl.push(`<li><span class="dot ok"></span><div><b>Reçu${shipDays(i) != null ? ` · ${shipDays(i)}${NB}j de livraison` : ''}</b><small>${dLong(availDate(i))}</small></div></li>`);
-    else tl.push(`<li><span class="dot on"></span><div><b>En livraison</b><small>depuis ${tied(i)}${NB}j</small></div></li>`);
+    else if (i.shipped) tl.push(`<li><span class="dot on"></span><div><b>En livraison</b><small>${isDate(i.shipDate) ? `envoyé il y a ${ago(i.shipDate)}${NB}j` : `acheté il y a ${tied(i)}${NB}j`}</small></div></li>`);
   }
   const entries = log.length ? log : (i.listPrice != null && i.status !== 'stock' ? [{ d: i.listDate, p: i.listPrice }] : []);
   entries.forEach((e, k) => tl.push(`<li><span class="dot ${sold || k < entries.length - 1 ? 'ok' : 'on'}"></span><div><b>${k === 0 ? 'Mis en annonce à' : 'Prix passé à'} ${eur(num(e.p))}</b><small>${dLong(e.d)}</small></div></li>`));
   if (i.status === 'reserve') tl.push(`<li><span class="dot on"></span><div><b>Réservé</b><small>en attente de la vente</small></div></li>`);
   if (sold) tl.push(`<li><span class="dot ok"></span><div><b>Vendu ${eur(num(i.sellPrice))} · <span class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</span></b><small>${dLong(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''}${i.buyerName ? ' · acheteur ' + esc(i.buyerName) : ''} · ${h}${NB}j après réception</small></div></li>`);
-  else if (!inTransit(i)) tl.push(`<li><span class="dot"></span><div><b>${i.status === 'stock' ? 'À mettre en annonce' : 'En attente d’acheteur'}</b><small>J+${h} depuis la réception</small></div></li>`);
+  else if (!inTransit(i) && !isCancelled(i)) tl.push(`<li><span class="dot"></span><div><b>${i.status === 'stock' ? 'À mettre en annonce' : 'En attente d’acheteur'}</b><small>J+${h} depuis la réception</small></div></li>`);
   const specs = [
     ['Catégorie', (CATS[i.category] || CATS.autre).label],
     ['Mode d’achat', (BUY_MODES.find((m) => m[0] === i.buyMode) || [])[1]],
@@ -1326,11 +1358,12 @@ function detailBody(i) {
       <button class="btn sm" data-act="edit" data-id="${esc(i.id)}">Modifier</button>
       <button class="btn sm" data-act="dup" data-id="${esc(i.id)}">Dupliquer</button>
       ${listed(i) ? `<button class="btn sm" data-act="price" data-id="${esc(i.id)}">Changer le prix</button>` : ''}
+      ${!isSold(i) && !isCancelled(i) && !awaitingShip(i) ? `<button class="btn sm danger" data-act="cancel-buy" data-id="${esc(i.id)}">Achat annulé</button>` : ''}
       <button class="btn sm danger" data-act="del" data-id="${esc(i.id)}">Supprimer</button>
     </div>`;
 }
 function durationsBlock(i) {
-  if (!isDate(i.buyDate)) return '';
+  if (!isDate(i.buyDate) || isCancelled(i)) return '';
   const ps = phaseSplit(i), sold = isSold(i), m = marketStart(i), a = availDate(i);
   const seg = (k, cls) => (ps[k] > 0 ? `<span class="${cls}" style="flex:${ps[k]}"></span>` : '');
   const line = (cls, label, val, note) => `<div class="dur"><i class="${cls}"></i><span>${label}<small>${note}</small></span><b>${val}</b></div>`;
@@ -1346,6 +1379,8 @@ function durationsBlock(i) {
 }
 function detailFoot(i) {
   const id = esc(i.id);
+  if (isCancelled(i)) return `<button class="btn primary grow" data-act="uncancel" data-id="${id}">Rétablir l’achat</button>`;
+  if (awaitingShip(i)) return `<button class="btn danger grow" data-act="cancel-buy" data-id="${id}">Achat annulé</button><button class="btn primary grow" data-act="ship" data-id="${id}">Envoyé par le vendeur</button>`;
   if (inTransit(i)) return `${i.status === 'stock' ? `<button class="btn grow" data-act="list" data-id="${id}">Mettre en annonce</button>` : `<button class="btn grow" data-act="sell" data-id="${id}">Vendu</button>`}<button class="btn primary grow" data-act="recv" data-id="${id}">Article reçu</button>`;
   if (i.status === 'stock') return `<button class="btn grow" data-act="sell" data-id="${id}">Vendu direct</button><button class="btn primary grow" data-act="list" data-id="${id}">Mettre en annonce</button>`;
   if (i.status === 'annonce') return `<button class="btn grow" data-act="reserve" data-id="${id}">Réservé</button><button class="btn primary grow" data-act="sell" data-id="${id}">Vendu</button>`;
@@ -1432,6 +1467,7 @@ function openForm(mode, item, prefill) {
       ${textF('f-seller', 'Vendeur <span class="opt-l">(pseudo)</span>', src.sellerName, '')}
     </div>
     <div class="fs"><p class="fs-t">Suivi</p>
+      <div id="f-ship-wrap"><label class="sw"><span class="sw-t"><b>Envoyé par le vendeur</b><small>Coche quand le vendeur a bien expédié le colis</small></span><input type="checkbox" id="f-ship" role="switch" ${src.shipped ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label></div>
       <label class="sw"><span class="sw-t"><b>Article reçu</b><small>Le délai de vente se compte à partir de la réception</small></span><input type="checkbox" id="f-recv" role="switch" ${recvOn ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
       <div id="f-sec-recv" class="sub">${dateF('f-recvDate', 'Date de réception', recvDate)}</div>
       <label class="sw"><span class="sw-t"><b>Mis en annonce</b><small>Leboncoin, Vinted…</small></span><input type="checkbox" id="f-listed" role="switch" ${st !== 'stock' && (st !== 'vendu' || src.listPrice != null) ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
@@ -1487,6 +1523,7 @@ function onTrackChange(init, changed) {
     }
   }
   $('#f-sec-recv').hidden = !recv.checked;
+  $('#f-ship-wrap').hidden = radioVal('f-mode') !== 'livraison' || recv.checked;
   $('#f-sec-list').hidden = !listedSw.checked;
   $('#f-sec-sell').hidden = !soldSw.checked;
 }
@@ -1582,6 +1619,7 @@ async function saveForm(btn) {
     buyDate: val('f-buyDate'), buyPrice: parseNum(val('f-buyPrice')), buyCosts: parseNum(val('f-buyCosts')) || 0,
     buySource: radioVal('f-src'), sellerName: val('f-seller'), status: formStatus(),
     buyMode: radioVal('f-mode'), received: $('#f-recv').checked, receiveDate: $('#f-recv').checked ? val('f-recvDate') : '',
+    shipped: radioVal('f-mode') === 'livraison' && ($('#f-ship').checked || $('#f-recv').checked),
     listDate: val('f-listDate'), listPrice: parseNum(val('f-listPrice')), listUrl: normUrl(val('f-listUrl')),
     sellDate: val('f-sellDate'), sellPrice: parseNum(val('f-sellPrice')), sellFees: parseNum(val('f-sellFees')) || 0,
     sellChannel: radioVal('f-chan'), buyerName: val('f-buyer'), notes: val('f-notes'),
@@ -1608,6 +1646,7 @@ async function saveForm(btn) {
     else if (last.p !== v.listPrice) log.push({ d: today(), p: v.listPrice });
   }
   const now = new Date().toISOString();
+  v.shipDate = v.shipped ? (F.item && F.item.shipped && F.item.shipDate) || today() : '';
   const doc = { ...v, photos: F.photos.filter((p) => p.state === 'ok' && p.f).map((p) => ({ f: p.f, t: p.t || p.f })), priceLog: log, updatedAt: now };
   if (v.buyMode) LS.set('buyMode', v.buyMode);
   btn.disabled = true;
@@ -1687,7 +1726,7 @@ async function saveQuick(btn) {
     if (!isDate(d)) return fieldErr('q-recv', 'Date de réception requise.');
     if (isDate(i.buyDate) && d < i.buyDate) return fieldErr('q-recv', `La réception ne peut pas précéder l’achat (${dShort(i.buyDate)}).`);
     btn.disabled = true;
-    const ok = await upd(i.id, { received: true, receiveDate: d, buyMode: i.buyMode || 'livraison' });
+    const ok = await upd(i.id, { received: true, receiveDate: d, buyMode: i.buyMode || 'livraison', shipped: true, shipDate: i.shipDate || '' });
     btn.disabled = false;
     if (ok) { closeSheet(); toast(`${i.ref} reçu : ${dayDiff(i.buyDate, d)}${NB}j de livraison`); }
     return;
@@ -2132,7 +2171,7 @@ function serialize(d) {
 }
 function applyData(d, sha) {
   DATA = d; SHA = sha;
-  S.items = DATA.items; S.settings = DATA.settings; S.cash = DATA.cash; S.repairs = DATA.repairs;
+  S.allItems = DATA.items; S.items = DATA.items.filter((i) => !isCancelled(i)); S.cancelled = DATA.items.filter(isCancelled); S.settings = DATA.settings; S.cash = DATA.cash; S.repairs = DATA.repairs;
   LS.set('cache', { data: DATA, sha: SHA, at: Date.now() });
 }
 async function pull() {
@@ -2289,10 +2328,11 @@ function claudeSummary() {
   if (S.cash.length) L.push('MOUVEMENTS DE CAISSE (date;type;montant;note)', ...S.cash.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((c) => [c.date, c.type, n2(num(c.amount)), (c.note || '').replace(/[\n;]/g, ' ')].join(';')));
   if (S.repairs.length) L.push(`REPARO (réparations, ${repInCash() ? 'comptées' : 'non comptées'} dans la caisse) : ${sum(S.repairs, repQty)} réparations · encaissé ${n2(sum(S.repairs, repTotal))} · pièces ${n2(sum(S.repairs, (r) => num(r.partsCost)))} · gain ${n2(sum(S.repairs, repNet))}`,
     'REPARO_PRESTATIONS (date;type;quantite;prix_unitaire;pieces;gain;client;note)', ...S.repairs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((r) => [r.date, r.type, repQty(r), n2(num(r.unitPrice)), n2(num(r.partsCost)), n2(repNet(r)), r.client || '', (r.note || '').replace(/[\n;]/g, ' ')].join(';')));
+  if (S.cancelled.length) L.push('ACHATS ANNULES (exclus de tous les calculs, argent revenu en caisse) : ' + S.cancelled.map((i) => `${i.ref} ${i.model} ${n2(cost(i))} € annulé le ${i.cancelDate || '?'}`).join(' · '));
   L.push('', 'MOIS;achats;investi;ventes;CA;frais_vente;benefice;ROI%');
   months.forEach((m) => { const s = monthStats(m); L.push([m, s.nBought, n2(s.invest), s.nSold, n2(s.ca), n2(s.fees), n2(s.profit), s.roi == null ? '' : Math.round(s.roi * 100)].join(';')); });
   L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;avant_annonce_j;en_annonce_j;argent_bloque_j;notes)');
-  items.forEach((i) => L.push([i.ref, i.category, i.model, i.details, i.condition, i.buyDate, n2(num(i.buyPrice)), n2(num(i.buyCosts)), i.buySource, i.buyMode || '', isReceived(i) ? availDate(i) : 'en livraison', shipDays(i) ?? '', i.status,
+  items.forEach((i) => L.push([i.ref, i.category, i.model, i.details, i.condition, i.buyDate, n2(num(i.buyPrice)), n2(num(i.buyCosts)), i.buySource, i.buyMode || '', isReceived(i) ? availDate(i) : awaitingShip(i) ? 'pas encore envoyé' : 'en livraison', shipDays(i) ?? '', i.status,
     i.status !== 'stock' ? i.listDate : '', i.status !== 'stock' ? n2(i.listPrice) : '', Math.max(0, (i.priceLog || []).length - 1),
     isSold(i) ? i.sellDate : '', isSold(i) ? n2(num(i.sellPrice)) : '', isSold(i) ? n2(num(i.sellFees)) : '', isSold(i) ? i.sellChannel : '',
     n2(profit(i)), isReceived(i) && (marketStart(i) || !isSold(i)) ? phaseSplit(i).prep : '', marketStart(i) ? marketDays(i) : '', tied(i), (i.notes || '').replace(/[\n;]/g, ' ')].map((v) => String(v ?? '').replace(/;/g, ',')).join(';')));
@@ -2346,7 +2386,7 @@ async function saveToken(btn) {
 }
 function logout() {
   TOKEN = ''; LS.set('token', ''); LS.set('cache', null);
-  DATA = null; SHA = null; S.items = []; S.status = 'setup'; S.authMsg = '';
+  DATA = null; SHA = null; S.items = []; S.allItems = []; S.cancelled = []; S.status = 'setup'; S.authMsg = '';
   closeSheet(); render(); toast('Appareil déconnecté');
 }
 async function refresh(force) {
@@ -2542,6 +2582,32 @@ const ACT = {
   open: (a) => openDetail(a.dataset.id),
   sell: (a) => openQuick('sell', a.dataset.id),
   recv: (a) => openQuick('recv', a.dataset.id),
+  ship: async (a) => {
+    const i = byId(a.dataset.id); if (!i) return;
+    if (await upd(i.id, { shipped: true, shipDate: today() })) toast(`${i.ref} : envoyé par le vendeur`);
+  },
+  'cancel-buy': (a) => {
+    const i = byId(a.dataset.id); if (!i) return;
+    openSheet({ kind: 'cancel', id: i.id, title: `Annuler l’achat ${i.ref}`, body: `
+      <div class="fs qhead" style="padding:12px">${mini(i)}<div style="display:grid;gap:3px;min-width:0"><div class="it-top">${tag(i)}</div><b>${esc(i.model)}</b><span class="muted" style="font-size:13px">Coût total ${eur(cost(i))} · acheté le ${dShort(i.buyDate)}</span></div></div>
+      <p style="margin:0">Le vendeur a annulé ou tu as été remboursé : <b>${eur(cost(i))}</b> reviennent dans la caisse. L’article sort du stock et des stats, mais reste visible dans Articles › Annulés (tu peux le rétablir).</p>
+      ${dateF('x-date', 'Date d’annulation', today())}`,
+      foot: `<button class="btn" data-act="close">Retour</button><button class="btn danger grow" data-act="cancel-save" data-id="${esc(i.id)}">Confirmer l’annulation</button>` });
+  },
+  'cancel-save': async (a) => {
+    const i = byId(a.dataset.id); if (!i) return;
+    clearErrs();
+    const d = val('x-date');
+    if (!isDate(d)) return fieldErr('x-date', 'Date requise.');
+    a.disabled = true;
+    const ok = await upd(i.id, { cancelled: true, cancelDate: d });
+    a.disabled = false;
+    if (ok) { closeSheet(); toast(`Achat ${i.ref} annulé : +${eur(cost(i))} · caisse ${eur(capital().dispo)}`); }
+  },
+  uncancel: async (a) => {
+    const i = byId(a.dataset.id); if (!i) return;
+    if (await upd(i.id, { cancelled: false, cancelDate: '' })) { closeSheet(); toast(`Achat ${i.ref} rétabli · caisse ${eur(capital().dispo)}`); }
+  },
   list: (a) => openQuick('list', a.dataset.id),
   price: (a) => openQuick('price', a.dataset.id),
   reserve: async (a) => { if (await upd(a.dataset.id, { status: 'reserve' })) toast('Marqué réservé'); },
