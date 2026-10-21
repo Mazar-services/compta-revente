@@ -214,6 +214,7 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .st-vendu{background:var(--good-soft);color:var(--good)}
 .st-annule{background:var(--bad-soft);color:var(--bad)} .st-attente{background:var(--warn-soft);color:var(--warn)}
 .item.cancelled{opacity:.75} .item.cancelled .it-name{text-decoration:line-through}
+.ship-info{margin:6px 0 0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
 .sw-t{display:grid;gap:1px;min-width:0}
@@ -675,7 +676,7 @@ const cost = (i) => num(i.buyPrice) + num(i.buyCosts);
 const profit = (i) => (isSold(i) ? num(i.sellPrice) - num(i.sellFees) - cost(i) : null);
 const roi = (i) => { const c = cost(i), p = profit(i); return p == null || !c ? null : p / c; };
 // Les anciens articles (sans champ « received ») sont considérés reçus le jour de l'achat.
-const isReceived = (i) => i.received !== false;
+const isReceived = (i) => i.received !== false || i.buyMode === 'main_propre';
 const inTransit = (i) => !isReceived(i) && !isSold(i);
 const isCancelled = (i) => i.cancelled === true;
 // Achat à distance pas encore envoyé par le vendeur (case « Envoyé » pas cochée)
@@ -693,6 +694,9 @@ const marketDays = (i) => { const s = marketStart(i); return s ? Math.max(0, day
 // Délai de vente d'un article vendu : depuis la mise en annonce (sinon depuis la réception, s'il a été vendu sans annonce).
 const saleDays = (i) => (isSold(i) ? (marketStart(i) ? marketDays(i) : held(i)) : null);
 const ago = (d) => (isDate(d) ? Math.max(0, dayDiff(d, today())) : null);
+// « envoyé aujourd'hui / hier / il y a 3 j »
+const agoTxt = (d) => { const n = ago(d); return n == null ? '' : n === 0 ? 'aujourd’hui' : n === 1 ? 'hier' : `il y a ${n}${NB}j`; };
+const shipTxt = (i) => (i.shipped ? (isDate(i.shipDate) ? `envoyé ${agoTxt(i.shipDate)}` : 'envoyé') : '');
 // Découpe le temps d'argent bloqué en livraison + avant annonce + en annonce (la somme fait toujours tied).
 function phaseSplit(i) {
   const t = tied(i), a = availDate(i), m = marketStart(i);
@@ -810,7 +814,7 @@ const mini = (i, cls = 'mini') => { const ph = firstPhoto(i); return ph ? `<span
 function stateLine(i) {
   const st = num(S.settings.staleDays) || 21;
   if (isSold(i)) return { t: marketStart(i) ? `vendu en ${marketDays(i)}${NB}j d’annonce` : `vendu ${held(i)}${NB}j après réception`, stale: false };
-  if (inTransit(i)) return { t: `acheté il y a ${tied(i)}${NB}j · en livraison`, stale: tied(i) > 7 };
+  if (inTransit(i)) return i.shipped ? { t: `${shipTxt(i)} · acheté il y a ${tied(i)}${NB}j`, stale: ago(i.shipDate) > 5 } : { t: `acheté il y a ${tied(i)}${NB}j · pas encore envoyé`, stale: tied(i) >= 3 };
   if (marketStart(i)) return { t: `en annonce depuis ${marketDays(i)}${NB}j · acheté il y a ${tied(i)}${NB}j`, stale: marketDays(i) > st };
   return { t: `reçu il y a ${held(i)}${NB}j · pas en annonce`, stale: held(i) > 3 };
 }
@@ -1317,14 +1321,14 @@ function detailBody(i) {
       : listed(i) ? ['Potentiel', eurS(potential(i)), 'au prix affiché', potential(i) >= 0 ? 'pos' : 'neg']
         : ['Potentiel', est ? '≈ ' + eurS(est.net) : '—', est ? (est.market ? `d’après ta cote ${eur(est.resale)}` : `d’après ${plural(est.n, 'vente')} du modèle`) : 'aucune vente ni cote pour ce modèle'],
     sold ? ['Vendu en', `${saleDays(i)}${NB}j`, marketStart(i) ? 'après la mise en annonce' : 'après réception, sans annonce']
-      : inTransit(i) ? ['En livraison depuis', `${tied(i)}${NB}j`, 'acheté le ' + dShort(i.buyDate)]
+      : inTransit(i) ? (i.shipped && isDate(i.shipDate) ? ['Envoyé', agoTxt(i.shipDate), `le ${dShort(i.shipDate)} · acheté le ${dShort(i.buyDate)}`] : ['Acheté il y a', `${tied(i)}${NB}j`, i.shipped ? 'envoyé, date non notée' : 'pas encore envoyé par le vendeur'])
         : marketStart(i) ? ['En annonce depuis', `${marketDays(i)}${NB}j`, 'sans vente pour l’instant', marketDays(i) > (num(S.settings.staleDays) || 21) ? 'neg' : '']
           : ['Reçu il y a', `${h}${NB}j`, 'pas encore en annonce'],
   ];
   const tl = [];
   tl.push(`<li><span class="dot ok"></span><div><b>Acheté ${eur(num(i.buyPrice))}${num(i.buyCosts) ? ` + ${eur(num(i.buyCosts))} de frais` : ''}</b><small>${dLong(i.buyDate)}${i.buySource ? ' · ' + esc(i.buySource) : ''}${i.sellerName ? ' · vendeur ' + esc(i.sellerName) : ''}</small></div></li>`);
   if (i.buyMode === 'livraison' && (i.shipped || inTransit(i))) {
-    if (i.shipped) tl.push(`<li><span class="dot ok"></span><div><b>Envoyé par le vendeur</b><small>${isDate(i.shipDate) ? dLong(i.shipDate) : 'date non notée'}</small></div></li>`);
+    if (i.shipped) tl.push(`<li><span class="dot ok"></span><div><b>Envoyé par le vendeur${isDate(i.shipDate) && inTransit(i) ? ' ' + agoTxt(i.shipDate) : ''}</b><small>${isDate(i.shipDate) ? dLong(i.shipDate) : 'date non notée'}</small></div></li>`);
     else if (!isCancelled(i)) tl.push(`<li><span class="dot on"></span><div><b>En attente d’envoi par le vendeur</b><small>acheté il y a ${tied(i)}${NB}j</small></div></li>`);
   }
   if (isCancelled(i)) tl.push(`<li><span class="dot"></span><div><b>Achat annulé · ${eur(cost(i))} remboursés dans la caisse</b><small>${dLong(i.cancelDate || i.buyDate)}</small></div></li>`);
@@ -1467,9 +1471,10 @@ function openForm(mode, item, prefill) {
       ${textF('f-seller', 'Vendeur <span class="opt-l">(pseudo)</span>', src.sellerName, '')}
     </div>
     <div class="fs"><p class="fs-t">Suivi</p>
-      <div id="f-ship-wrap"><label class="sw"><span class="sw-t"><b>Envoyé par le vendeur</b><small>Coche quand le vendeur a bien expédié le colis</small></span><input type="checkbox" id="f-ship" role="switch" ${src.shipped ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label></div>
-      <label class="sw"><span class="sw-t"><b>Article reçu</b><small>Le délai de vente se compte à partir de la réception</small></span><input type="checkbox" id="f-recv" role="switch" ${recvOn ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
-      <div id="f-sec-recv" class="sub">${dateF('f-recvDate', 'Date de réception', recvDate)}</div>
+      <div id="f-ship-wrap" class="stack" style="gap:12px"><label class="sw"><span class="sw-t"><b>Envoyé par le vendeur</b><small>Coche quand le vendeur a bien expédié le colis</small></span><input type="checkbox" id="f-ship" role="switch" ${src.shipped ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
+        <div id="f-sec-ship" class="sub">${dateF('f-shipDate', 'Date d’envoi', src.shipped && isDate(src.shipDate) ? src.shipDate : today())}<p class="ship-info" id="f-ship-info" aria-live="polite"></p></div></div>
+      <div id="f-recv-wrap"><label class="sw"><span class="sw-t"><b>Article reçu</b><small>Le délai de vente se compte à partir de la réception</small></span><input type="checkbox" id="f-recv" role="switch" ${recvOn ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
+      <div id="f-sec-recv" class="sub">${dateF('f-recvDate', 'Date de réception', recvDate)}</div></div>
       <label class="sw"><span class="sw-t"><b>Mis en annonce</b><small>Leboncoin, Vinted…</small></span><input type="checkbox" id="f-listed" role="switch" ${st !== 'stock' && (st !== 'vendu' || src.listPrice != null) ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
       <div id="f-sec-list" class="sub">
         <div class="row2">${dateF('f-listDate', 'Mise en ligne', src.listDate)}${moneyF('f-listPrice', 'Prix affiché', src.listPrice)}</div>
@@ -1492,8 +1497,10 @@ function openForm(mode, item, prefill) {
   b.addEventListener('input', formPreview);
   b.addEventListener('change', (e) => {
     if (e.target.name === 'f-cat') onCatChange();
-    if (['f-recv', 'f-listed', 'f-sold'].includes(e.target.id) || e.target.name === 'f-mode') onTrackChange(false, e.target.id || e.target.name);
+    if (['f-recv', 'f-listed', 'f-sold', 'f-ship'].includes(e.target.id) || e.target.name === 'f-mode') onTrackChange(false, e.target.id || e.target.name);
+    if (e.target.id === 'f-shipDate') shipInfo();
     if (e.target.id === 'f-buyDate' && radioVal('f-mode') === 'main_propre' && $('#f-recv').checked) $('#f-recvDate').value = val('f-buyDate');
+    if (e.target.id === 'f-buyDate') shipInfo();
     if (e.target.id === 'f-file') { const files = Array.from(e.target.files || []); e.target.value = ''; addPhotos(files); }
     formPreview();
   });
@@ -1505,6 +1512,11 @@ function onCatChange() {
   $('#dl-form').innerHTML = modelsFor(c).map((m) => `<option value="${esc(m)}"></option>`).join('');
   $('#f-hw').hidden = !HW.includes(c);
   $('#f-model').placeholder = (CATS[c] || CATS.autre).ph;
+}
+function shipInfo() {
+  const el = $('#f-ship-info'); if (!el) return;
+  const d = val('f-shipDate');
+  el.textContent = isDate(d) ? `Le vendeur a envoyé l’article ${agoTxt(d)}${ago(d) > 0 ? ` (le ${dShort(d)})` : ''}${isDate(val('f-buyDate')) ? ` · ${Math.max(0, dayDiff(val('f-buyDate'), d))}${NB}j après l’achat` : ''}.` : '';
 }
 function onTrackChange(init, changed) {
   const recv = $('#f-recv'), listedSw = $('#f-listed'), soldSw = $('#f-sold');
@@ -1522,8 +1534,13 @@ function onTrackChange(init, changed) {
       if (!recv.checked) { recv.checked = true; if (!val('f-recvDate')) $('#f-recvDate').value = radioVal('f-mode') === 'main_propre' ? val('f-buyDate') : ''; }
     }
   }
+  const mpMode = radioVal('f-mode') === 'main_propre';
+  if (mpMode) { recv.checked = true; $('#f-recvDate').value = val('f-buyDate'); }
+  $('#f-recv-wrap').hidden = mpMode;
   $('#f-sec-recv').hidden = !recv.checked;
   $('#f-ship-wrap').hidden = radioVal('f-mode') !== 'livraison' || recv.checked;
+  $('#f-sec-ship').hidden = !$('#f-ship').checked;
+  shipInfo();
   $('#f-sec-list').hidden = !listedSw.checked;
   $('#f-sec-sell').hidden = !soldSw.checked;
 }
@@ -1646,7 +1663,8 @@ async function saveForm(btn) {
     else if (last.p !== v.listPrice) log.push({ d: today(), p: v.listPrice });
   }
   const now = new Date().toISOString();
-  v.shipDate = v.shipped ? (F.item && F.item.shipped && F.item.shipDate) || today() : '';
+  v.shipDate = v.shipped ? (isDate(val('f-shipDate')) && $('#f-ship').checked ? val('f-shipDate') : (F.item && F.item.shipDate) || '') : '';
+  if (v.shipped && v.shipDate && v.shipDate < v.buyDate) return fieldErr('f-shipDate', 'L’envoi ne peut pas précéder l’achat.');
   const doc = { ...v, photos: F.photos.filter((p) => p.state === 'ok' && p.f).map((p) => ({ f: p.f, t: p.t || p.f })), priceLog: log, updatedAt: now };
   if (v.buyMode) LS.set('buyMode', v.buyMode);
   btn.disabled = true;
@@ -2584,7 +2602,7 @@ const ACT = {
   recv: (a) => openQuick('recv', a.dataset.id),
   ship: async (a) => {
     const i = byId(a.dataset.id); if (!i) return;
-    if (await upd(i.id, { shipped: true, shipDate: today() })) toast(`${i.ref} : envoyé par le vendeur`);
+    if (await upd(i.id, { shipped: true, shipDate: today() })) toast(`${i.ref} : envoyé par le vendeur aujourd’hui (date modifiable dans « Modifier »)`);
   },
   'cancel-buy': (a) => {
     const i = byId(a.dataset.id); if (!i) return;
