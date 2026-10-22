@@ -219,6 +219,7 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .lastmove span{font-weight:700;color:var(--ink-2);flex:1 1 100%} .lastmove b{font-variant-numeric:tabular-nums}
 .lastmove em{font-style:normal;font-weight:800;margin-left:auto} .lastmove.out em{color:var(--bad)} .lastmove.in em{color:var(--good)}
 @keyframes lm-in{from{transform:scale(.97);opacity:0}to{transform:none;opacity:1}}
+.refund-wait{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:14px;background:var(--warn-soft);font-size:13.5px}
 .ship-info{margin:6px 0 0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
@@ -684,6 +685,8 @@ const roi = (i) => { const c = cost(i), p = profit(i); return p == null || !c ? 
 const isReceived = (i) => i.received !== false || i.buyMode === 'main_propre';
 const inTransit = (i) => !isReceived(i) && !isSold(i);
 const isCancelled = (i) => i.cancelled === true;
+// Achat annulé dont l'argent n'est pas encore revenu : il reste sorti de la caisse
+const refundPending = (i) => isCancelled(i) && i.refunded === false;
 // Achat à distance pas encore envoyé par le vendeur (case « Envoyé » pas cochée)
 const awaitingShip = (i) => inTransit(i) && i.buyMode === 'livraison' && !i.shipped && !isCancelled(i);
 const availDate = (i) => (isReceived(i) ? (isDate(i.receiveDate) ? i.receiveDate : i.buyDate) : null);
@@ -835,8 +838,9 @@ function capital() {
   const retraits = sum(S.cash.filter((c) => c.type === 'retrait'), (c) => num(c.amount));
   const invested = sum(S.items, cost), cashed = sum(sold, (i) => num(i.sellPrice) - num(i.sellFees));
   const reparo = repInCash() ? sum(S.repairs, repNet) : 0;
-  const stock = sum(open, cost), dispo = apports - retraits + cashed - invested + reparo;
-  return { reparo, apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock, nSold: sold.length };
+  const pending = sum(S.cancelled.filter(refundPending), cost);
+  const stock = sum(open, cost), dispo = apports - retraits + cashed - invested + reparo - pending;
+  return { pending, reparo, apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock, nSold: sold.length };
 }
 // Une tuile : [titre, valeur, sous-titre, classe de la valeur, couleur de fond c-good|c-bad|c-info|c-warn]
 const tileHtml = (t) => `<div class="tile ${t[4] || ''}"><span class="k">${t[0]}</span><span class="v ${t[3] || ''}">${t[1]}</span><span class="s">${t[2]}</span></div>`;
@@ -857,7 +861,7 @@ function cashLedger() {
   S.cash.forEach((c) => ev.push({ d: c.date || '', k: 0, label: c.type === 'retrait' ? 'Retrait' : 'Entrée d’argent', note: c.note || '', a: c.type === 'retrait' ? -num(c.amount) : num(c.amount), cash: c }));
   S.cancelled.forEach((i) => {
     if (isDate(i.buyDate)) ev.push({ d: i.buyDate, k: 1, label: 'Achat', a: -cost(i), i });
-    ev.push({ d: i.cancelDate || i.buyDate || '', k: 2, label: 'Achat annulé, remboursé', a: cost(i), i });
+    if (!refundPending(i)) ev.push({ d: i.refundDate || i.cancelDate || i.buyDate || '', k: 2, label: 'Achat annulé, remboursé', a: cost(i), i });
   });
   S.items.forEach((i) => {
     if (isDate(i.buyDate)) ev.push({ d: i.buyDate, k: 1, label: 'Achat', a: -cost(i), i });
@@ -1016,11 +1020,13 @@ function cashCard() {
     </div>
     ${(() => { const L = S.lastMove; if (!L || Date.now() - L.at > 15 * 60000) return ''; const d = L.after - L.before;
       return `<div class="lastmove ${d < 0 ? 'out' : 'in'}" role="status"><span>${esc(L.label.replace(/ · .*$/, '').replace(/^Ajout /, 'Achat '))}</span><b>${eur(L.before)} → ${eur(L.after)}</b><em>${eurS(d)}</em></div>`; })()}
+    ${S.cancelled.filter(refundPending).map((i) => `<div class="refund-wait"><span>${tag(i)} annulé le ${dShort(i.cancelDate)} · <b>${eur(cost(i))}</b> pas encore remboursés</span><button class="btn sm primary" data-act="refund-ok" data-id="${esc(i.id)}">Remboursement reçu</button></div>`).join('')}
     <div class="cc-calc" aria-label="Calcul de l’argent disponible">
       <span>Argent apporté</span><b class="in">+${eur(K.apports)}</b>
       <span>Ventes encaissées <small>dont ${eurS(K.profit)} de bénéfice</small></span><b class="in">+${eur(K.cashed)}</b>
       ${K.reparo ? `<span>Réparo</span><b class="in">+${eur(K.reparo)}</b>` : ''}
       <span>Achats</span><b class="out">−${eur(K.invested)}</b>
+      ${K.pending ? `<span>Annulés, remboursement en attente</span><b class="out">−${eur(K.pending)}</b>` : ''}
       ${K.retraits ? `<span>Retraits</span><b class="out">−${eur(K.retraits)}</b>` : ''}
       <span class="tot">Argent disponible</span><b class="tot">${eur(K.dispo)}</b>
     </div>
@@ -1235,7 +1241,7 @@ function cancelledCard(i) {
     ${mini(i, 'thumb')}
     <span class="it-main"><span class="it-top">${tag(i)}${pills(i)}</span><span class="it-name">${esc(i.model || '—')}</span>
       <span class="it-dates"><span class="days">acheté le ${dShort(i.buyDate)} · annulé le ${dShort(i.cancelDate || i.buyDate)}</span></span></span>
-    <span class="it-side"><span class="it-price"><s>${eur(cost(i))}</s></span><span class="it-sub pos">remboursé</span></span>
+    <span class="it-side"><span class="it-price"><s>${eur(cost(i))}</s></span>${refundPending(i) ? '<span class="it-sub neg">pas encore remboursé</span>' : '<span class="it-sub pos">remboursé</span>'}</span>
   </div>`;
 }
 function card(i) {
@@ -1338,7 +1344,11 @@ function detailBody(i) {
     if (i.shipped) tl.push(`<li><span class="dot ok"></span><div><b>Envoyé par le vendeur${isDate(i.shipDate) && inTransit(i) ? ' ' + agoTxt(i.shipDate) : ''}</b><small>${isDate(i.shipDate) ? dLong(i.shipDate) : 'date non notée'}</small></div></li>`);
     else if (!isCancelled(i)) tl.push(`<li><span class="dot on"></span><div><b>En attente d’envoi par le vendeur</b><small>acheté il y a ${tied(i)}${NB}j</small></div></li>`);
   }
-  if (isCancelled(i)) tl.push(`<li><span class="dot"></span><div><b>Achat annulé · ${eur(cost(i))} remboursés dans la caisse</b><small>${dLong(i.cancelDate || i.buyDate)}</small></div></li>`);
+  if (isCancelled(i)) {
+    tl.push(`<li><span class="dot"></span><div><b>Achat annulé</b><small>${dLong(i.cancelDate || i.buyDate)}</small></div></li>`);
+    tl.push(refundPending(i) ? `<li><span class="dot on"></span><div><b>Remboursement de ${eur(cost(i))} en attente</b><small>pas encore revenu dans la caisse</small></div></li>`
+      : `<li><span class="dot ok"></span><div><b>Remboursé ${eur(cost(i))} · revenu dans la caisse</b><small>${dLong(i.refundDate || i.cancelDate || i.buyDate)}</small></div></li>`);
+  }
   else if (i.buyMode === 'livraison' || inTransit(i)) {
     if (isReceived(i)) tl.push(`<li><span class="dot ok"></span><div><b>Reçu${shipDays(i) != null ? ` · ${shipDays(i)}${NB}j de livraison` : ''}</b><small>${dLong(availDate(i))}</small></div></li>`);
     else if (i.shipped) tl.push(`<li><span class="dot on"></span><div><b>En livraison</b><small>${isDate(i.shipDate) ? `envoyé il y a ${ago(i.shipDate)}${NB}j` : `acheté il y a ${tied(i)}${NB}j`}</small></div></li>`);
@@ -1390,7 +1400,8 @@ function durationsBlock(i) {
 }
 function detailFoot(i) {
   const id = esc(i.id);
-  if (isCancelled(i)) return `<button class="btn primary grow" data-act="uncancel" data-id="${id}">Rétablir l’achat</button>`;
+  if (isCancelled(i)) return refundPending(i) ? `<button class="btn grow" data-act="uncancel" data-id="${id}">Rétablir l’achat</button><button class="btn primary grow" data-act="refund-ok" data-id="${id}">Remboursement reçu</button>`
+    : `<button class="btn grow" data-act="refund-undo" data-id="${id}">Pas encore remboursé</button><button class="btn primary grow" data-act="uncancel" data-id="${id}">Rétablir l’achat</button>`;
   if (awaitingShip(i)) return `<button class="btn danger grow" data-act="cancel-buy" data-id="${id}">Achat annulé</button><button class="btn primary grow" data-act="ship" data-id="${id}">Envoyé par le vendeur</button>`;
   if (inTransit(i)) return `${i.status === 'stock' ? `<button class="btn grow" data-act="list" data-id="${id}">Mettre en annonce</button>` : `<button class="btn grow" data-act="sell" data-id="${id}">Vendu</button>`}<button class="btn primary grow" data-act="recv" data-id="${id}">Article reçu</button>`;
   if (i.status === 'stock') return `<button class="btn grow" data-act="sell" data-id="${id}">Vendu direct</button><button class="btn primary grow" data-act="list" data-id="${id}">Mettre en annonce</button>`;
@@ -2256,6 +2267,10 @@ function msgFor(prev, next) {
   const ref = (next && next.ref) || (prev && prev.ref) || '?';
   if (!prev) return `Ajout ${ref} · ${next.model || ''}`.trim();
   if (next.status === 'vendu' && prev.status !== 'vendu') return `Vente ${ref} · ${eurS(num(next.sellPrice) - num(next.sellFees) - cost(next))}`;
+  if (next.cancelled && !prev.cancelled) return `Annulation ${ref}`;
+  if (next.cancelled && next.refunded === true && prev.refunded !== true) return `Remboursement ${ref}`;
+  if (next.cancelled && next.refunded === false && prev.refunded !== false) return `Remboursement en attente ${ref}`;
+  if (!next.cancelled && prev.cancelled) return `Rétablissement ${ref}`;
   if (next.received && prev.received === false) return `${ref} · reçu`;
   if (next.status !== prev.status) return `${ref} · ${STATUS[next.status] || next.status}`;
   if (next.listPrice !== prev.listPrice) return `${ref} · prix ${eur(num(next.listPrice))}`;
@@ -2357,7 +2372,7 @@ function claudeSummary() {
   if (S.cash.length) L.push('MOUVEMENTS DE CAISSE (date;type;montant;note)', ...S.cash.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((c) => [c.date, c.type, n2(num(c.amount)), (c.note || '').replace(/[\n;]/g, ' ')].join(';')));
   if (S.repairs.length) L.push(`REPARO (réparations, ${repInCash() ? 'comptées' : 'non comptées'} dans la caisse) : ${sum(S.repairs, repQty)} réparations · encaissé ${n2(sum(S.repairs, repTotal))} · pièces ${n2(sum(S.repairs, (r) => num(r.partsCost)))} · gain ${n2(sum(S.repairs, repNet))}`,
     'REPARO_PRESTATIONS (date;type;quantite;prix_unitaire;pieces;gain;client;note)', ...S.repairs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((r) => [r.date, r.type, repQty(r), n2(num(r.unitPrice)), n2(num(r.partsCost)), n2(repNet(r)), r.client || '', (r.note || '').replace(/[\n;]/g, ' ')].join(';')));
-  if (S.cancelled.length) L.push('ACHATS ANNULES (exclus de tous les calculs, argent revenu en caisse) : ' + S.cancelled.map((i) => `${i.ref} ${i.model} ${n2(cost(i))} € annulé le ${i.cancelDate || '?'}`).join(' · '));
+  if (S.cancelled.length) L.push('ACHATS ANNULES (exclus de tous les calculs, argent revenu en caisse) : ' + S.cancelled.map((i) => `${i.ref} ${i.model} ${n2(cost(i))} € annulé le ${i.cancelDate || '?'}${refundPending(i) ? ' (remboursement en attente, argent toujours sorti)' : ''}`).join(' · '));
   L.push('', 'MOIS;achats;investi;ventes;CA;frais_vente;benefice;ROI%');
   months.forEach((m) => { const s = monthStats(m); L.push([m, s.nBought, n2(s.invest), s.nSold, n2(s.ca), n2(s.fees), n2(s.profit), s.roi == null ? '' : Math.round(s.roi * 100)].join(';')); });
   L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;avant_annonce_j;en_annonce_j;argent_bloque_j;notes)');
@@ -2619,8 +2634,9 @@ const ACT = {
     const i = byId(a.dataset.id); if (!i) return;
     openSheet({ kind: 'cancel', id: i.id, title: `Annuler l’achat ${i.ref}`, body: `
       <div class="fs qhead" style="padding:12px">${mini(i)}<div style="display:grid;gap:3px;min-width:0"><div class="it-top">${tag(i)}</div><b>${esc(i.model)}</b><span class="muted" style="font-size:13px">Coût total ${eur(cost(i))} · acheté le ${dShort(i.buyDate)}</span></div></div>
-      <p style="margin:0">Le vendeur a annulé ou tu as été remboursé : <b>${eur(cost(i))}</b> reviennent dans la caisse. L’article sort du stock et des stats, mais reste visible dans Articles › Annulés (tu peux le rétablir).</p>
-      ${dateF('x-date', 'Date d’annulation', today())}`,
+      <p style="margin:0">L’article sort du stock et des stats, mais reste visible dans Articles › Annulés (tu peux le rétablir). Les <b>${eur(cost(i))}</b> reviennent dans la caisse seulement quand le remboursement est reçu.</p>
+      ${dateF('x-date', 'Date d’annulation', today())}
+      <label class="sw"><span class="sw-t"><b>Remboursement déjà reçu</b><small>Laisse décoché si l’argent n’est pas encore revenu sur ton compte</small></span><input type="checkbox" id="x-refunded" role="switch"><span class="sw-ui" aria-hidden="true"></span></label>`,
       foot: `<button class="btn" data-act="close">Retour</button><button class="btn danger grow" data-act="cancel-save" data-id="${esc(i.id)}">Confirmer l’annulation</button>` });
   },
   'cancel-save': async (a) => {
@@ -2629,13 +2645,22 @@ const ACT = {
     const d = val('x-date');
     if (!isDate(d)) return fieldErr('x-date', 'Date requise.');
     a.disabled = true;
-    const ok = await upd(i.id, { cancelled: true, cancelDate: d });
+    const got = $('#x-refunded').checked;
+    const ok = await upd(i.id, { cancelled: true, cancelDate: d, refunded: got, refundDate: got ? d : '' });
     a.disabled = false;
-    if (ok) { closeSheet(); toast(`Achat ${i.ref} annulé : +${eur(cost(i))} · caisse ${eur(capital().dispo)}`); }
+    if (ok) { closeSheet(); toast(got ? `Achat ${i.ref} annulé et remboursé : +${eur(cost(i))} · caisse ${eur(capital().dispo)}` : `Achat ${i.ref} annulé · ${eur(cost(i))} en attente de remboursement`); }
   },
   uncancel: async (a) => {
     const i = byId(a.dataset.id); if (!i) return;
-    if (await upd(i.id, { cancelled: false, cancelDate: '' })) { closeSheet(); toast(`Achat ${i.ref} rétabli · caisse ${eur(capital().dispo)}`); }
+    if (await upd(i.id, { cancelled: false, cancelDate: '', refunded: null, refundDate: '' })) { closeSheet(); toast(`Achat ${i.ref} rétabli · caisse ${eur(capital().dispo)}`); }
+  },
+  'refund-ok': async (a) => {
+    const i = byId(a.dataset.id); if (!i) return;
+    if (await upd(i.id, { refunded: true, refundDate: today() })) toast(`${i.ref} remboursé : +${eur(cost(i))} · caisse ${eur(capital().dispo)}`);
+  },
+  'refund-undo': async (a) => {
+    const i = byId(a.dataset.id); if (!i) return;
+    if (await upd(i.id, { refunded: false, refundDate: '' })) toast(`${i.ref} : remboursement en attente · caisse ${eur(capital().dispo)}`);
   },
   list: (a) => openQuick('list', a.dataset.id),
   price: (a) => openQuick('price', a.dataset.id),
