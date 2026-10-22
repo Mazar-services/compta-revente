@@ -1377,12 +1377,12 @@ function detailBody(i) {
   entries.forEach((e, k) => tl.push(`<li><span class="dot ${sold || k < entries.length - 1 ? 'ok' : 'on'}"></span><div><b>${k === 0 ? 'Mis en annonce à' : 'Prix passé à'} ${eur(num(e.p))}</b><small>${dLong(e.d)}</small></div></li>`));
   if (i.status === 'reserve') tl.push(`<li><span class="dot on"></span><div><b>Réservé</b><small>en attente de la vente</small></div></li>`);
   if (sold) tl.push(`<li><span class="dot ok"></span><div><b>Vendu ${eur(num(i.sellPrice))} · <span class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</span></b><small>${dLong(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''}${i.buyerName ? ' · acheteur ' + esc(i.buyerName) : ''} · ${h}${NB}j après réception${i.sellNotes ? `<br>${esc(i.sellNotes)}` : ''}</small></div></li>`);
+  else if (!inTransit(i) && !isCancelled(i)) tl.push(`<li><span class="dot"></span><div><b>${i.status === 'stock' ? 'À mettre en annonce' : 'En attente d’acheteur'}</b><small>J+${h} depuis la réception</small></div></li>`);
   if (sold && (i.paid === false || i.paidDate || isDate(i.buyerRecvDate))) {
     tl.push(`<li><span class="dot ${isDate(i.buyerRecvDate) ? 'ok' : 'on'}"></span><div><b>${isDate(i.buyerRecvDate) ? 'Reçu par l’acheteur' : 'En route vers l’acheteur'}</b><small>${isDate(i.buyerRecvDate) ? dLong(i.buyerRecvDate) : `envoyé ${agoTxt(i.sellDate)}`}</small></div></li>`);
     tl.push(isPaid(i) ? `<li><span class="dot ok"></span><div><b>Paiement reçu · ${eur(num(i.sellPrice) - num(i.sellFees))} dans la caisse</b><small>${dLong(paidOn(i))}${i.paid === false ? ` · automatique ${payDelay()}${NB}j après réception` : ''}</small></div></li>`
       : `<li><span class="dot on"></span><div><b>Paiement en attente · ${eur(num(i.sellPrice) - num(i.sellFees))}</b><small>${isDate(i.buyerRecvDate) ? `automatique le ${dLong(autoPayDate(i))} si l’acheteur ne valide pas avant` : `l’acheteur a ${payDelay()}${NB}j après réception pour valider`}</small></div></li>`);
   }
-  else if (!inTransit(i) && !isCancelled(i)) tl.push(`<li><span class="dot"></span><div><b>${i.status === 'stock' ? 'À mettre en annonce' : 'En attente d’acheteur'}</b><small>J+${h} depuis la réception</small></div></li>`);
   const specs = [
     ['Catégorie', (CATS[i.category] || CATS.autre).label],
     ['Mode d’achat', (BUY_MODES.find((m) => m[0] === i.buyMode) || [])[1]],
