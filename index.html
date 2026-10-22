@@ -691,7 +691,7 @@ const isCancelled = (i) => i.cancelled === true;
 // Vente en livraison (paiement sécurisé) : l'argent arrive quand l'acheteur valide, ou automatiquement N jours après réception
 const SHIP_CHANNELS = ['LBC livraison', 'Vinted'];
 const isShipSale = (ch) => SHIP_CHANNELS.includes(ch);
-const addDays = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+const addDays = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 const payDelay = () => (S.settings.payDelay == null ? 3 : num(S.settings.payDelay));
 const autoPayDate = (i) => (isDate(i.buyerRecvDate) ? addDays(i.buyerRecvDate, payDelay()) : null);
 const isPaid = (i) => isSold(i) && (i.paid !== false || (autoPayDate(i) != null && autoPayDate(i) <= today()));
@@ -720,7 +720,7 @@ const shipTxt = (i) => (i.shipped ? (isDate(i.shipDate) ? `envoyé ${agoTxt(i.sh
 // Découpe le temps d'argent bloqué en livraison + avant annonce + en annonce (la somme fait toujours tied).
 function phaseSplit(i) {
   const t = tied(i), a = availDate(i), m = marketStart(i);
-  const ship = Math.min(t, isDate(a) ? Math.max(0, dayDiff(i.buyDate, a)) : t);
+  const ship = Math.min(t, isDate(a) && isDate(i.buyDate) ? Math.max(0, dayDiff(i.buyDate, a)) : t);
   const prep = Math.min(t - ship, m ? Math.max(0, dayDiff(isDate(a) ? a : i.buyDate, m)) : isSold(i) ? 0 : t - ship);
   return { ship, prep, market: Math.max(0, t - ship - prep), total: t };
 }
@@ -747,7 +747,12 @@ function aggregate(bought, sold) {
 function monthStats(ym) {
   const bought = S.items.filter((i) => (i.buyDate || '').slice(0, 7) === ym);
   const sold = S.items.filter((i) => isSold(i) && i.sellDate.slice(0, 7) === ym);
-  return aggregate(bought, sold);
+  const A = aggregate(bought, sold);
+  // Flux de caisse : argent réellement entré / sorti ce mois-ci pour la revente (paiements reçus, achats, remboursements)
+  const ev = cashLedger().filter((e) => (e.k === 1 || e.k === 2) && (e.d || '').slice(0, 7) === ym);
+  A.cashIn = sum(ev.filter((e) => e.a > 0), (e) => e.a); A.cashOut = -sum(ev.filter((e) => e.a < 0), (e) => e.a);
+  A.cash = A.cashIn - A.cashOut;
+  return A;
 }
 function modelTable(soldSet) {
   const map = new Map();
@@ -854,7 +859,7 @@ function capital() {
   const reparo = repInCash() ? sum(S.repairs, repNet) : 0;
   const pending = sum(S.cancelled.filter(refundPending), cost);
   const stock = sum(open, cost), dispo = apports - retraits + cashed - invested + reparo - pending;
-  return { toCome, pending, reparo, apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock, nSold: sold.length };
+  return { toCome, pending, reparo, apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock + toCome, nSold: sold.length };
 }
 // Une tuile : [titre, valeur, sous-titre, classe de la valeur, couleur de fond c-good|c-bad|c-info|c-warn]
 const tileHtml = (t) => `<div class="tile ${t[4] || ''}"><span class="k">${t[0]}</span><span class="v ${t[3] || ''}">${t[1]}</span><span class="s">${t[2]}</span></div>`;
@@ -867,21 +872,22 @@ function breakEvenHtml(small) {
     <span class="be-t">${ok ? 'Rentré dans tes frais' : 'Pas encore rentré dans tes frais'}</span>
     <span class="be-v">${eurS(net)}</span>
     <div class="meter" role="meter" aria-label="Argent récupéré sur l’argent dépensé" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pctBack * 100)}"><i style="width:${(pctBack * 100).toFixed(1)}%"></i></div>
-    <span class="be-s">Dépensé ${eur(K.invested)} · récupéré ${eur(K.cashed)} (${Math.round(pctBack * 100)}${NB}%)${!ok && K.stock > 0 ? ` · ton stock (${eur(K.stock)} au coût) doit encore être vendu` : ''}</span>
+    <span class="be-s">Dépensé ${eur(K.invested)} · récupéré ${eur(K.cashed)} (${Math.round(pctBack * 100)}${NB}%)${K.toCome ? ` · ${eur(K.toCome)} de ventes pas encore payées` : ''}${!ok && K.stock > 0 ? ` · ton stock (${eur(K.stock)} au coût) doit encore être vendu` : ''}</span>
   </div>`;
 }
 function cashLedger() {
   const ev = [];
   S.cash.forEach((c) => ev.push({ d: c.date || '', k: 0, label: c.type === 'retrait' ? 'Retrait' : 'Entrée d’argent', note: c.note || '', a: c.type === 'retrait' ? -num(c.amount) : num(c.amount), cash: c }));
   S.cancelled.forEach((i) => {
-    if (isDate(i.buyDate)) ev.push({ d: i.buyDate, k: 1, label: 'Achat', a: -cost(i), i });
+    ev.push({ d: isDate(i.buyDate) ? i.buyDate : '', k: 1, label: 'Achat', a: -cost(i), i });
     if (!refundPending(i)) ev.push({ d: i.refundDate || i.cancelDate || i.buyDate || '', k: 2, label: 'Achat annulé, remboursé', a: cost(i), i });
   });
   S.items.forEach((i) => {
-    if (isDate(i.buyDate)) ev.push({ d: i.buyDate, k: 1, label: 'Achat', a: -cost(i), i });
+    ev.push({ d: isDate(i.buyDate) ? i.buyDate : '', k: 1, label: 'Achat', a: -cost(i), i });
     if (isPaid(i)) ev.push({ d: paidOn(i) || i.sellDate, k: 2, label: i.paid === false || i.paidDate ? 'Paiement de la vente' : 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
   });
   if (repInCash()) S.repairs.forEach((r) => ev.push({ d: r.date || '', k: 3, label: 'Réparo', note: `${r.type}${repQty(r) > 1 ? ' ×' + repQty(r) : ''}`, a: repNet(r) }));
+  ev.forEach((e) => { if (!isDate(e.d)) e.d = ''; });
   ev.sort((x, y) => x.d.localeCompare(y.d) || x.k - y.k);
   let bal = 0;
   ev.forEach((e) => { bal += e.a; e.bal = bal; });
@@ -1167,7 +1173,7 @@ function journal(m, ms) {
       <span class="lg-a">${e.t === 'achat' ? `<b class="out">${eur(-cost(e.i))}</b>` : `<b>${eurS(num(e.i.sellPrice))}</b><small class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</small>`}</span>
     </div>`;
   }).join('')}</div>
-  <div class="lg-tot"><span>Sorties ${eur(-ms.invest)}</span><span>Entrées ${eurS(ms.ca - ms.fees)}</span><span>Flux de caisse ${eurS(ms.cash)}</span></div>`;
+  <div class="lg-tot"><span>Sorties ${eur(-ms.cashOut)}</span><span>Entrées ${eurS(ms.cashIn)}</span><span>Flux de caisse ${eurS(ms.cash)}</span></div>`;
 }
 
 /* ---------- Articles ---------- */
@@ -1317,6 +1323,7 @@ function openSheet({ kind, id, title, head, body, foot, onClose }) {
 }
 function closeSheet() {
   if (!SHEET) return;
+  if (SHEET.kind === 'form' && F && F.saving) { toast('Enregistrement en cours…'); return; }
   const s = SHEET; SHEET = null;
   if (s.onClose) { try { s.onClose(); } catch (e) {} }
   $('#sheet-root').innerHTML = '';
@@ -1460,7 +1467,7 @@ async function write(fn) {
 const upd = (id, patch) => write(() => itemsCol().doc(id).update({ ...patch, updatedAt: new Date().toISOString() }));
 async function deleteAssets(ids, exceptId) {
   if (!S.assets || !ids.length) return;
-  const used = new Set(S.items.filter((i) => i.id !== exceptId).flatMap(photoIds));
+  const used = new Set(S.allItems.filter((i) => i.id !== exceptId).flatMap(photoIds));
   for (const id of ids) { if (!used.has(id)) { try { await S.assets.delete(id); } catch (e) {} } }
 }
 
@@ -1517,7 +1524,7 @@ function openForm(mode, item, prefill) {
     </div>
     <div class="fs"><p class="fs-t">Suivi</p>
       <div id="f-ship-wrap" class="stack" style="gap:12px"><label class="sw"><span class="sw-t"><b>Envoyé par le vendeur</b><small>Coche quand le vendeur a bien expédié le colis</small></span><input type="checkbox" id="f-ship" role="switch" ${src.shipped ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
-        <div id="f-sec-ship" class="sub">${dateF('f-shipDate', 'Date d’envoi', src.shipped && isDate(src.shipDate) ? src.shipDate : today())}<p class="ship-info" id="f-ship-info" aria-live="polite"></p></div></div>
+        <div id="f-sec-ship" class="sub">${dateF('f-shipDate', 'Date d’envoi', src.shipped ? (isDate(src.shipDate) ? src.shipDate : '') : today())}<p class="ship-info" id="f-ship-info" aria-live="polite"></p></div></div>
       <div id="f-recv-wrap"><label class="sw"><span class="sw-t"><b>Article reçu</b><small>Le délai de vente se compte à partir de la réception</small></span><input type="checkbox" id="f-recv" role="switch" ${recvOn ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
       <div id="f-sec-recv" class="sub">${dateF('f-recvDate', 'Date de réception', recvDate)}</div></div>
       <label class="sw"><span class="sw-t"><b>Mis en annonce</b><small>Leboncoin, Vinted…</small></span><input type="checkbox" id="f-listed" role="switch" ${st !== 'stock' && (st !== 'vendu' || src.listPrice != null) ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
@@ -1674,7 +1681,7 @@ function cleanupForm() {
   const form = F; if (!form) return;
   form.closed = true;
   form.photos.forEach((p) => { if (p.preview) URL.revokeObjectURL(p.preview); });
-  if (!form.saved && form.newAssets.length) deleteAssets(form.newAssets.splice(0));
+  if (!form.saved && !form.saving && form.newAssets.length) deleteAssets(form.newAssets.splice(0));
   F = null;
 }
 
@@ -1700,14 +1707,19 @@ async function saveForm(btn) {
   if (v.received && !isDate(v.receiveDate)) return fieldErr('f-recvDate', 'Indique la date de réception.');
   if (v.received && v.receiveDate < v.buyDate) return fieldErr('f-recvDate', 'La réception ne peut pas précéder l’achat.');
   if (v.status === 'vendu' && isDate(v.sellDate) && v.received && v.sellDate < v.receiveDate) return fieldErr('f-sellDate', 'La vente ne peut pas précéder la réception.');
+  for (const [id, x] of [['f-buyCosts', v.buyCosts], ['f-sellFees', v.sellFees], ['f-listPrice', v.listPrice]]) if (x != null && x < 0) return fieldErr(id, 'Montant négatif impossible.');
   const listedOn = $('#f-listed').checked;
   if (listedOn && !isDate(v.listDate)) v.listDate = today();
+  if (listedOn && v.listDate < v.buyDate) return fieldErr('f-listDate', 'La mise en annonce ne peut pas précéder l’achat.');
+  // 8. annonce décochée : on n'en garde pas la trace (sinon délais et remises faussés)
+  if (!listedOn) { v.listDate = ''; if (v.status === 'vendu') v.listPrice = null; }
   if (v.status === 'vendu') {
     if (v.sellPrice == null || v.sellPrice < 0) return fieldErr('f-sellPrice', 'Prix de vente requis.');
     if (!isDate(v.sellDate)) return fieldErr('f-sellDate', 'Date de vente requise.');
     if (v.sellDate < v.buyDate) return fieldErr('f-sellDate', 'La vente ne peut pas précéder l’achat.');
     const ship = isShipSale(v.sellChannel), paidNow = !ship || $('#f-paid').checked, old0 = F.item || {};
     v.paid = paidNow; v.buyerRecvDate = ship && isDate(val('f-bRecv')) ? val('f-bRecv') : '';
+    if (v.buyerRecvDate && v.buyerRecvDate < v.sellDate) return fieldErr('f-bRecv', 'La réception par l’acheteur ne peut pas précéder la vente.');
     v.paidDate = paidNow ? old0.paidDate || (old0.paid === false ? today() : '') : '';
   } else { v.sellDate = ''; v.sellPrice = null; v.sellFees = 0; v.buyerName = ''; v.sellNotes = ''; v.paid = null; v.paidDate = ''; v.buyerRecvDate = ''; }
   const old = F.item;
@@ -1720,30 +1732,29 @@ async function saveForm(btn) {
   const now = new Date().toISOString();
   v.shipDate = v.shipped ? (isDate(val('f-shipDate')) && $('#f-ship').checked ? val('f-shipDate') : (F.item && F.item.shipDate) || '') : '';
   if (v.shipped && v.shipDate && v.shipDate < v.buyDate) return fieldErr('f-shipDate', 'L’envoi ne peut pas précéder l’achat.');
+  if (v.shipped && v.shipDate && v.received && isDate(v.receiveDate) && v.shipDate > v.receiveDate) return fieldErr('f-shipDate', 'L’envoi ne peut pas suivre la réception.');
   const doc = { ...v, photos: F.photos.filter((p) => p.state === 'ok' && p.f).map((p) => ({ f: p.f, t: p.t || p.f })), priceLog: log, updatedAt: now };
   if (v.buyMode) LS.set('buyMode', v.buyMode);
-  btn.disabled = true;
+  const form = F;
+  btn.disabled = true; form.saving = true;
   let ok, msg;
-  if (F.mode === 'edit') {
-    const base = JSON.parse(JSON.stringify(old)); delete base.id;
-    ok = await write(() => itemsCol().doc(old.id).set({ ...base, ...doc, ref: old.ref, createdAt: old.createdAt || now, example: !!old.example }));
+  if (form.mode === 'edit') {
+    // Fusion avec la version la plus récente (une modif faite ailleurs entre-temps n'est pas écrasée)
+    ok = await write(() => itemsCol().doc(old.id).update(doc));
     msg = `${old.ref} enregistré`;
   } else {
     const qty = Math.max(1, Math.min(10, parseInt(val('f-qty'), 10) || 1));
-    const refs = [];
+    const refs = Array.from({ length: qty }, (_, k) => nextRef(v.category, k)); // calculées avant tout envoi
     ok = true;
-    for (let k = 0; k < qty && ok; k++) {
-      const ref = nextRef(v.category, k); refs.push(ref);
-      ok = await write(() => itemsCol().doc().set({ ...doc, ref, createdAt: now, example: false }));
-    }
+    for (let k = 0; k < qty && ok; k++) ok = await write(() => itemsCol().doc().set({ ...doc, ref: refs[k], createdAt: now, example: false }));
     msg = refs.length > 1 ? `${refs.length} articles ajoutés (${refs[0]} → ${refs[refs.length - 1]})` : `${refs[0]} ajouté au stock`;
   }
-  btn.disabled = false;
+  btn.disabled = false; form.saving = false;
   if (!ok) return;
-  F.saved = true;
-  const removed = F.removed.slice(), editedId = old && old.id;
-  if (F.mode !== 'edit') msg += ` · caisse ${eur(capital().dispo)}`;
-  closeSheet();
+  form.saved = true;
+  const removed = form.removed.slice(), editedId = old && old.id;
+  if (form.mode !== 'edit') msg += ` · caisse ${eur(capital().dispo)}`;
+  if (!form.closed) closeSheet();
   toast(msg);
   if (removed.length) deleteAssets(removed, editedId);
 }
@@ -1815,6 +1826,7 @@ async function saveQuick(btn) {
     const d = val('q-date');
     if (!isDate(d)) return fieldErr('q-date', 'Date de vente requise.');
     if (isDate(i.buyDate) && d < i.buyDate) return fieldErr('q-date', `La vente ne peut pas précéder l’achat (${dShort(i.buyDate)}).`);
+    if (isReceived(i) && isDate(availDate(i)) && d < availDate(i)) return fieldErr('q-date', `La vente ne peut pas précéder la réception (${dShort(availDate(i))}).`);
     const fees = parseNum(val('q-fees')) || 0;
     patch = { status: 'vendu', sellPrice: price, sellDate: d, sellFees: fees, sellChannel: radioVal('q-chan'), buyerName: val('q-buyer'), sellNotes: $('#q-snotes').value.trim() };
     const waitPay = isShipSale(patch.sellChannel) && !$('#q-paid').checked;
@@ -1992,10 +2004,10 @@ function bilanHtml() {
   const t = [
     ['Bénéfice net total', eurS(K.profit), `${plural(K.nSold, 'vente')} · ROI ${pctS(cs ? K.profit / cs : null)}`, '', sign(K.profit)],
     ['Total investi', eur(K.invested), `${plural(S.items.length, 'achat')}, prix + frais`, '', 'c-warn'],
-    ['Total encaissé', eur(K.cashed), `CA ${eur(K.ca)} − frais de vente`, '', 'c-info'],
+    ['Total encaissé', eur(K.cashed), `ventes payées, frais déduits${K.toCome ? ` · ${eur(K.toCome)} à venir` : ''}`, '', 'c-info'],
     ['Apports nets', eur(K.apports - K.retraits), K.apports ? `bénéfice ${pctS((K.apports - K.retraits) > 0 ? K.profit / (K.apports - K.retraits) : null)} des apports` : 'aucun apport déclaré'],
     ['Disponible', eur(K.dispo), 'pour de nouveaux achats', '', sign(K.dispo)],
-    ['Capital total', eur(K.total), `caisse + ${eur(K.stock)} de stock au coût`, '', sign(K.total - (K.apports - K.retraits))],
+    ['Capital total', eur(K.total), `caisse + ${eur(K.stock)} de stock au coût${K.toCome ? ` + ${eur(K.toCome)} à encaisser` : ''}`, '', sign(K.total - (K.apports - K.retraits))],
   ];
   return `${breakEvenHtml(false)}<div class="tiles" style="margin-top:12px">${t.map(tileHtml).join('')}</div>`;
 }
@@ -2011,7 +2023,7 @@ function projHtml() {
     return { i, sale, p: sale - cost(i), ps5 };
   });
   const K = capital(), ca = sum(rows, (r) => r.sale), pr = sum(rows, (r) => r.p), nP = rows.filter((r) => r.ps5).length;
-  const after = K.cashed + ca - K.invested;
+  const after = K.cashed + K.toCome + ca - K.invested;
   return `<section class="card proj" aria-label="Projection du stock">
     <label class="sw"><span class="sw-t"><b>Projection : vendre tout mon stock</b><small>Combien de CA et de bénéfice si tout part au prix que tu choisis</small></span><input type="checkbox" id="proj-on" role="switch" ${on ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
     ${on ? `<div class="proj-in"><div class="field"><label for="proj-price">Prix de vente d’une PS5</label><div class="affix"><input id="proj-price" class="inp money" inputmode="decimal" value="${esc(numIn(price))}"></div></div><p class="hint" style="margin:0 0 6px">${plural(nP, 'PS5')} à ce prix${rows.length - nP ? `, ${plural(rows.length - nP, 'autre article')} au prix affiché ou à la cote` : ''}.</p></div>
@@ -2071,13 +2083,13 @@ function renderStats() {
   if (S.status !== 'ok') { el.innerHTML = stateBlock(); return; }
   if (S.statsTab === 'reparo') { el.innerHTML = statsTabs() + reparoHtml(); return; }
   const P = S.period, cur = thisMonth(), start12 = addMonths(cur, -11);
-  const years = [...new Set(S.items.flatMap((i) => [i.buyDate, i.sellDate]).filter(isDate).map((d) => d.slice(0, 4)))].sort().reverse();
+  const years = [...new Set(S.items.flatMap((i) => [i.buyDate, isSold(i) ? i.sellDate : null]).filter(isDate).map((d) => d.slice(0, 4)))].sort().reverse();
   const inP = (d) => isDate(d) && (P === 'all' || (P === '12m' ? d.slice(0, 7) >= start12 : d.slice(0, 4) === P));
   const sold = S.items.filter((i) => isSold(i) && inP(i.sellDate)), bought = S.items.filter((i) => inP(i.buyDate));
   const A = aggregate(bought, sold);
   let months;
   if (P === '12m') months = monthRange(start12, cur);
-  else if (P === 'all') { const first = S.items.flatMap((i) => [i.buyDate, i.sellDate]).filter(isDate).sort()[0]; months = monthRange(first ? first.slice(0, 7) : cur, cur).slice(-24); }
+  else if (P === 'all') { const first = S.items.flatMap((i) => [i.buyDate, isSold(i) ? i.sellDate : null]).filter(isDate).sort()[0]; months = monthRange(first ? first.slice(0, 7) : cur, cur).slice(-24); }
   else months = monthRange(P + '-01', P === cur.slice(0, 4) ? cur : P + '-12');
   const rows = months.map((m) => { const s = monthStats(m); return { ym: m, ca: s.ca, profit: s.profit, invest: s.invest, nB: s.nBought, nS: s.nSold, roi: s.roi, cash: s.cash }; });
   S.chartRows = rows;
@@ -2133,7 +2145,7 @@ function renderStats() {
 
   const Y = /^\d{4}$/.test(P) ? P : cur.slice(0, 4);
   const soldY = S.items.filter((i) => isSold(i) && i.sellDate.slice(0, 4) === Y);
-  const plat = ['Leboncoin', 'Vinted'].map((p) => { const s = soldY.filter((i) => platformOf(i.sellChannel) === p); return { p, n: s.length, amt: sum(s, (i) => num(i.sellPrice)) }; });
+  const plat = ['Leboncoin', 'Vinted'].map((p) => { const s = soldY.filter((i) => platformOf(i.sellChannel) === p && isPaid(i)); return { p, n: s.length, amt: sum(s, (i) => num(i.sellPrice)) }; });
   const caY = sum(soldY, (i) => num(i.sellPrice)), profY = sum(soldY, profit);
   const st = S.settings, rate = num(st.urssafRate), capM = num(st.microCap);
   const fiscHtml = `<div class="meters">${plat.map((x) => {
@@ -2237,7 +2249,7 @@ function blobToB64(blob) {
 }
 function normalize(d) {
   d = d && typeof d === 'object' ? d : {};
-  const list = (a) => (Array.isArray(a) ? a.filter((x) => x && x.id) : []);
+  const list = (a) => (Array.isArray(a) ? a.filter((x) => x && typeof x === 'object').map((x) => (x.id ? x : { ...x, id: newId() })) : []);
   // Les clés inconnues sont gardées : une future version de l'appli ne perd jamais de données.
   const { format, settings, items, cash, repairs, ...extra } = d;
   return { ...extra, format: 1, settings: { ...DEFAULTS, ...(settings || {}) }, items: list(items), cash: list(cash), repairs: list(repairs) };
@@ -2254,7 +2266,9 @@ function applyData(d, sha) {
   S.allItems = DATA.items; S.items = DATA.items.filter((i) => !isCancelled(i)); S.cancelled = DATA.items.filter(isCancelled); S.settings = DATA.settings; S.cash = DATA.cash; S.repairs = DATA.repairs;
   LS.set('cache', { data: DATA, sha: SHA, at: Date.now() });
 }
+let GEN = 0; // augmente à chaque enregistrement : un rechargement lancé avant est ignoré
 async function pull() {
+  const g = GEN;
   let j;
   try { j = await (await gh(`contents/${GH.file}?ref=${GH.branch}`)).json(); } catch (e) {
     if (e.status === 404) {
@@ -2267,6 +2281,7 @@ async function pull() {
   let text;
   if (j.content && j.encoding === 'base64') text = b64ToUtf8(j.content);
   else text = await (await gh(`contents/${GH.file}?ref=${GH.branch}`, { headers: { Accept: 'application/vnd.github.raw' } })).text();
+  if (g !== GEN) return;
   applyData(normalize(JSON.parse(text)), j.sha);
   LAST_PULL = Date.now();
 }
@@ -2289,20 +2304,24 @@ function commit(mutate, message) {
       if (!DATA) await pull();
       const next = JSON.parse(JSON.stringify(DATA));
       mutate(next);
+      let sha;
+      try { sha = await pushData(next, message); } catch (e) {
+        if (e.code !== 'conflict' || attempt === 3) throw e;
+        await new Promise((r) => setTimeout(r, 400 + attempt * 600));
+        await pull();
+        continue;
+      }
+      GEN++;
+      let before = null;
+      try { before = DATA && S.status === 'ok' ? capital().dispo : null; } catch (e) {}
+      applyData(next, sha);
       try {
-        const sha = await pushData(next, message);
-        const before = DATA && S.status === 'ok' ? capital().dispo : null;
-        applyData(next, sha);
         const after = capital().dispo;
         // Mouvement de caisse visible tout de suite : « 971,19 € → 597,25 € (−373,94 €) »
         if (before != null && Math.abs(after - before) > 0.004) S.lastMove = { before, after, label: message, at: Date.now() };
         onData();
-        return;
-      } catch (e) {
-        if (e.code !== 'conflict' || attempt === 3) throw e;
-        await new Promise((r) => setTimeout(r, 400 + attempt * 600));
-        await pull();
-      }
+      } catch (e) { console.error(e); }
+      return;
     }
   });
 }
@@ -2347,7 +2366,7 @@ const addCash = (c) => commit((d) => { d.cash.push({ ...c, id: newId() }); }, `$
 const delCash = (id) => commit((d) => { d.cash = d.cash.filter((c) => c.id !== id); }, 'Suppression mouvement de caisse');
 const addRepair = (r) => commit((d) => { d.repairs.push({ ...r, id: newId() }); }, `Réparo ${r.type} ×${repQty(r)} ${eur(repTotal(r))}`);
 const delRepair = (id) => commit((d) => { d.repairs = d.repairs.filter((r) => r.id !== id); }, 'Suppression prestation Réparo');
-const saveSettingsData = (next) => commit((d) => { d.settings = { ...DEFAULTS, ...next }; }, 'Réglages');
+const saveSettingsData = (next) => { const patch = Object.fromEntries(Object.entries(next).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(S.settings[k]))); return commit((d) => { d.settings = { ...DEFAULTS, ...d.settings, ...patch }; }, 'Réglages'); };
 
 /* Photos : envoyées dans photos/, affichées via l'API (dépôt privé) avec un cache local. */
 const PHOTO_URLS = new Map();
@@ -2414,18 +2433,18 @@ function claudeSummary() {
   L.push(`COMPTA REVENTE · export du ${today()} · ${items.length} articles (${items.filter(isOpen).length} en cours, ${items.filter(isSold).length} vendus)`);
   L.push(`Réglages : objectif ${num(st.monthlyGoal)} €/mois · bénéfice mini ${num(st.targetProfit)} € · alerte stock ${num(st.staleDays)} j · statut ${st.legal}${num(st.ps5Price) ? ` · cote PS5 ${num(st.ps5Price)} €` : ''}${Object.keys(st.ps5Models || {}).length ? ' · cotes modèles ' + Object.entries(st.ps5Models).map(([k, v]) => `${k}=${v}`).join(',') : ''}`);
   const K = capital();
-  L.push(`Caisse depuis le début : apports ${n2(K.apports)} · retraits ${n2(K.retraits)} · investi ${n2(K.invested)} · encaissé net ${n2(K.cashed)} · bénéfice ${n2(K.profit)} · disponible ${n2(K.dispo)} · stock au coût ${n2(K.stock)} · capital ${n2(K.total)}`);
+  L.push(`Caisse depuis le début : apports ${n2(K.apports)} · retraits ${n2(K.retraits)} · investi ${n2(K.invested)} · encaissé net ${n2(K.cashed)} · réparo ${n2(K.reparo)} · remboursements en attente ${n2(K.pending)} · ventes à encaisser ${n2(K.toCome)} · bénéfice ${n2(K.profit)} · disponible ${n2(K.dispo)} · stock au coût ${n2(K.stock)} · capital ${n2(K.total)}`);
   if (S.cash.length) L.push('MOUVEMENTS DE CAISSE (date;type;montant;note)', ...S.cash.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((c) => [c.date, c.type, n2(num(c.amount)), (c.note || '').replace(/[\n;]/g, ' ')].join(';')));
   if (S.repairs.length) L.push(`REPARO (réparations, ${repInCash() ? 'comptées' : 'non comptées'} dans la caisse) : ${sum(S.repairs, repQty)} réparations · encaissé ${n2(sum(S.repairs, repTotal))} · pièces ${n2(sum(S.repairs, (r) => num(r.partsCost)))} · gain ${n2(sum(S.repairs, repNet))}`,
     'REPARO_PRESTATIONS (date;type;quantite;prix_unitaire;pieces;gain;client;note)', ...S.repairs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((r) => [r.date, r.type, repQty(r), n2(num(r.unitPrice)), n2(num(r.partsCost)), n2(repNet(r)), r.client || '', (r.note || '').replace(/[\n;]/g, ' ')].join(';')));
-  if (S.cancelled.length) L.push('ACHATS ANNULES (exclus de tous les calculs, argent revenu en caisse) : ' + S.cancelled.map((i) => `${i.ref} ${i.model} ${n2(cost(i))} € annulé le ${i.cancelDate || '?'}${refundPending(i) ? ' (remboursement en attente, argent toujours sorti)' : ''}`).join(' · '));
+  if (S.cancelled.length) L.push('ACHATS ANNULES (exclus des stats) : ' + S.cancelled.map((i) => `${i.ref} ${i.model} ${n2(cost(i))} € annulé le ${i.cancelDate || '?'}${refundPending(i) ? ' (remboursement en attente, argent toujours sorti)' : ''}`).join(' · '));
   L.push('', 'MOIS;achats;investi;ventes;CA;frais_vente;benefice;ROI%');
   months.forEach((m) => { const s = monthStats(m); L.push([m, s.nBought, n2(s.invest), s.nSold, n2(s.ca), n2(s.fees), n2(s.profit), s.roi == null ? '' : Math.round(s.roi * 100)].join(';')); });
-  L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;avant_annonce_j;en_annonce_j;argent_bloque_j;notes;details_vente)');
+  L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;avant_annonce_j;en_annonce_j;argent_bloque_j;notes;details_vente;encaisse)');
   items.forEach((i) => L.push([i.ref, i.category, i.model, i.details, i.condition, i.buyDate, n2(num(i.buyPrice)), n2(num(i.buyCosts)), i.buySource, i.buyMode || '', isReceived(i) ? availDate(i) : awaitingShip(i) ? 'pas encore envoyé' : 'en livraison', shipDays(i) ?? '', i.status,
     i.status !== 'stock' ? i.listDate : '', i.status !== 'stock' ? n2(i.listPrice) : '', Math.max(0, (i.priceLog || []).length - 1),
     isSold(i) ? i.sellDate : '', isSold(i) ? n2(num(i.sellPrice)) : '', isSold(i) ? n2(num(i.sellFees)) : '', isSold(i) ? i.sellChannel : '',
-    n2(profit(i)), isReceived(i) && (marketStart(i) || !isSold(i)) ? phaseSplit(i).prep : '', marketStart(i) ? marketDays(i) : '', tied(i), (i.notes || '').replace(/[\n;]/g, ' '), isSold(i) ? (i.sellNotes || '').replace(/[\n;]/g, ' ') : ''].map((v) => String(v ?? '').replace(/;/g, ',')).join(';')));
+    n2(profit(i)), isReceived(i) && (marketStart(i) || !isSold(i)) ? phaseSplit(i).prep : '', marketStart(i) ? marketDays(i) : '', tied(i), (i.notes || '').replace(/[\n;]/g, ' '), isSold(i) ? (i.sellNotes || '').replace(/[\n;]/g, ' ') : '', isSold(i) ? (isPaid(i) ? paidOn(i) : 'en attente') : ''].map((v) => String(v ?? '').replace(/;/g, ',')).join(';')));
   return L.join('\n');
 }
 
@@ -2482,7 +2501,7 @@ function logout() {
 async function refresh(force) {
   if (!TOKEN || PENDING) return;
   if (!force && Date.now() - LAST_PULL < 20000) return;
-  try { await pull(); if (S.status !== 'ok') S.status = 'ok'; onData(); } catch (e) {
+  try { await pull(); if (PENDING) return; if (S.status !== 'ok') S.status = 'ok'; onData(); } catch (e) {
     if (e.code === 'offline' && DATA) { S.offline = true; syncLabel(); return; }
     if (!DATA) { S.status = 'error'; render(); }
   }
@@ -2495,7 +2514,7 @@ const adLow = (s) => String(s || '').toLowerCase();
 function adClean(s) {
   s = String(s || '').replace(/\s+/g, ' ').trim()
     .replace(/\b(ps[1-5])\b/gi, (m) => m.toUpperCase()).replace(/\bpro\b/gi, (m) => (m === 'pro' ? 'Pro' : m))
-    .replace(/(\d)([a-zà-ÿ])/gi, '$1 $2').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')
+    .replace(/(\d)(en|jeux?|manettes?)\b/gi, '$1 $2').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')
     .replace(/\b(nba|gta|fifa|fc|ea|cod|ufc|wwe|mw[23]?)\b/gi, (m) => m.toUpperCase())
     .replace(/\b(\d+) manette\b/gi, '$1 manettes').replace(/\ba r[eé]parer\b/gi, 'à réparer').replace(/\breparer\b/gi, 'réparer');
   return s ? s[0].toUpperCase() + s.slice(1) : '';
@@ -2505,9 +2524,10 @@ function adParse(i) {
   const r = { color: '', pads: 0, games: false, gameCount: 0, gameLine: '', extras: [], defects: [] };
   String(i.details || '').split(/[,;\n+]|\s\/\s|\s-\s/).map((f) => f.trim()).filter(Boolean).forEach((f) => {
     let low = adLow(f);
+    if (/^sans\b/.test(low)) { r.extras.push(adClean(f)); if (/manette/.test(low)) r.noPad = true; if (/jeu/.test(low)) r.noGame = true; return; }
     const pm = low.match(/(\d+)\s*manettes?/);
     if (pm) { r.pads = Math.max(r.pads, +pm[1]); low = low.replace(pm[0], ' manette '); }
-    if (/manette|dualsense/.test(low)) {
+    if (/manette|dualsense/.test(low) || (i.category === 'manette' && Object.keys(AD_COLORS).some((k) => new RegExp(`\\b${k}\\b`).test(low)))) {
       const c = Object.keys(AD_COLORS).find((k) => new RegExp(`\\b${k}\\b`).test(low));
       if (c) { r.color = AD_COLORS[c]; low = low.replace(new RegExp(`\\b${c}\\b`), ' '); }
       r.pads = Math.max(r.pads, 1);
@@ -2528,9 +2548,10 @@ function adParse(i) {
   });
   return r;
 }
+const adModel = (i) => i.model || (CATS[i.category] || CATS.autre).label;
 function adConsole(i, forTitle) {
   const m = adLow(i.model);
-  if (i.category !== 'ps5') return adClean(i.model);
+  if (i.category !== 'ps5') return adClean(adModel(i));
   const slim = /slim/.test(m), dig = /digital|num[ée]rique/.test(m);
   if (/\bpro\b/.test(m)) return 'PS5 Pro';
   if (forTitle) return dig ? (slim ? 'PS5 Slim Digital Édition' : 'PS5 Digital Édition') : slim ? 'PS5 Slim Lecteur CD' : 'PS5 Lecteur CD Édition';
@@ -2542,12 +2563,12 @@ function adTitle(i) {
   const etat = { neuf: i.category === 'pokemon' ? 'Neuf Scellé' : fem ? 'Neuve' : 'Neuf', comme_neuf: fem ? 'Comme Neuve' : 'Comme Neuf', tres_bon: 'Très Bon État', bon: 'Bon État', abime: 'À Réparer' }[i.condition] || 'Très Bon État';
   const parts = [];
   if (['ps5', 'console'].includes(i.category)) {
-    if (p.games || c.includes('Jeu(x)')) parts.push(p.gameCount > 1 ? `${p.gameCount} Jeux` : 'Jeux');
+    if (!p.noGame && (p.games || c.includes('Jeu(x)'))) parts.push(p.gameCount > 1 ? `${p.gameCount} Jeux` : 'Jeux');
     if (p.pads > 1) parts.push(`${p.pads} Manettes${p.color ? ' dont ' + p.color : ''}`);
     else if (p.color) parts.push(`Manette ${p.color}`);
     return `${adConsole(i, true)}${parts.length ? ' + ' + parts.join(' + ') : ''} - ${etat}`;
   }
-  const base = i.category === 'manette' && /dualsense/i.test(i.model) ? `Manette PS5 ${adClean(i.model)}${p.color ? ' ' + p.color : ''}` : adClean(i.model);
+  const base = i.category === 'manette' && /dualsense/i.test(i.model) ? `Manette PS5 ${adClean(adModel(i))}${p.color ? ' ' + p.color : ''}` : adClean(adModel(i));
   return `${base} - ${etat}`;
 }
 function adDesc(i, withRef) {
@@ -2556,16 +2577,16 @@ function adDesc(i, withRef) {
     neuf: fem ? 'neuve, jamais utilisée' : 'neuf, jamais utilisé',
     comme_neuf: fem ? 'comme neuve, en parfait état de fonctionnement' : 'comme neuf, en parfait état de fonctionnement',
     tres_bon: 'en parfait état de fonctionnement', bon: 'en bon état de fonctionnement',
-    abime: 'vendue en l’état, à réparer',
+    abime: fem ? 'vendue en l’état, à réparer' : 'vendu en l’état, à réparer',
   }[i.condition] || 'en parfait état de fonctionnement';
-  const name = hw ? adConsole(i, false) : adClean(i.model);
+  const name = hw ? adConsole(i, false) : adClean(adModel(i));
   const L = [`${name} ${state}.`];
   const list = [];
   if (hw) {
     list.push(i.category === 'ps5' ? `Console ${name.replace(/^PS5/, 'PS5')}` : `Console ${name}`);
     const pad = i.category === 'ps5' ? 'DualSense' : '';
     if (p.pads > 1) list.push(`${p.pads} manettes${pad ? ' ' + pad : ''}${p.color ? ` dont une ${p.color.toLowerCase()}` : ''}`);
-    else if (c.includes('Manette') || p.pads) list.push(`Manette${pad ? ' ' + pad : ''}${p.color ? ' ' + p.color.toLowerCase() : ''}`);
+    else if (!p.noPad && (c.includes('Manette') || p.pads)) list.push(`Manette${pad ? ' ' + pad : ''}${p.color ? ' ' + p.color.toLowerCase() : ''}`);
     if (c.includes('Socle')) list.push(i.category === 'ps5' ? 'Socle pour maintenir la PS5' : 'Socle');
     if (c.includes('Câbles')) list.push('Câble alimentation', 'Câble HDMI');
   } else if (i.category === 'manette' && p.color && !/rose|blanche|noire|bleue|rouge|grise|violette|camo/i.test(name)) {
@@ -2573,7 +2594,7 @@ function adDesc(i, withRef) {
   }
   if (c.includes('Boîte')) list.push('Boîte d’origine');
   if (p.gameLine) list.push(p.gameLine);
-  else if (p.games || c.includes('Jeu(x)')) list.push(p.gameCount > 1 ? `${p.gameCount} jeux` : 'Jeux inclus');
+  else if (!p.noGame && (p.games || c.includes('Jeu(x)'))) list.push(p.gameCount > 1 ? `${p.gameCount} jeux` : 'Jeux inclus');
   p.extras.forEach((e) => { if (!list.some((x) => adLow(x).includes(adLow(e)) || (/socle/i.test(e) && /socle/i.test(x)))) list.push(e); });
   if (c.includes('Facture')) list.push('Facture d’achat');
   if (c.includes('Garantie')) list.push('Encore sous garantie');
@@ -2789,7 +2810,7 @@ const ACT = {
   },
   'f-month-clear': () => { S.f.month = null; renderArticles(); },
   'ledger-all': () => { S.ledgerAll = true; S.ledgerOpen = true; renderAccueil(); },
-  goto: (a) => { if (a.dataset.st) S.f.st = a.dataset.st; if (a.dataset.sort) S.f.sort = a.dataset.sort; S.f.cat = 'all'; saveFilters(); setView(a.dataset.view); },
+  goto: (a) => { S.f.month = null; if (a.dataset.st) S.f.st = a.dataset.st; if (a.dataset.sort) S.f.sort = a.dataset.sort; S.f.cat = 'all'; saveFilters(); setView(a.dataset.view); },
   open: (a) => openDetail(a.dataset.id),
   sell: (a) => openQuick('sell', a.dataset.id),
   recv: (a) => openQuick('recv', a.dataset.id),
@@ -2811,6 +2832,7 @@ const ACT = {
     clearErrs();
     const d = val('x-date');
     if (!isDate(d)) return fieldErr('x-date', 'Date requise.');
+    if (isDate(i.buyDate) && d < i.buyDate) return fieldErr('x-date', 'L’annulation ne peut pas précéder l’achat.');
     a.disabled = true;
     const got = $('#x-refunded').checked;
     const ok = await upd(i.id, { cancelled: true, cancelDate: d, refunded: got, refundDate: got ? d : '' });
@@ -2894,7 +2916,7 @@ const ACT = {
     if (await write(() => delCash(id))) toast('Mouvement supprimé');
   },
   'f-view': (a) => { S.f.view = a.dataset.v; saveFilters(); renderArticles(); },
-  'clear-filters': () => { S.f.st = 'tous'; S.f.cat = 'all'; S.f.q = ''; $('#q').value = ''; saveFilters(); renderArticles(); },
+  'clear-filters': () => { S.f.month = null; S.f.st = 'tous'; S.f.cat = 'all'; S.f.q = ''; $('#q').value = ''; saveFilters(); renderArticles(); },
   copy: (a) => copyText(a.dataset.text, `Réf ${a.dataset.text} copiée`),
   'copy-csv': () => copyText($('#csv-txt').value, 'CSV copié'),
   photo: (a) => { $('#lb-img').removeAttribute('src'); $('#lightbox').hidden = false; photoUrl(a.dataset.src).then((u) => { $('#lb-img').src = u; }).catch(() => toast('Photo indisponible')); },
