@@ -220,6 +220,7 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .lastmove em{font-style:normal;font-weight:800;margin-left:auto} .lastmove.out em{color:var(--bad)} .lastmove.in em{color:var(--good)}
 @keyframes lm-in{from{transform:scale(.97);opacity:0}to{transform:none;opacity:1}}
 .refund-wait{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:14px;background:var(--warn-soft);font-size:13.5px}
+textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-size:14.5px;line-height:1.5}
 .ship-info{margin:6px 0 0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
@@ -662,7 +663,7 @@ const CONDS = [['neuf', 'Neuf / scellé'], ['comme_neuf', 'Comme neuf'], ['tres_
 const CONTENTS = ['Boîte', 'Manette', 'Câbles', 'Socle', 'Facture', 'Jeu(x)', 'Garantie'];
 const SOURCES = ['Leboncoin', 'Vinted', 'Facebook', 'Particulier', 'Magasin', 'Autre'];
 const CHANNELS = ['LBC main propre', 'LBC livraison', 'Vinted', 'Facebook', 'Particulier', 'Autre'];
-const DEFAULTS = { monthlyGoal: 500, staleDays: 21, targetProfit: 50, legal: 'particulier', urssafRate: 12.3, microCap: 188700, ps5Price: null, ps5Models: {}, reparoInCash: true };
+const DEFAULTS = { monthlyGoal: 500, staleDays: 21, targetProfit: 50, legal: 'particulier', urssafRate: 12.3, microCap: 188700, ps5Price: null, ps5Models: {}, reparoInCash: true, adCity: 'Grenoble' };
 const platformOf = (c) => (c === 'LBC livraison' ? 'Leboncoin' : c === 'Vinted' ? 'Vinted' : null);
 const condLabel = (c) => (CONDS.find((x) => x[0] === c) || [])[1] || '';
 const PS5_KEYS = [['slim_std', 'PS5 Slim Standard'], ['slim_dig', 'PS5 Slim Digital'], ['fat_std', 'PS5 Fat Standard'], ['fat_dig', 'PS5 Fat Digital'], ['pro', 'PS5 Pro']];
@@ -1375,6 +1376,7 @@ function detailBody(i) {
     ${durationsBlock(i)}
     <div class="fs"><p class="fs-t">Historique</p><ol class="tl">${tl.join('')}</ol></div>
     ${specs.length ? `<div class="fs"><p class="fs-t">Détails</p><dl class="specs">${specs.map((s) => `<dt>${s[0]}</dt><dd>${esc(s[1])}</dd>`).join('')}</dl></div>` : ''}
+    ${!isSold(i) && !isCancelled(i) ? `<div class="btns"><button class="btn sm primary" data-act="ad" data-f="title" data-id="${esc(i.id)}">${ic('copy')} Titre Leboncoin</button><button class="btn sm primary" data-act="ad" data-f="desc" data-id="${esc(i.id)}">${ic('copy')} Description Leboncoin</button></div>` : ''}
     <div id="d-more" class="btns">
       <button class="btn sm" data-act="edit" data-id="${esc(i.id)}">Modifier</button>
       <button class="btn sm" data-act="dup" data-id="${esc(i.id)}">Dupliquer</button>
@@ -1732,6 +1734,7 @@ function openQuick(mode, id) {
     const sug = suggestedList(i);
     body = `${head}<div class="row2">${moneyF('q-price', 'Prix affiché', i.listPrice != null ? i.listPrice : sug, sug ? `Conseillé ≈ ${eur(sug)}, marge de négociation comprise` : '')}${dateF('q-date', 'Mise en ligne', today())}</div>
       ${textF('q-url', 'Lien de l’annonce <span class="opt-l">(facultatif)</span>', i.listUrl, 'https://www.leboncoin.fr/…', 'inputmode="url" autocapitalize="off"')}
+      <button class="btn sm" data-act="ad" data-f="title" data-id="${esc(i.id)}">${ic('copy')} Titre et description Leboncoin</button>
       <p class="hint">Astuce : écris <b>${esc(i.ref)}</b> dans la description de l’annonce. Quand un acheteur t’écrit, tape la réf ou le prix dans Articles pour retrouver la bonne console.</p>`;
   } else {
     title = `Nouveau prix ${i.ref}`; btn = 'Enregistrer le prix';
@@ -2442,6 +2445,123 @@ async function refresh(force) {
   }
 }
 
+/* ---------- Annonce Leboncoin : titre et description générés depuis la fiche ---------- */
+const AD_COLORS = { rose: 'Rose', blanche: 'Blanche', blanc: 'Blanche', noire: 'Noire', noir: 'Noire', bleue: 'Bleue', bleu: 'Bleue', rouge: 'Rouge', grise: 'Grise', gris: 'Grise', violette: 'Violette', violet: 'Violette', verte: 'Verte', vert: 'Verte', camo: 'Camo', camouflage: 'Camo', jaune: 'Jaune', orange: 'Orange', chrome: 'Chrome', argent: 'Argent' };
+const adLow = (s) => String(s || '').toLowerCase();
+// « 11 jeux ps4 et 2 jeux ps5 (13en tout) » → « 11 jeux PS4 et 2 jeux PS5 (13 en tout) »
+function adClean(s) {
+  s = String(s || '').replace(/\s+/g, ' ').trim()
+    .replace(/\b(ps[1-5])\b/gi, (m) => m.toUpperCase()).replace(/\bpro\b/gi, (m) => (m === 'pro' ? 'Pro' : m))
+    .replace(/(\d)([a-zà-ÿ])/gi, '$1 $2').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')')
+    .replace(/\b(nba|gta|fifa|fc|ea|cod|ufc|wwe|mw[23]?)\b/gi, (m) => m.toUpperCase())
+    .replace(/\b(\d+) manette\b/gi, '$1 manettes').replace(/\ba r[eé]parer\b/gi, 'à réparer').replace(/\breparer\b/gi, 'réparer');
+  return s ? s[0].toUpperCase() + s.slice(1) : '';
+}
+// Lit le champ « Détails » : couleur et nombre de manettes, jeux, et autres éléments du pack.
+function adParse(i) {
+  const r = { color: '', pads: 0, games: false, gameCount: 0, gameLine: '', extras: [], defects: [] };
+  String(i.details || '').split(/[,;\n+]|\s\/\s|\s-\s/).map((f) => f.trim()).filter(Boolean).forEach((f) => {
+    let low = adLow(f);
+    const pm = low.match(/(\d+)\s*manettes?/);
+    if (pm) { r.pads = Math.max(r.pads, +pm[1]); low = low.replace(pm[0], ' manette '); }
+    if (/manette|dualsense/.test(low)) {
+      const c = Object.keys(AD_COLORS).find((k) => new RegExp(`\\b${k}\\b`).test(low));
+      if (c) { r.color = AD_COLORS[c]; low = low.replace(new RegExp(`\\b${c}\\b`), ' '); }
+      r.pads = Math.max(r.pads, 1);
+      low = low.replace(/\b(manettes?|dualsense|ps5)\b/g, ' ');
+    }
+    // Défaut signalé (« une à réparer », « joystick à changer »…) : mentionné à part, sans « aucun défaut »
+    if (/r[eé]par|chang|cass|\bhs\b|d[eé]faut|drift|rayur|fissur|panne|ab[iî]m|fonctionne pas|bug/.test(adLow(f))) { r.defects.push(adClean(f)); return; }
+    if (/\bjeux?\b/.test(low)) {
+      r.games = true;
+      const tot = low.match(/(\d+)\s*en tout/), all = [...low.matchAll(/(\d+)\s*jeux?/g)].map((m) => +m[1]);
+      const n = tot ? +tot[1] : /\bdont\b/.test(low) ? all[0] || 0 : all.reduce((a, b) => a + b, 0);
+      if (n) r.gameCount = Math.max(r.gameCount, n);
+      if (low.replace(/\b(jeux?|avec|et|\+)\b/g, ' ').trim()) { r.gameLine = adClean(/manette/i.test(f) ? low : f); return; }
+      low = low.replace(/\b(jeux?|avec|et)\b/g, ' ');
+    }
+    const rest = low.replace(/\b(avec|et)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    if (rest.length > 1) r.extras.push(adClean(rest));
+  });
+  return r;
+}
+function adConsole(i, forTitle) {
+  const m = adLow(i.model);
+  if (i.category !== 'ps5') return adClean(i.model);
+  const slim = /slim/.test(m), dig = /digital|num[ée]rique/.test(m);
+  if (/\bpro\b/.test(m)) return 'PS5 Pro';
+  if (forTitle) return dig ? (slim ? 'PS5 Slim Digital Édition' : 'PS5 Digital Édition') : slim ? 'PS5 Slim Lecteur CD' : 'PS5 Lecteur CD Édition';
+  return dig ? (slim ? 'PS5 Slim Digital Edition (sans lecteur CD)' : 'PS5 Digital Edition (sans lecteur CD)') : slim ? 'PS5 Slim avec lecteur CD' : 'PS5 avec lecteur CD';
+}
+const adFem = (i) => ['ps5', 'console', 'manette'].includes(i.category);
+function adTitle(i) {
+  const p = adParse(i), fem = adFem(i), c = i.contents || [];
+  const etat = { neuf: i.category === 'pokemon' ? 'Neuf Scellé' : fem ? 'Neuve' : 'Neuf', comme_neuf: fem ? 'Comme Neuve' : 'Comme Neuf', tres_bon: 'Très Bon État', bon: 'Bon État', abime: 'À Réparer' }[i.condition] || 'Très Bon État';
+  const parts = [];
+  if (['ps5', 'console'].includes(i.category)) {
+    if (p.games || c.includes('Jeu(x)')) parts.push(p.gameCount > 1 ? `${p.gameCount} Jeux` : 'Jeux');
+    if (p.pads > 1) parts.push(`${p.pads} Manettes${p.color ? ' dont ' + p.color : ''}`);
+    else if (p.color) parts.push(`Manette ${p.color}`);
+    return `${adConsole(i, true)}${parts.length ? ' + ' + parts.join(' + ') : ''} - ${etat}`;
+  }
+  const base = i.category === 'manette' && /dualsense/i.test(i.model) ? `Manette PS5 ${adClean(i.model)}${p.color ? ' ' + p.color : ''}` : adClean(i.model);
+  return `${base} - ${etat}`;
+}
+function adDesc(i, withRef) {
+  const p = adParse(i), fem = adFem(i), c = i.contents || [], hw = ['ps5', 'console'].includes(i.category);
+  const state = {
+    neuf: fem ? 'neuve, jamais utilisée' : 'neuf, jamais utilisé',
+    comme_neuf: fem ? 'comme neuve, en parfait état de fonctionnement' : 'comme neuf, en parfait état de fonctionnement',
+    tres_bon: 'en parfait état de fonctionnement', bon: 'en bon état de fonctionnement',
+    abime: 'vendue en l’état, à réparer',
+  }[i.condition] || 'en parfait état de fonctionnement';
+  const name = hw ? adConsole(i, false) : adClean(i.model);
+  const L = [`${name} ${state}.`];
+  const list = [];
+  if (hw) {
+    list.push(i.category === 'ps5' ? `Console ${name.replace(/^PS5/, 'PS5')}` : `Console ${name}`);
+    const pad = i.category === 'ps5' ? 'DualSense' : '';
+    if (p.pads > 1) list.push(`${p.pads} manettes${pad ? ' ' + pad : ''}${p.color ? ` dont une ${p.color.toLowerCase()}` : ''}`);
+    else if (c.includes('Manette') || p.pads) list.push(`Manette${pad ? ' ' + pad : ''}${p.color ? ' ' + p.color.toLowerCase() : ''}`);
+    if (c.includes('Socle')) list.push(i.category === 'ps5' ? 'Socle pour maintenir la PS5' : 'Socle');
+    if (c.includes('Câbles')) list.push('Câble alimentation', 'Câble HDMI');
+  } else if (i.category === 'manette' && p.color && !/rose|blanche|noire|bleue|rouge|grise|violette|camo/i.test(name)) {
+    L[0] = `${name} ${p.color.toLowerCase()} ${state}.`;
+  }
+  if (c.includes('Boîte')) list.push('Boîte d’origine');
+  if (p.gameLine) list.push(p.gameLine);
+  else if (p.games || c.includes('Jeu(x)')) list.push(p.gameCount > 1 ? `${p.gameCount} jeux` : 'Jeux inclus');
+  p.extras.forEach((e) => { if (!list.some((x) => adLow(x).includes(adLow(e)) || (/socle/i.test(e) && /socle/i.test(x)))) list.push(e); });
+  if (c.includes('Facture')) list.push('Facture d’achat');
+  if (c.includes('Garantie')) list.push('Encore sous garantie');
+  if (list.length > (hw ? 1 : 0)) { L.push('', list.length >= 3 ? 'Pack complet :' : 'Contenu :', '', ...list.map((x) => '– ' + x)); }
+  const noun = hw ? 'Console propre, prête à l’emploi.' : i.category === 'manette' ? 'Manette propre, prête à l’emploi.' : fem ? 'Propre, prête à l’emploi.' : 'Article propre, prêt à l’emploi.';
+  const close = { neuf: 'Jamais utilisé' + (fem ? 'e' : '') + ', dans son emballage d’origine.', bon: `Quelques légères traces d’usage, aucun problème de fonctionnement. ${noun}`, abime: 'Défauts visibles sur les photos, vendu' + (fem ? 'e' : '') + ' en l’état.' }[i.condition]
+    || `Aucun défaut esthétique ou de fonctionnement. ${noun}`;
+  if (p.defects.length && !['neuf', 'abime'].includes(i.condition)) L.push('', `À noter : ${p.defects.map((d) => d[0].toLowerCase() + d.slice(1)).join(', ')}. ${noun}`);
+  else L.push('', close);
+  const city = (S.settings.adCity || '').trim();
+  L.push('', city ? `Remise en main propre sur ${city} et ses environs ou envoi partout en France rapide et soigné.` : 'Remise en main propre ou envoi partout en France rapide et soigné.');
+  if (withRef) L.push('', `Réf. ${i.ref}`);
+  return L.join('\n');
+}
+function openAd(id, focus) {
+  const i = byId(id); if (!i) return;
+  const withRef = LS.get('adRef', true);
+  const t = i.adTitle || adTitle(i), d = i.adDesc || adDesc(i, withRef);
+  openSheet({ kind: 'ad', id, title: `Annonce Leboncoin ${i.ref}`, body: `
+    <div class="field"><label for="ad-title">Titre de l’annonce <span class="opt-l" id="ad-tn"></span></label><textarea id="ad-title" class="inp ad-t" rows="2">${esc(t)}</textarea>
+      <div class="btns"><button class="btn sm primary" data-act="ad-copy" data-f="ad-title">${ic('copy')} Copier le titre</button><button class="btn sm" data-act="ad-regen" data-f="title" data-id="${esc(id)}">Régénérer</button></div></div>
+    <div class="field"><label for="ad-desc">Description</label><textarea id="ad-desc" class="inp ad-d" rows="16">${esc(d)}</textarea>
+      <div class="btns"><button class="btn sm primary" data-act="ad-copy" data-f="ad-desc">${ic('copy')} Copier la description</button><button class="btn sm" data-act="ad-regen" data-f="desc" data-id="${esc(id)}">Régénérer</button></div></div>
+    <label class="sw"><span class="sw-t"><b>Ajouter la réf ${esc(i.ref)} en bas</b><small>Pour retrouver l’article quand un acheteur t’écrit</small></span><input type="checkbox" id="ad-ref" role="switch" ${withRef ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
+    <p class="hint">Le texte vient du modèle, de l’état, du contenu coché et du champ « Détails » de la fiche (ex. « manette rose, 3 jeux dont 2 NBA et GTA 5, câble ethernet neuf offert »). Tu peux le retoucher ici ; « Enregistrer » le garde dans la fiche.${(S.settings.adCity || '').trim() ? '' : ' Indique ta ville dans Réglages pour la remise en main propre.'}</p>`,
+    foot: `<button class="btn" data-act="close">Fermer</button><button class="btn primary grow" data-act="ad-save" data-id="${esc(id)}">Enregistrer dans la fiche</button>` });
+  adCount();
+  const f = $(focus === 'desc' ? '#ad-desc' : '#ad-title'); if (f) f.scrollIntoView({ block: 'center' });
+}
+function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el.textContent = `(${t.value.length} caractères)`; }
+
 /* ---------- Réglages et export ---------- */
 function openSettings() {
   const st = S.settings, micro = st.legal === 'micro';
@@ -2461,6 +2581,9 @@ function openSettings() {
     <div class="fs"><p class="fs-t">Objectifs</p>
       <div class="row2">${moneyF('s-goal', 'Objectif de bénéfice / mois', st.monthlyGoal)}${moneyF('s-tp', 'Bénéfice minimum par article', st.targetProfit, 'Utilisé par le simulateur')}</div>
       <div class="field"><label for="s-stale">Alerte stock dormant après</label><span class="selw" style="display:block"><select id="s-stale" class="inp">${[7, 10, 14, 21, 30, 45, 60].map((d) => `<option value="${d}" ${num(st.staleDays) === d ? 'selected' : ''}>${d} jours</option>`).join('')}</select></span></div>
+    </div>
+    <div class="fs"><p class="fs-t">Annonces Leboncoin</p>
+      ${textF('s-city', 'Ville pour la remise en main propre', st.adCity, 'ex. Grenoble')}
     </div>
     <div class="fs"><p class="fs-t">Statut</p>
       ${radios('s-legal', [['particulier', 'Particulier'], ['micro', 'Micro-entreprise']], micro ? 'micro' : 'particulier', 'opts')}
@@ -2488,11 +2611,11 @@ async function saveSettings(btn) {
   const next = {
     monthlyGoal: parseNum(val('s-goal')) ?? 0, targetProfit: parseNum(val('s-tp')) ?? 0, staleDays: parseInt(val('s-stale'), 10) || 21,
     legal: radioVal('s-legal') || 'particulier', urssafRate: parseNum(val('s-rate')) ?? DEFAULTS.urssafRate, microCap: parseNum(val('s-cap')) ?? DEFAULTS.microCap,
-    ps5Price: parseNum(val('s-ps5')),
+    ps5Price: parseNum(val('s-ps5')), adCity: val('s-city').trim(),
     ps5Models: Object.fromEntries(PS5_KEYS.map(([k]) => [k, parseNum(val('s-ps5-' + k))]).filter(([, v]) => v != null && v > 0)),
   };
   btn.disabled = true;
-  const ok = await write(() => saveSettingsData(next));
+  const ok = await write(() => saveSettingsData({ ...S.settings, ...next }));
   btn.disabled = false;
   if (ok) { S.settings = { ...DEFAULTS, ...next }; closeSheet(); toast('Réglages enregistrés'); render(); }
 }
@@ -2662,6 +2785,16 @@ const ACT = {
     const i = byId(a.dataset.id); if (!i) return;
     if (await upd(i.id, { refunded: false, refundDate: '' })) toast(`${i.ref} : remboursement en attente · caisse ${eur(capital().dispo)}`);
   },
+  ad: (a) => openAd(a.dataset.id, a.dataset.f),
+  'ad-copy': (a) => copyText(val(a.dataset.f), a.dataset.f === 'ad-title' ? 'Titre copié' : 'Description copiée'),
+  'ad-regen': (a) => { const i = byId(a.dataset.id); if (!i) return; if (a.dataset.f === 'title') { $('#ad-title').value = adTitle(i); adCount(); } else $('#ad-desc').value = adDesc(i, $('#ad-ref').checked); },
+  'ad-save': async (a) => {
+    const i = byId(a.dataset.id); if (!i) return;
+    a.disabled = true;
+    const ok = await upd(i.id, { adTitle: val('ad-title').trim(), adDesc: $('#ad-desc').value.trim() });
+    a.disabled = false;
+    if (ok) { closeSheet(); toast(`Annonce de ${i.ref} enregistrée`); }
+  },
   list: (a) => openQuick('list', a.dataset.id),
   price: (a) => openQuick('price', a.dataset.id),
   reserve: async (a) => { if (await upd(a.dataset.id, { status: 'reserve' })) toast('Marqué réservé'); },
@@ -2759,10 +2892,16 @@ function bind() {
     renderSimu();
     if (it) $('#s-resale').focus();
   });
-  document.addEventListener('input', (e) => { if (/^r-(qty|price|parts)$/.test(e.target.id)) repPreview(); });
+  document.addEventListener('input', (e) => { if (/^r-(qty|price|parts)$/.test(e.target.id)) repPreview(); if (e.target.id === 'ad-title') adCount(); });
   document.addEventListener('change', (e) => {
     if (e.target.id === 'r-type') { const p = repTypes().get(e.target.value.trim()); if (p != null) { $('#r-price').value = numIn(p); } repPreview(); }
     if (e.target.id === 'r-qty') repPreview();
+    if (e.target.id === 'ad-ref') {
+      LS.set('adRef', e.target.checked);
+      const d = $('#ad-desc'), i = byId(SHEET && SHEET.id); if (!d || !i) return;
+      const line = `\n\nRéf. ${i.ref}`;
+      d.value = e.target.checked ? (d.value.includes(`Réf. ${i.ref}`) ? d.value : d.value.trimEnd() + line) : d.value.replace(line, '').replace(`Réf. ${i.ref}`, '').trimEnd();
+    }
   });
   $('#v-stats').addEventListener('change', async (e) => {
     if (e.target.id === 'rep-cash') { const on = e.target.checked; if (await write(() => saveSettingsData({ ...S.settings, reparoInCash: on }))) toast(on ? 'Réparo compté dans la caisse' : 'Réparo retiré de la caisse'); }
