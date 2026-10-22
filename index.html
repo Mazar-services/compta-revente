@@ -222,6 +222,7 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .refund-wait{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:14px;background:var(--warn-soft);font-size:13.5px}
 textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-size:14.5px;line-height:1.5}
 .refund-wait.pay{background:var(--accent-soft)} .refund-wait .btns{display:flex;gap:6px;flex-wrap:wrap}
+.sv-id small.sv-note{color:var(--ink-2);font-style:italic}
 .ship-info{margin:6px 0 0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
@@ -1014,7 +1015,7 @@ function salesCard(m, ms) {
   return `<section class="card" aria-label="Ventes du mois">
     <div class="card-h"><h2 class="sec">Ventes de ${monthName(m)} : ${sold.length}</h2>${sold.length ? `<button class="btn sm" data-act="goto-sales" data-m="${m}">Tout voir</button>` : ''}</div>
     ${sold.length ? `<div class="sv-list">${sold.map((i) => { const p = profit(i); return `<div class="sv" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">
-        <div class="sv-top">${mini(i, 'mini lg')}<div class="sv-id"><b>${esc(i.model)}</b>${i.details ? `<small>${esc(i.details)}</small>` : ''}<span>Réf ${tag(i)}</span><small>Vendu le ${dShort(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}</small>${awaitingPay(i) ? '<span class="pill st-attente" style="justify-self:start">Paiement en attente</span>' : ''}</div></div>
+        <div class="sv-top">${mini(i, 'mini lg')}<div class="sv-id"><b>${esc(i.model)}</b>${i.details ? `<small>${esc(i.details)}</small>` : ''}<span>Réf ${tag(i)}</span><small>Vendu le ${dShort(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}</small>${i.sellNotes ? `<small class="sv-note">${esc(i.sellNotes)}</small>` : ''}${awaitingPay(i) ? '<span class="pill st-attente" style="justify-self:start">Paiement en attente</span>' : ''}</div></div>
         <div class="sv-nums"><span>Acheté<b>${eur(cost(i))}</b></span><span>Vendu<b>${eur(num(i.sellPrice))}</b></span><span>Bénéfice<b class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</b></span></div>
       </div>`; }).join('')}</div>
       ${(() => { const pr = LS.get('salesProfit', false); return `<div class="sv-total ${pr ? (ms.profit < -0.004 ? 'r' : 'g') : 'i'}"><span>${pr ? 'Bénéfice total' : 'Chiffre d’affaires total'}<small>${plural(sold.length, 'vente')} en ${monthName(m)}</small></span><b>${pr ? eurS(ms.profit) : eur(ms.ca)}</b></div>
@@ -1375,13 +1376,13 @@ function detailBody(i) {
   const entries = log.length ? log : (i.listPrice != null && i.status !== 'stock' ? [{ d: i.listDate, p: i.listPrice }] : []);
   entries.forEach((e, k) => tl.push(`<li><span class="dot ${sold || k < entries.length - 1 ? 'ok' : 'on'}"></span><div><b>${k === 0 ? 'Mis en annonce à' : 'Prix passé à'} ${eur(num(e.p))}</b><small>${dLong(e.d)}</small></div></li>`));
   if (i.status === 'reserve') tl.push(`<li><span class="dot on"></span><div><b>Réservé</b><small>en attente de la vente</small></div></li>`);
-  if (sold) tl.push(`<li><span class="dot ok"></span><div><b>Vendu ${eur(num(i.sellPrice))} · <span class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</span></b><small>${dLong(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''}${i.buyerName ? ' · acheteur ' + esc(i.buyerName) : ''} · ${h}${NB}j après réception</small></div></li>`);
+  if (sold) tl.push(`<li><span class="dot ok"></span><div><b>Vendu ${eur(num(i.sellPrice))} · <span class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</span></b><small>${dLong(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''}${i.buyerName ? ' · acheteur ' + esc(i.buyerName) : ''} · ${h}${NB}j après réception${i.sellNotes ? `<br>${esc(i.sellNotes)}` : ''}</small></div></li>`);
+  else if (!inTransit(i) && !isCancelled(i)) tl.push(`<li><span class="dot"></span><div><b>${i.status === 'stock' ? 'À mettre en annonce' : 'En attente d’acheteur'}</b><small>J+${h} depuis la réception</small></div></li>`);
   if (sold && (i.paid === false || i.paidDate || isDate(i.buyerRecvDate))) {
     tl.push(`<li><span class="dot ${isDate(i.buyerRecvDate) ? 'ok' : 'on'}"></span><div><b>${isDate(i.buyerRecvDate) ? 'Reçu par l’acheteur' : 'En route vers l’acheteur'}</b><small>${isDate(i.buyerRecvDate) ? dLong(i.buyerRecvDate) : `envoyé ${agoTxt(i.sellDate)}`}</small></div></li>`);
     tl.push(isPaid(i) ? `<li><span class="dot ok"></span><div><b>Paiement reçu · ${eur(num(i.sellPrice) - num(i.sellFees))} dans la caisse</b><small>${dLong(paidOn(i))}${i.paid === false ? ` · automatique ${payDelay()}${NB}j après réception` : ''}</small></div></li>`
       : `<li><span class="dot on"></span><div><b>Paiement en attente · ${eur(num(i.sellPrice) - num(i.sellFees))}</b><small>${isDate(i.buyerRecvDate) ? `automatique le ${dLong(autoPayDate(i))} si l’acheteur ne valide pas avant` : `l’acheteur a ${payDelay()}${NB}j après réception pour valider`}</small></div></li>`);
   }
-  else if (!inTransit(i) && !isCancelled(i)) tl.push(`<li><span class="dot"></span><div><b>${i.status === 'stock' ? 'À mettre en annonce' : 'En attente d’acheteur'}</b><small>J+${h} depuis la réception</small></div></li>`);
   const specs = [
     ['Catégorie', (CATS[i.category] || CATS.autre).label],
     ['Mode d’achat', (BUY_MODES.find((m) => m[0] === i.buyMode) || [])[1]],
@@ -1531,6 +1532,7 @@ function openForm(mode, item, prefill) {
         ${moneyF('f-sellFees', 'Frais de vente', src.sellFees, 'Envoi, commission, essence…')}
         <div class="field"><span class="lbl">Vendu via</span>${radios('f-chan', CHANNELS.map((c) => [c, c]), src.sellChannel || 'LBC main propre')}</div>
         ${textF('f-buyer', 'Acheteur <span class="opt-l">(pseudo)</span>', src.buyerName, '')}
+        ${`<div class="field"><label for="f-snotes">Détails de la vente <span class="opt-l">(facultatif)</span></label><textarea id="f-snotes" class="inp" rows="2" placeholder="ex. revendue avec une seule manette, jeux gardés, remise de 20 €…">${esc(src.sellNotes || '')}</textarea></div>`}
         <div id="f-pay" class="stack" style="gap:12px">
           <label class="sw"><span class="sw-t"><b>Argent reçu</b><small>Vente en livraison : décoche tant que le paiement n’est pas arrivé</small></span><input type="checkbox" id="f-paid" role="switch" ${src.paid !== false ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
           ${dateF('f-bRecv', 'Reçu par l’acheteur le <span class="opt-l">(facultatif)</span>', src.buyerRecvDate || '')}
@@ -1689,7 +1691,7 @@ async function saveForm(btn) {
     shipped: radioVal('f-mode') === 'livraison' && ($('#f-ship').checked || $('#f-recv').checked),
     listDate: val('f-listDate'), listPrice: parseNum(val('f-listPrice')), listUrl: normUrl(val('f-listUrl')),
     sellDate: val('f-sellDate'), sellPrice: parseNum(val('f-sellPrice')), sellFees: parseNum(val('f-sellFees')) || 0,
-    sellChannel: radioVal('f-chan'), buyerName: val('f-buyer'), notes: val('f-notes'),
+    sellChannel: radioVal('f-chan'), buyerName: val('f-buyer'), sellNotes: $('#f-snotes').value.trim(), notes: val('f-notes'),
   };
   if (!v.model) return fieldErr('f-model', 'Indique l’article (ex. PS5 Slim Standard).');
   if (!isDate(v.buyDate)) return fieldErr('f-buyDate', 'Date d’achat requise.');
@@ -1707,7 +1709,7 @@ async function saveForm(btn) {
     const ship = isShipSale(v.sellChannel), paidNow = !ship || $('#f-paid').checked, old0 = F.item || {};
     v.paid = paidNow; v.buyerRecvDate = ship && isDate(val('f-bRecv')) ? val('f-bRecv') : '';
     v.paidDate = paidNow ? old0.paidDate || (old0.paid === false ? today() : '') : '';
-  } else { v.sellDate = ''; v.sellPrice = null; v.sellFees = 0; v.buyerName = ''; v.paid = null; v.paidDate = ''; v.buyerRecvDate = ''; }
+  } else { v.sellDate = ''; v.sellPrice = null; v.sellFees = 0; v.buyerName = ''; v.sellNotes = ''; v.paid = null; v.paidDate = ''; v.buyerRecvDate = ''; }
   const old = F.item;
   const log = (old && Array.isArray(old.priceLog) ? old.priceLog : []).map((e) => ({ d: e.d, p: e.p }));
   if (listedOn && v.listPrice != null) {
@@ -1763,6 +1765,7 @@ function openQuick(mode, id) {
       <div id="q-pay" class="sub" ${isShipSale(lastChannel()) ? '' : 'hidden'}><p class="hint" style="margin:0">Paiement sécurisé : l’argent n’entre dans la caisse qu’une fois le colis reçu par l’acheteur et validé (ou automatiquement ${payDelay()}${NB}j après réception).</p>
         <label class="sw"><span class="sw-t"><b>Argent déjà reçu</b><small>Coche seulement si le paiement est déjà arrivé</small></span><input type="checkbox" id="q-paid" role="switch"><span class="sw-ui" aria-hidden="true"></span></label></div>
       ${textF('q-buyer', 'Acheteur <span class="opt-l">(pseudo)</span>', '', '')}
+      ${`<div class="field"><label for="q-snotes">Détails de la vente <span class="opt-l">(facultatif)</span></label><textarea id="q-snotes" class="inp" rows="2" placeholder="ex. revendue avec une seule manette, jeux gardés, remise de 20 €…">${esc(i.sellNotes || '')}</textarea></div>`}
       ${inTransit(i) ? dateF('q-recv', 'Reçu le <span class="opt-l">(pas encore indiqué)</span>', '') : ''}`;
   } else if (mode === 'list') {
     title = `Mettre en annonce ${i.ref}`; btn = 'Mettre en annonce';
@@ -1813,7 +1816,7 @@ async function saveQuick(btn) {
     if (!isDate(d)) return fieldErr('q-date', 'Date de vente requise.');
     if (isDate(i.buyDate) && d < i.buyDate) return fieldErr('q-date', `La vente ne peut pas précéder l’achat (${dShort(i.buyDate)}).`);
     const fees = parseNum(val('q-fees')) || 0;
-    patch = { status: 'vendu', sellPrice: price, sellDate: d, sellFees: fees, sellChannel: radioVal('q-chan'), buyerName: val('q-buyer') };
+    patch = { status: 'vendu', sellPrice: price, sellDate: d, sellFees: fees, sellChannel: radioVal('q-chan'), buyerName: val('q-buyer'), sellNotes: $('#q-snotes').value.trim() };
     const waitPay = isShipSale(patch.sellChannel) && !$('#q-paid').checked;
     Object.assign(patch, waitPay ? { paid: false, paidDate: '', buyerRecvDate: '' } : { paid: true, paidDate: d });
     if (inTransit(i)) {
@@ -2418,11 +2421,11 @@ function claudeSummary() {
   if (S.cancelled.length) L.push('ACHATS ANNULES (exclus de tous les calculs, argent revenu en caisse) : ' + S.cancelled.map((i) => `${i.ref} ${i.model} ${n2(cost(i))} € annulé le ${i.cancelDate || '?'}${refundPending(i) ? ' (remboursement en attente, argent toujours sorti)' : ''}`).join(' · '));
   L.push('', 'MOIS;achats;investi;ventes;CA;frais_vente;benefice;ROI%');
   months.forEach((m) => { const s = monthStats(m); L.push([m, s.nBought, n2(s.invest), s.nSold, n2(s.ca), n2(s.fees), n2(s.profit), s.roi == null ? '' : Math.round(s.roi * 100)].join(';')); });
-  L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;avant_annonce_j;en_annonce_j;argent_bloque_j;notes)');
+  L.push('', 'ARTICLES (ref;cat;modele;details;etat;achat_date;achat_prix;achat_frais;source;mode;reception_date;livraison_j;statut;annonce_date;prix_affiche;baisses;vente_date;vente_prix;vente_frais;canal;benefice;avant_annonce_j;en_annonce_j;argent_bloque_j;notes;details_vente)');
   items.forEach((i) => L.push([i.ref, i.category, i.model, i.details, i.condition, i.buyDate, n2(num(i.buyPrice)), n2(num(i.buyCosts)), i.buySource, i.buyMode || '', isReceived(i) ? availDate(i) : awaitingShip(i) ? 'pas encore envoyé' : 'en livraison', shipDays(i) ?? '', i.status,
     i.status !== 'stock' ? i.listDate : '', i.status !== 'stock' ? n2(i.listPrice) : '', Math.max(0, (i.priceLog || []).length - 1),
     isSold(i) ? i.sellDate : '', isSold(i) ? n2(num(i.sellPrice)) : '', isSold(i) ? n2(num(i.sellFees)) : '', isSold(i) ? i.sellChannel : '',
-    n2(profit(i)), isReceived(i) && (marketStart(i) || !isSold(i)) ? phaseSplit(i).prep : '', marketStart(i) ? marketDays(i) : '', tied(i), (i.notes || '').replace(/[\n;]/g, ' ')].map((v) => String(v ?? '').replace(/;/g, ',')).join(';')));
+    n2(profit(i)), isReceived(i) && (marketStart(i) || !isSold(i)) ? phaseSplit(i).prep : '', marketStart(i) ? marketDays(i) : '', tied(i), (i.notes || '').replace(/[\n;]/g, ' '), isSold(i) ? (i.sellNotes || '').replace(/[\n;]/g, ' ') : ''].map((v) => String(v ?? '').replace(/;/g, ',')).join(';')));
   return L.join('\n');
 }
 
@@ -2661,14 +2664,14 @@ async function saveSettings(btn) {
   if (ok) { S.settings = { ...DEFAULTS, ...next }; closeSheet(); toast('Réglages enregistrés'); render(); }
 }
 function toCSV() {
-  const head = ['Réf', 'Catégorie', 'Article', 'Détails', 'État', 'N° de série', 'Contenu', 'Date achat', 'Prix achat', 'Frais achat', 'Coût total', 'Acheté sur', 'Vendeur', 'Mode d’achat', 'Date réception', 'Jours de livraison', 'Statut', 'Date annonce', 'Prix affiché', 'Lien annonce', 'Date vente', 'Prix vente', 'Frais vente', 'Vendu via', 'Acheteur', 'Bénéfice', 'ROI %', 'Jours avant annonce', 'Jours en annonce', 'Jours d’argent bloqué', 'Notes'];
+  const head = ['Réf', 'Catégorie', 'Article', 'Détails', 'État', 'N° de série', 'Contenu', 'Date achat', 'Prix achat', 'Frais achat', 'Coût total', 'Acheté sur', 'Vendeur', 'Mode d’achat', 'Date réception', 'Jours de livraison', 'Statut', 'Date annonce', 'Prix affiché', 'Lien annonce', 'Date vente', 'Prix vente', 'Frais vente', 'Vendu via', 'Acheteur', 'Détails de la vente', 'Bénéfice', 'ROI %', 'Jours avant annonce', 'Jours en annonce', 'Jours d’argent bloqué', 'Notes'];
   const n = (v) => (v == null || v === '' || !isFinite(v) ? '' : String(Math.round(v * 100) / 100).replace('.', ','));
   const t = (v) => { const s = String(v ?? ''); return /^[=+\-@]/.test(s) ? "'" + s : s; };
   const cell = (v) => { const s = String(v ?? ''); return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const rows = S.items.slice().sort((a, b) => (a.buyDate || '').localeCompare(b.buyDate || '')).map((i) => [
     t(i.ref), (CATS[i.category] || CATS.autre).label, t(i.model), t(i.details), condLabel(i.condition), t(i.serial), (i.contents || []).join(', '),
     i.buyDate, n(num(i.buyPrice)), n(num(i.buyCosts)), n(cost(i)), t(i.buySource), t(i.sellerName), (BUY_MODES.find((m) => m[0] === i.buyMode) || [])[1] || '', isReceived(i) ? availDate(i) : 'en livraison', shipDays(i) ?? '', STATUS[i.status] || i.status,
-    i.listDate, n(i.listPrice), safeUrl(i.listUrl), i.sellDate, n(i.sellPrice), isSold(i) ? n(num(i.sellFees)) : '', t(i.sellChannel && isSold(i) ? i.sellChannel : ''), t(i.buyerName),
+    i.listDate, n(i.listPrice), safeUrl(i.listUrl), i.sellDate, n(i.sellPrice), isSold(i) ? n(num(i.sellFees)) : '', t(i.sellChannel && isSold(i) ? i.sellChannel : ''), t(i.buyerName), t(isSold(i) ? i.sellNotes : ''),
     n(profit(i)), roi(i) == null ? '' : n(roi(i) * 100), isReceived(i) ? phaseSplit(i).prep : '', marketStart(i) ? marketDays(i) : '', tied(i), t(i.notes),
   ]);
   return '﻿' + [head, ...rows].map((r) => r.map(cell).join(';')).join('\r\n');
