@@ -214,6 +214,11 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .st-vendu{background:var(--good-soft);color:var(--good)}
 .st-annule{background:var(--bad-soft);color:var(--bad)} .st-attente{background:var(--warn-soft);color:var(--warn)}
 .item.cancelled{opacity:.75} .item.cancelled .it-name{text-decoration:line-through}
+.lastmove{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:10px 14px;border-radius:14px;font-size:13.5px;animation:lm-in .5s ease}
+.lastmove.out{background:var(--bad-soft)} .lastmove.in{background:var(--good-soft)}
+.lastmove span{font-weight:700;color:var(--ink-2);flex:1 1 100%} .lastmove b{font-variant-numeric:tabular-nums}
+.lastmove em{font-style:normal;font-weight:800;margin-left:auto} .lastmove.out em{color:var(--bad)} .lastmove.in em{color:var(--good)}
+@keyframes lm-in{from{transform:scale(.97);opacity:0}to{transform:none;opacity:1}}
 .ship-info{margin:6px 0 0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
@@ -1009,6 +1014,8 @@ function cashCard() {
       <div class="cc i"><span>En stock</span><b>${eur(K.stock)}</b></div>
       <div class="cc y"><span>Capital</span><b>${eur(K.total)}</b></div>
     </div>
+    ${(() => { const L = S.lastMove; if (!L || Date.now() - L.at > 15 * 60000) return ''; const d = L.after - L.before;
+      return `<div class="lastmove ${d < 0 ? 'out' : 'in'}" role="status"><span>${esc(L.label.replace(/ · .*$/, '').replace(/^Ajout /, 'Achat '))}</span><b>${eur(L.before)} → ${eur(L.after)}</b><em>${eurS(d)}</em></div>`; })()}
     <div class="cc-calc" aria-label="Calcul de l’argent disponible">
       <span>Argent apporté</span><b class="in">+${eur(K.apports)}</b>
       <span>Ventes encaissées <small>dont ${eurS(K.profit)} de bénéfice</small></span><b class="in">+${eur(K.cashed)}</b>
@@ -2229,7 +2236,11 @@ function commit(mutate, message) {
       mutate(next);
       try {
         const sha = await pushData(next, message);
+        const before = DATA && S.status === 'ok' ? capital().dispo : null;
         applyData(next, sha);
+        const after = capital().dispo;
+        // Mouvement de caisse visible tout de suite : « 971,19 € → 597,25 € (−373,94 €) »
+        if (before != null && Math.abs(after - before) > 0.004) S.lastMove = { before, after, label: message, at: Date.now() };
         onData();
         return;
       } catch (e) {
