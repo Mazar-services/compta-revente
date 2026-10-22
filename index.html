@@ -221,6 +221,7 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 @keyframes lm-in{from{transform:scale(.97);opacity:0}to{transform:none;opacity:1}}
 .refund-wait{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:14px;background:var(--warn-soft);font-size:13.5px}
 textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-size:14.5px;line-height:1.5}
+.refund-wait.pay{background:var(--accent-soft)} .refund-wait .btns{display:flex;gap:6px;flex-wrap:wrap}
 .ship-info{margin:6px 0 0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
@@ -663,7 +664,7 @@ const CONDS = [['neuf', 'Neuf / scellé'], ['comme_neuf', 'Comme neuf'], ['tres_
 const CONTENTS = ['Boîte', 'Manette', 'Câbles', 'Socle', 'Facture', 'Jeu(x)', 'Garantie'];
 const SOURCES = ['Leboncoin', 'Vinted', 'Facebook', 'Particulier', 'Magasin', 'Autre'];
 const CHANNELS = ['LBC main propre', 'LBC livraison', 'Vinted', 'Facebook', 'Particulier', 'Autre'];
-const DEFAULTS = { monthlyGoal: 500, staleDays: 21, targetProfit: 50, legal: 'particulier', urssafRate: 12.3, microCap: 188700, ps5Price: null, ps5Models: {}, reparoInCash: true, adCity: 'Grenoble' };
+const DEFAULTS = { monthlyGoal: 500, staleDays: 21, targetProfit: 50, legal: 'particulier', urssafRate: 12.3, microCap: 188700, ps5Price: null, ps5Models: {}, reparoInCash: true, adCity: 'Grenoble', payDelay: 3 };
 const platformOf = (c) => (c === 'LBC livraison' ? 'Leboncoin' : c === 'Vinted' ? 'Vinted' : null);
 const condLabel = (c) => (CONDS.find((x) => x[0] === c) || [])[1] || '';
 const PS5_KEYS = [['slim_std', 'PS5 Slim Standard'], ['slim_dig', 'PS5 Slim Digital'], ['fat_std', 'PS5 Fat Standard'], ['fat_dig', 'PS5 Fat Digital'], ['pro', 'PS5 Pro']];
@@ -686,6 +687,15 @@ const roi = (i) => { const c = cost(i), p = profit(i); return p == null || !c ? 
 const isReceived = (i) => i.received !== false || i.buyMode === 'main_propre';
 const inTransit = (i) => !isReceived(i) && !isSold(i);
 const isCancelled = (i) => i.cancelled === true;
+// Vente en livraison (paiement sécurisé) : l'argent arrive quand l'acheteur valide, ou automatiquement N jours après réception
+const SHIP_CHANNELS = ['LBC livraison', 'Vinted'];
+const isShipSale = (ch) => SHIP_CHANNELS.includes(ch);
+const addDays = (d, n) => { const x = new Date(d + 'T12:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+const payDelay = () => (S.settings.payDelay == null ? 3 : num(S.settings.payDelay));
+const autoPayDate = (i) => (isDate(i.buyerRecvDate) ? addDays(i.buyerRecvDate, payDelay()) : null);
+const isPaid = (i) => isSold(i) && (i.paid !== false || (autoPayDate(i) != null && autoPayDate(i) <= today()));
+const awaitingPay = (i) => isSold(i) && !isPaid(i);
+const paidOn = (i) => (i.paid !== false ? i.paidDate || i.sellDate : autoPayDate(i));
 // Achat annulé dont l'argent n'est pas encore revenu : il reste sorti de la caisse
 const refundPending = (i) => isCancelled(i) && i.refunded === false;
 // Achat à distance pas encore envoyé par le vendeur (case « Envoyé » pas cochée)
@@ -822,6 +832,7 @@ const glyphOf = (i) => `<span class="glyph">${esc((CATS[i.category] || CATS.autr
 const mini = (i, cls = 'mini') => { const ph = firstPhoto(i); return ph ? `<span class="${cls}" data-act="photo" data-src="${esc(ph.f)}" role="button" aria-label="Voir la photo de ${esc(i.ref || '')}">${imgTag(ph.t || ph.f)}</span>` : `<span class="${cls}">${glyphOf(i)}</span>`; };
 function stateLine(i) {
   const st = num(S.settings.staleDays) || 21;
+  if (awaitingPay(i)) return isDate(i.buyerRecvDate) ? { t: `reçu par l’acheteur ${agoTxt(i.buyerRecvDate)} · paiement ${autoPayDate(i) <= today() ? 'déclenché' : 'prévu le ' + dShort(autoPayDate(i))}`, stale: false } : { t: `vendu ${agoTxt(i.sellDate)} en livraison · en route vers l’acheteur`, stale: ago(i.sellDate) > 7 };
   if (isSold(i)) return { t: marketStart(i) ? `vendu en ${marketDays(i)}${NB}j d’annonce` : `vendu ${held(i)}${NB}j après réception`, stale: false };
   if (inTransit(i)) return i.shipped ? { t: `${shipTxt(i)} · acheté il y a ${tied(i)}${NB}j`, stale: ago(i.shipDate) > 5 } : { t: `acheté il y a ${tied(i)}${NB}j · pas encore envoyé`, stale: tied(i) >= 3 };
   if (marketStart(i)) return { t: `en annonce depuis ${marketDays(i)}${NB}j · acheté il y a ${tied(i)}${NB}j`, stale: marketDays(i) > st };
@@ -837,11 +848,12 @@ function capital() {
   const sold = S.items.filter(isSold), open = S.items.filter((i) => !isSold(i));
   const apports = sum(S.cash.filter((c) => c.type !== 'retrait'), (c) => num(c.amount));
   const retraits = sum(S.cash.filter((c) => c.type === 'retrait'), (c) => num(c.amount));
-  const invested = sum(S.items, cost), cashed = sum(sold, (i) => num(i.sellPrice) - num(i.sellFees));
+  const invested = sum(S.items, cost), cashed = sum(sold.filter(isPaid), (i) => num(i.sellPrice) - num(i.sellFees));
+  const toCome = sum(sold.filter(awaitingPay), (i) => num(i.sellPrice) - num(i.sellFees));
   const reparo = repInCash() ? sum(S.repairs, repNet) : 0;
   const pending = sum(S.cancelled.filter(refundPending), cost);
   const stock = sum(open, cost), dispo = apports - retraits + cashed - invested + reparo - pending;
-  return { pending, reparo, apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock, nSold: sold.length };
+  return { toCome, pending, reparo, apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock, nSold: sold.length };
 }
 // Une tuile : [titre, valeur, sous-titre, classe de la valeur, couleur de fond c-good|c-bad|c-info|c-warn]
 const tileHtml = (t) => `<div class="tile ${t[4] || ''}"><span class="k">${t[0]}</span><span class="v ${t[3] || ''}">${t[1]}</span><span class="s">${t[2]}</span></div>`;
@@ -866,7 +878,7 @@ function cashLedger() {
   });
   S.items.forEach((i) => {
     if (isDate(i.buyDate)) ev.push({ d: i.buyDate, k: 1, label: 'Achat', a: -cost(i), i });
-    if (isSold(i)) ev.push({ d: i.sellDate, k: 2, label: 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
+    if (isPaid(i)) ev.push({ d: paidOn(i) || i.sellDate, k: 2, label: i.paid === false || i.paidDate ? 'Paiement de la vente' : 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
   });
   if (repInCash()) S.repairs.forEach((r) => ev.push({ d: r.date || '', k: 3, label: 'Réparo', note: `${r.type}${repQty(r) > 1 ? ' ×' + repQty(r) : ''}`, a: repNet(r) }));
   ev.sort((x, y) => x.d.localeCompare(y.d) || x.k - y.k);
@@ -875,6 +887,7 @@ function cashLedger() {
   return ev.reverse();
 }
 const pills = (i) => (isCancelled(i) ? '<span class="pill st-annule">Achat annulé</span>'
+  : awaitingPay(i) ? pill('vendu') + '<span class="pill st-attente">Paiement en attente</span>'
   : awaitingShip(i) ? (i.status === 'stock' ? '' : pill(i.status)) + '<span class="pill st-attente">Pas encore envoyé</span>'
   : inTransit(i) ? (i.status === 'stock' ? pill('livraison') : pill(i.status) + '<span class="pill st-livraison">Pas encore reçu</span>') : pill(i.status));
 const exb = (i) => (i.example ? '<span class="exb">Exemple</span>' : '');
@@ -1001,7 +1014,7 @@ function salesCard(m, ms) {
   return `<section class="card" aria-label="Ventes du mois">
     <div class="card-h"><h2 class="sec">Ventes de ${monthName(m)} : ${sold.length}</h2>${sold.length ? `<button class="btn sm" data-act="goto-sales" data-m="${m}">Tout voir</button>` : ''}</div>
     ${sold.length ? `<div class="sv-list">${sold.map((i) => { const p = profit(i); return `<div class="sv" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">
-        <div class="sv-top">${mini(i, 'mini lg')}<div class="sv-id"><b>${esc(i.model)}</b>${i.details ? `<small>${esc(i.details)}</small>` : ''}<span>Réf ${tag(i)}</span><small>Vendu le ${dShort(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}</small></div></div>
+        <div class="sv-top">${mini(i, 'mini lg')}<div class="sv-id"><b>${esc(i.model)}</b>${i.details ? `<small>${esc(i.details)}</small>` : ''}<span>Réf ${tag(i)}</span><small>Vendu le ${dShort(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}</small>${awaitingPay(i) ? '<span class="pill st-attente" style="justify-self:start">Paiement en attente</span>' : ''}</div></div>
         <div class="sv-nums"><span>Acheté<b>${eur(cost(i))}</b></span><span>Vendu<b>${eur(num(i.sellPrice))}</b></span><span>Bénéfice<b class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</b></span></div>
       </div>`; }).join('')}</div>
       ${(() => { const pr = LS.get('salesProfit', false); return `<div class="sv-total ${pr ? (ms.profit < -0.004 ? 'r' : 'g') : 'i'}"><span>${pr ? 'Bénéfice total' : 'Chiffre d’affaires total'}<small>${plural(sold.length, 'vente')} en ${monthName(m)}</small></span><b>${pr ? eurS(ms.profit) : eur(ms.ca)}</b></div>
@@ -1021,15 +1034,17 @@ function cashCard() {
     </div>
     ${(() => { const L = S.lastMove; if (!L || Date.now() - L.at > 15 * 60000) return ''; const d = L.after - L.before;
       return `<div class="lastmove ${d < 0 ? 'out' : 'in'}" role="status"><span>${esc(L.label.replace(/ · .*$/, '').replace(/^Ajout /, 'Achat '))}</span><b>${eur(L.before)} → ${eur(L.after)}</b><em>${eurS(d)}</em></div>`; })()}
+    ${S.items.filter(awaitingPay).map((i) => `<div class="refund-wait pay"><span>${tag(i)} vendu ${eur(num(i.sellPrice) - num(i.sellFees))} · ${isDate(i.buyerRecvDate) ? `reçu par l’acheteur, paiement auto le ${dShort(autoPayDate(i))}` : 'colis en route vers l’acheteur'}</span><span class="btns">${isDate(i.buyerRecvDate) ? '' : `<button class="btn sm" data-act="buyer-recv" data-id="${esc(i.id)}">Reçu par l’acheteur</button>`}<button class="btn sm primary" data-act="pay-ok" data-id="${esc(i.id)}">Argent reçu</button></span></div>`).join('')}
     ${S.cancelled.filter(refundPending).map((i) => `<div class="refund-wait"><span>${tag(i)} annulé le ${dShort(i.cancelDate)} · <b>${eur(cost(i))}</b> pas encore remboursés</span><button class="btn sm primary" data-act="refund-ok" data-id="${esc(i.id)}">Remboursement reçu</button></div>`).join('')}
     <div class="cc-calc" aria-label="Calcul de l’argent disponible">
       <span>Argent apporté</span><b class="in">+${eur(K.apports)}</b>
-      <span>Ventes encaissées <small>dont ${eurS(K.profit)} de bénéfice</small></span><b class="in">+${eur(K.cashed)}</b>
+      <span>Ventes encaissées <small>bénéfice des ventes : ${eurS(K.profit)}</small></span><b class="in">+${eur(K.cashed)}</b>
       ${K.reparo ? `<span>Réparo</span><b class="in">+${eur(K.reparo)}</b>` : ''}
       <span>Achats</span><b class="out">−${eur(K.invested)}</b>
       ${K.pending ? `<span>Annulés, remboursement en attente</span><b class="out">−${eur(K.pending)}</b>` : ''}
       ${K.retraits ? `<span>Retraits</span><b class="out">−${eur(K.retraits)}</b>` : ''}
       <span class="tot">Argent disponible</span><b class="tot">${eur(K.dispo)}</b>
+      ${K.toCome ? `<span class="muted">À venir : ventes en livraison pas encore payées</span><b class="muted">${eur(K.toCome)}</b>` : ''}
     </div>
     ${breakEvenHtml(true)}
     ${!K.apports ? '<p class="hint" style="margin:0">Ajoute ton argent de départ avec « Argent » pour voir ce qu’il te reste à investir.</p>' : ''}
@@ -1070,6 +1085,9 @@ function alerts() {
     act: i.status === 'reserve' ? ['sell', 'Vendu'] : ['price', 'Baisser'],
   }));
   recv.filter((i) => i.status === 'stock' && held(i) >= 2).sort((a, b) => held(b) - held(a)).forEach((i) => rows.push({ i, t: held(i) > stale ? 'warn' : 'info', txt: `Reçu il y a ${held(i)}${NB}j, pas encore en annonce`, act: ['list', 'Annonce'] }));
+  S.items.filter(awaitingPay).forEach((i) => rows.push(isDate(i.buyerRecvDate)
+    ? { i, t: 'info', txt: `Reçu par l’acheteur ${agoTxt(i.buyerRecvDate)} : paiement automatique le ${dShort(autoPayDate(i))}`, act: ['pay-ok', 'Payé'] }
+    : { i, t: ago(i.sellDate) > 5 ? 'warn' : 'info', txt: `Vendu en livraison ${agoTxt(i.sellDate)} : l’acheteur a reçu le colis ?`, act: ['buyer-recv', 'Reçu'] }));
   recv.filter((i) => i.status === 'reserve' && !(marketDays(i) > stale)).forEach((i) => rows.push({ i, t: 'info', txt: 'Réservé : pense à finaliser la vente', act: ['sell', 'Vendu'] }));
   const noLink = open.filter((i) => i.status !== 'stock' && !safeUrl(i.listUrl)).length;
   return { rows, noLink };
@@ -1358,6 +1376,11 @@ function detailBody(i) {
   entries.forEach((e, k) => tl.push(`<li><span class="dot ${sold || k < entries.length - 1 ? 'ok' : 'on'}"></span><div><b>${k === 0 ? 'Mis en annonce à' : 'Prix passé à'} ${eur(num(e.p))}</b><small>${dLong(e.d)}</small></div></li>`));
   if (i.status === 'reserve') tl.push(`<li><span class="dot on"></span><div><b>Réservé</b><small>en attente de la vente</small></div></li>`);
   if (sold) tl.push(`<li><span class="dot ok"></span><div><b>Vendu ${eur(num(i.sellPrice))} · <span class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</span></b><small>${dLong(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''}${i.buyerName ? ' · acheteur ' + esc(i.buyerName) : ''} · ${h}${NB}j après réception</small></div></li>`);
+  if (sold && (i.paid === false || i.paidDate || isDate(i.buyerRecvDate))) {
+    tl.push(`<li><span class="dot ${isDate(i.buyerRecvDate) ? 'ok' : 'on'}"></span><div><b>${isDate(i.buyerRecvDate) ? 'Reçu par l’acheteur' : 'En route vers l’acheteur'}</b><small>${isDate(i.buyerRecvDate) ? dLong(i.buyerRecvDate) : `envoyé ${agoTxt(i.sellDate)}`}</small></div></li>`);
+    tl.push(isPaid(i) ? `<li><span class="dot ok"></span><div><b>Paiement reçu · ${eur(num(i.sellPrice) - num(i.sellFees))} dans la caisse</b><small>${dLong(paidOn(i))}${i.paid === false ? ` · automatique ${payDelay()}${NB}j après réception` : ''}</small></div></li>`
+      : `<li><span class="dot on"></span><div><b>Paiement en attente · ${eur(num(i.sellPrice) - num(i.sellFees))}</b><small>${isDate(i.buyerRecvDate) ? `automatique le ${dLong(autoPayDate(i))} si l’acheteur ne valide pas avant` : `l’acheteur a ${payDelay()}${NB}j après réception pour valider`}</small></div></li>`);
+  }
   else if (!inTransit(i) && !isCancelled(i)) tl.push(`<li><span class="dot"></span><div><b>${i.status === 'stock' ? 'À mettre en annonce' : 'En attente d’acheteur'}</b><small>J+${h} depuis la réception</small></div></li>`);
   const specs = [
     ['Catégorie', (CATS[i.category] || CATS.autre).label],
@@ -1402,6 +1425,7 @@ function durationsBlock(i) {
 }
 function detailFoot(i) {
   const id = esc(i.id);
+  if (awaitingPay(i)) return `${isDate(i.buyerRecvDate) ? '' : `<button class="btn grow" data-act="buyer-recv" data-id="${id}">Reçu par l’acheteur</button>`}<button class="btn primary grow" data-act="pay-ok" data-id="${id}">Argent reçu</button>`;
   if (isCancelled(i)) return refundPending(i) ? `<button class="btn grow" data-act="uncancel" data-id="${id}">Rétablir l’achat</button><button class="btn primary grow" data-act="refund-ok" data-id="${id}">Remboursement reçu</button>`
     : `<button class="btn grow" data-act="refund-undo" data-id="${id}">Pas encore remboursé</button><button class="btn primary grow" data-act="uncancel" data-id="${id}">Rétablir l’achat</button>`;
   if (awaitingShip(i)) return `<button class="btn danger grow" data-act="cancel-buy" data-id="${id}">Achat annulé</button><button class="btn primary grow" data-act="ship" data-id="${id}">Envoyé par le vendeur</button>`;
@@ -1507,6 +1531,10 @@ function openForm(mode, item, prefill) {
         ${moneyF('f-sellFees', 'Frais de vente', src.sellFees, 'Envoi, commission, essence…')}
         <div class="field"><span class="lbl">Vendu via</span>${radios('f-chan', CHANNELS.map((c) => [c, c]), src.sellChannel || 'LBC main propre')}</div>
         ${textF('f-buyer', 'Acheteur <span class="opt-l">(pseudo)</span>', src.buyerName, '')}
+        <div id="f-pay" class="stack" style="gap:12px">
+          <label class="sw"><span class="sw-t"><b>Argent reçu</b><small>Vente en livraison : décoche tant que le paiement n’est pas arrivé</small></span><input type="checkbox" id="f-paid" role="switch" ${src.paid !== false ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
+          ${dateF('f-bRecv', 'Reçu par l’acheteur le <span class="opt-l">(facultatif)</span>', src.buyerRecvDate || '')}
+        </div>
       </div>
     </div>
     <div class="field"><label for="f-notes">Notes</label><textarea id="f-notes" class="inp" placeholder="Rayure côté gauche, ventilateur bruyant, manette d’origine…">${esc(src.notes || '')}</textarea></div>
@@ -1517,6 +1545,7 @@ function openForm(mode, item, prefill) {
   b.addEventListener('input', formPreview);
   b.addEventListener('change', (e) => {
     if (e.target.name === 'f-cat') onCatChange();
+    if (e.target.name === 'f-chan') { $('#f-pay').hidden = !isShipSale(radioVal('f-chan')); if (isShipSale(radioVal('f-chan')) && !(F.item && F.item.status === 'vendu')) $('#f-paid').checked = false; }
     if (['f-recv', 'f-listed', 'f-sold', 'f-ship'].includes(e.target.id) || e.target.name === 'f-mode') onTrackChange(false, e.target.id || e.target.name);
     if (e.target.id === 'f-shipDate') shipInfo();
     if (e.target.id === 'f-buyDate' && radioVal('f-mode') === 'main_propre' && $('#f-recv').checked) $('#f-recvDate').value = val('f-buyDate');
@@ -1563,6 +1592,7 @@ function onTrackChange(init, changed) {
   shipInfo();
   $('#f-sec-list').hidden = !listedSw.checked;
   $('#f-sec-sell').hidden = !soldSw.checked;
+  $('#f-pay').hidden = !isShipSale(radioVal('f-chan'));
 }
 const formStatus = () => ($('#f-sold').checked ? 'vendu' : $('#f-listed').checked ? ($('#f-reserved').checked ? 'reserve' : 'annonce') : 'stock');
 function formPreview() {
@@ -1674,7 +1704,10 @@ async function saveForm(btn) {
     if (v.sellPrice == null || v.sellPrice < 0) return fieldErr('f-sellPrice', 'Prix de vente requis.');
     if (!isDate(v.sellDate)) return fieldErr('f-sellDate', 'Date de vente requise.');
     if (v.sellDate < v.buyDate) return fieldErr('f-sellDate', 'La vente ne peut pas précéder l’achat.');
-  } else { v.sellDate = ''; v.sellPrice = null; v.sellFees = 0; v.buyerName = ''; }
+    const ship = isShipSale(v.sellChannel), paidNow = !ship || $('#f-paid').checked, old0 = F.item || {};
+    v.paid = paidNow; v.buyerRecvDate = ship && isDate(val('f-bRecv')) ? val('f-bRecv') : '';
+    v.paidDate = paidNow ? old0.paidDate || (old0.paid === false ? today() : '') : '';
+  } else { v.sellDate = ''; v.sellPrice = null; v.sellFees = 0; v.buyerName = ''; v.paid = null; v.paidDate = ''; v.buyerRecvDate = ''; }
   const old = F.item;
   const log = (old && Array.isArray(old.priceLog) ? old.priceLog : []).map((e) => ({ d: e.d, p: e.p }));
   if (listedOn && v.listPrice != null) {
@@ -1727,6 +1760,8 @@ function openQuick(mode, id) {
     body = `${head}<div class="row2">${moneyF('q-price', 'Prix de vente', listed(i) ? i.listPrice : null)}${dateF('q-date', 'Date de vente', today())}</div>
       ${moneyF('q-fees', 'Frais de vente', null, 'Envoi, commission, essence…')}
       <div class="field"><span class="lbl">Vendu via</span>${radios('q-chan', CHANNELS.map((c) => [c, c]), lastChannel())}</div>
+      <div id="q-pay" class="sub" ${isShipSale(lastChannel()) ? '' : 'hidden'}><p class="hint" style="margin:0">Paiement sécurisé : l’argent n’entre dans la caisse qu’une fois le colis reçu par l’acheteur et validé (ou automatiquement ${payDelay()}${NB}j après réception).</p>
+        <label class="sw"><span class="sw-t"><b>Argent déjà reçu</b><small>Coche seulement si le paiement est déjà arrivé</small></span><input type="checkbox" id="q-paid" role="switch"><span class="sw-ui" aria-hidden="true"></span></label></div>
       ${textF('q-buyer', 'Acheteur <span class="opt-l">(pseudo)</span>', '', '')}
       ${inTransit(i) ? dateF('q-recv', 'Reçu le <span class="opt-l">(pas encore indiqué)</span>', '') : ''}`;
   } else if (mode === 'list') {
@@ -1754,6 +1789,7 @@ function openQuick(mode, id) {
     }
   };
   $('#sheet-body').addEventListener('input', prev); prev();
+  $('#sheet-body').addEventListener('change', (e) => { if (e.target.name === 'q-chan' && $('#q-pay')) $('#q-pay').hidden = !isShipSale(radioVal('q-chan')); });
 }
 async function saveQuick(btn) {
   const mode = btn.dataset.mode, i = byId(btn.dataset.id);
@@ -1778,13 +1814,15 @@ async function saveQuick(btn) {
     if (isDate(i.buyDate) && d < i.buyDate) return fieldErr('q-date', `La vente ne peut pas précéder l’achat (${dShort(i.buyDate)}).`);
     const fees = parseNum(val('q-fees')) || 0;
     patch = { status: 'vendu', sellPrice: price, sellDate: d, sellFees: fees, sellChannel: radioVal('q-chan'), buyerName: val('q-buyer') };
+    const waitPay = isShipSale(patch.sellChannel) && !$('#q-paid').checked;
+    Object.assign(patch, waitPay ? { paid: false, paidDate: '', buyerRecvDate: '' } : { paid: true, paidDate: d });
     if (inTransit(i)) {
       const r = val('q-recv');
       if (!isDate(r)) return fieldErr('q-recv', 'Indique quand tu as reçu l’article.');
       if (r < i.buyDate || r > d) return fieldErr('q-recv', 'La réception doit être entre l’achat et la vente.');
       Object.assign(patch, { received: true, receiveDate: r });
     }
-    msg = `${i.ref} vendu : ${eurS(price - fees - cost(i))} de bénéfice`;
+    msg = `${i.ref} vendu : ${eurS(price - fees - cost(i))} de bénéfice${waitPay ? ` · ${eur(price - fees)} en attente de paiement` : ''}`;
   } else {
     const log = (Array.isArray(i.priceLog) ? i.priceLog : []).map((e) => ({ d: e.d, p: e.p }));
     if (!log.length && i.listPrice != null && isDate(i.listDate) && i.listPrice !== price) log.push({ d: i.listDate, p: i.listPrice });
@@ -1803,7 +1841,7 @@ async function saveQuick(btn) {
   btn.disabled = true;
   const ok = await upd(i.id, patch);
   btn.disabled = false;
-  if (ok) { closeSheet(); toast(mode === 'sell' ? `${msg} · caisse ${eur(capital().dispo)}` : msg); }
+  if (ok) { closeSheet(); toast(mode === 'sell' && !msg.includes('attente') ? `${msg} · caisse ${eur(capital().dispo)}` : msg); }
 }
 
 /* ---------- Simulateur ---------- */
@@ -2269,6 +2307,8 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 function msgFor(prev, next) {
   const ref = (next && next.ref) || (prev && prev.ref) || '?';
   if (!prev) return `Ajout ${ref} · ${next.model || ''}`.trim();
+  if (next.paid === true && prev.paid === false) return `Paiement ${ref}`;
+  if (next.buyerRecvDate && !prev.buyerRecvDate) return `${ref} · reçu par l’acheteur`;
   if (next.status === 'vendu' && prev.status !== 'vendu') return `Vente ${ref} · ${eurS(num(next.sellPrice) - num(next.sellFees) - cost(next))}`;
   if (next.cancelled && !prev.cancelled) return `Annulation ${ref}`;
   if (next.cancelled && next.refunded === true && prev.refunded !== true) return `Remboursement ${ref}`;
@@ -2584,6 +2624,7 @@ function openSettings() {
     </div>
     <div class="fs"><p class="fs-t">Annonces Leboncoin</p>
       ${textF('s-city', 'Ville pour la remise en main propre', st.adCity, 'ex. Grenoble')}
+      <div class="field"><label for="s-pay">Paiement automatique après réception par l’acheteur</label><span class="selw" style="display:block"><select id="s-pay" class="inp">${[1, 2, 3, 4, 5, 7].map((d) => `<option value="${d}" ${payDelay() === d ? 'selected' : ''}>${d} jour${d > 1 ? 's' : ''}</option>`).join('')}</select></span><small class="hint">Ventes en livraison : l’argent entre dans la caisse à cette date, sauf si tu indiques « Argent reçu » avant.</small></div>
     </div>
     <div class="fs"><p class="fs-t">Statut</p>
       ${radios('s-legal', [['particulier', 'Particulier'], ['micro', 'Micro-entreprise']], micro ? 'micro' : 'particulier', 'opts')}
@@ -2611,7 +2652,7 @@ async function saveSettings(btn) {
   const next = {
     monthlyGoal: parseNum(val('s-goal')) ?? 0, targetProfit: parseNum(val('s-tp')) ?? 0, staleDays: parseInt(val('s-stale'), 10) || 21,
     legal: radioVal('s-legal') || 'particulier', urssafRate: parseNum(val('s-rate')) ?? DEFAULTS.urssafRate, microCap: parseNum(val('s-cap')) ?? DEFAULTS.microCap,
-    ps5Price: parseNum(val('s-ps5')), adCity: val('s-city').trim(),
+    ps5Price: parseNum(val('s-ps5')), adCity: val('s-city').trim(), payDelay: parseInt(val('s-pay'), 10) || 3,
     ps5Models: Object.fromEntries(PS5_KEYS.map(([k]) => [k, parseNum(val('s-ps5-' + k))]).filter(([, v]) => v != null && v > 0)),
   };
   btn.disabled = true;
@@ -2794,6 +2835,14 @@ const ACT = {
     const ok = await upd(i.id, { adTitle: val('ad-title').trim(), adDesc: $('#ad-desc').value.trim() });
     a.disabled = false;
     if (ok) { closeSheet(); toast(`Annonce de ${i.ref} enregistrée`); }
+  },
+  'buyer-recv': async (a) => {
+    const i = byId(a.dataset.id); if (!i) return;
+    if (await upd(i.id, { buyerRecvDate: today() })) toast(`${i.ref} reçu par l’acheteur · paiement automatique le ${dShort(addDays(today(), payDelay()))}`);
+  },
+  'pay-ok': async (a) => {
+    const i = byId(a.dataset.id); if (!i) return;
+    if (await upd(i.id, { paid: true, paidDate: today() })) toast(`Paiement ${i.ref} : +${eur(num(i.sellPrice) - num(i.sellFees))} · caisse ${eur(capital().dispo)}`);
   },
   list: (a) => openQuick('list', a.dataset.id),
   price: (a) => openQuick('price', a.dataset.id),
