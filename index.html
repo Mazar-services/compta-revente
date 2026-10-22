@@ -978,9 +978,9 @@ function renderAccueil() {
           ${goalHtml}
         </section>
         <div class="tiles">${[tiles[0], tiles[1], tiles[3], tiles[4], tiles[5], tiles[2], ...tiles.slice(6)].map(tileHtml).join('')}</div>
+        ${cashCard()}
         ${salesCard(m, ms)}
         ${reparoStrip(m)}
-        ${cashCard()}
         <button class="strip" data-act="goto" data-view="articles" data-st="encours">
           <span>En ce moment</span><span><b>${open.length}</b> en cours</span><span><b>${eur(capital)}</b> immobilisés</span><span><b>${eurS(pot)}</b> au prix affiché</span>${ic('right')}
         </button>
