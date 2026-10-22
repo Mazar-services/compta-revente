@@ -599,6 +599,18 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
+const APP_VERSION = '95f53f8c4491';
+// Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
+async function checkUpdate() {
+  try {
+    const r = await fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' });
+    const m = (await r.text()).match(/const APP_VERSION = '([0-9a-f]{12})'/);
+    if (!m || m[1] === APP_VERSION || sessionStorage.getItem('compta.tried') === m[1]) return;
+    if (PENDING || (typeof SHEET !== 'undefined' && SHEET)) return;
+    sessionStorage.setItem('compta.tried', m[1]);
+    location.replace(location.pathname + '?v=' + m[1] + location.hash);
+  } catch (e) {}
+}
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('compta.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('compta.' + k, JSON.stringify(v)); } catch (e) {} },
@@ -2949,7 +2961,7 @@ function bind() {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-act]')) { e.preventDefault(); e.target.click(); }
   });
   new MutationObserver(() => hydrateImgs()).observe(document.body, { childList: true, subtree: true });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { refresh(); checkUpdate(); } });
   window.addEventListener('online', () => { S.offline = false; refresh(true); });
   document.addEventListener('toggle', (e) => { if (e.target.matches && e.target.matches('details[data-ledger]')) S.ledgerOpen = e.target.open; }, true);
   document.addEventListener('error', (e) => { if (e.target && e.target.tagName === 'IMG') e.target.classList.add('broken'); }, true);
@@ -3003,6 +3015,7 @@ function onData() {
 
 async function init() {
   bind();
+  setTimeout(checkUpdate, 1500);
   S.assets = photoStore;
   S.downloads = fileSaver;
   const h = (location.hash || '').slice(1);
