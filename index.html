@@ -599,7 +599,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '95f53f8c4491';
+const APP_VERSION = 'de88f26eafb2';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -764,6 +764,10 @@ function monthStats(ym) {
   const ev = cashLedger().filter((e) => (e.k === 1 || e.k === 2) && (e.d || '').slice(0, 7) === ym);
   A.cashIn = sum(ev.filter((e) => e.a > 0), (e) => e.a); A.cashOut = -sum(ev.filter((e) => e.a < 0), (e) => e.a);
   A.cash = A.cashIn - A.cashOut;
+  // Encaissé : argent des ventes reçu ce mois-ci (frais déduits), à la date du paiement
+  const paidEv = ev.filter((e) => e.k === 2 && e.i && !isCancelled(e.i));
+  A.salesIn = sum(paidEv, (e) => e.a); A.nPaid = paidEv.length;
+  A.toCome = sum(sold.filter(awaitingPay), (i) => num(i.sellPrice) - num(i.sellFees));
   return A;
 }
 function modelTable(soldSet) {
@@ -958,6 +962,7 @@ function renderAccueil() {
   const tiles = [
     ['Chiffre d’affaires', eur(ms.ca), plural(ms.nSold, 'vente'), '', 'c-info'],
     ['Investi', eur(ms.invest), plural(ms.nBought, 'achat'), '', 'c-warn'],
+    ['Encaissé', eur(ms.salesIn), `${plural(ms.nPaid, 'vente payée', 'ventes payées')}${ms.toCome ? ` · ${eur(ms.toCome)} à venir` : ' · frais déduits'}`, '', 'c-good'],
     ['Flux de caisse', eurS(ms.cash), ms.cash < -0.004 && stocked > 0.004 ? `dont ${eur(stocked)} placés en stock, pas perdus` : 'argent entré − argent sorti'],
     ['ROI moyen', pctS(ms.roi), 'bénéfice ÷ coût d’achat', '', sign(ms.roi)],
     ['Bénéfice moyen', ms.avgProfit == null ? '—' : eurS(ms.avgProfit), 'par vente', '', sign(ms.avgProfit)],
@@ -989,7 +994,7 @@ function renderAccueil() {
           <div class="hero-sub">${deltaHtml}</div>
           ${goalHtml}
         </section>
-        <div class="tiles">${[tiles[0], tiles[1], tiles[3], tiles[4], tiles[5], tiles[2], ...tiles.slice(6)].map(tileHtml).join('')}</div>
+        <div class="tiles">${tiles.map(tileHtml).join('')}</div>
         ${cashCard()}
         ${salesCard(m, ms)}
         ${reparoStrip(m)}
