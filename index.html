@@ -281,6 +281,7 @@ textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-
 .chip{flex:none;height:34px;padding:0 13px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .chip .n{font-family:var(--f-mono);font-size:11px;opacity:.7}
+.month-bar{display:flex;gap:8px;flex-wrap:wrap} .month-bar .sel{min-width:0}
 .list-bar{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
 .list-sum{font-size:13px;color:var(--ink-2);font-weight:600}
 .list-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -535,6 +536,12 @@ tr.click{cursor:pointer}
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>
       <input id="q" class="search-in" type="search" placeholder="Réf, modèle, n° de série, prix, pseudo…" autocomplete="off" enterkeyhint="search" aria-label="Rechercher un article">
     </div>
+    <div class="month-bar">
+      <span class="selw"><select id="f-month" class="sel" aria-label="Filtrer par mois"></select></span>
+      <span class="selw"><select id="f-mkind" class="sel" aria-label="Achetés ou vendus ce mois-ci">
+        <option value="tout">Achetés ou vendus</option><option value="achat">Achetés ce mois-ci</option><option value="vente">Vendus ce mois-ci</option>
+      </select></span>
+    </div>
     <div class="chips" id="chips-st" role="toolbar" aria-label="Filtrer par statut"></div>
     <div class="chips" id="chips-cat" role="toolbar" aria-label="Filtrer par catégorie"></div>
     <div class="list-bar">
@@ -599,7 +606,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'de88f26eafb2';
+const APP_VERSION = 'a4b584dd032a';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -1225,7 +1232,10 @@ const SORTS = {
 function filteredItems() {
   let arr = statusSet(S.f.st);
   if (S.f.cat !== 'all') arr = arr.filter((i) => i.category === S.f.cat);
-  if (S.f.month) arr = arr.filter((i) => isSold(i) && i.sellDate.slice(0, 7) === S.f.month);
+  if (S.f.month) {
+    const k = S.f.mkind || 'tout', inM = (d) => isDate(d) && d.slice(0, 7) === S.f.month;
+    arr = arr.filter((i) => (k !== 'vente' && inM(i.buyDate)) || (k !== 'achat' && isSold(i) && inM(i.sellDate)));
+  }
   const q = norm(S.f.q);
   if (q) arr = arr.filter((i) => matches(i, q));
   return arr.sort(SORTS[S.f.sort] || SORTS.recent);
@@ -1235,7 +1245,11 @@ function renderArticles() {
   $('#art-banner').innerHTML = S.status === 'ok' ? exampleBanner() : '';
   const counts = {};
   ST_OPTS.forEach(([v]) => { counts[v] = statusSet(v).length; });
-  $('#chips-st').innerHTML = (S.f.month ? `<button class="chip" data-act="f-month-clear" aria-pressed="true">Ventes · ${esc(monthLabel(S.f.month))} ✕</button>` : '') + ST_OPTS.filter(([v]) => ['encours', 'vendu', 'tous'].includes(v) || counts[v] > 0 || S.f.st === v)
+  const months = [...new Set(S.allItems.flatMap((i) => [i.buyDate, isSold(i) ? i.sellDate : null]).filter(isDate).map((d) => d.slice(0, 7)))].sort().reverse();
+  if (S.f.month && !months.includes(S.f.month)) months.unshift(S.f.month);
+  $('#f-month').innerHTML = `<option value="">Tous les mois</option>` + months.map((m) => `<option value="${m}" ${m === S.f.month ? 'selected' : ''}>${esc(monthLabel(m))}</option>`).join('');
+  $('#f-mkind').value = S.f.mkind || 'tout'; $('#f-mkind').closest('.selw').hidden = !S.f.month;
+  $('#chips-st').innerHTML = ST_OPTS.filter(([v]) => ['encours', 'vendu', 'tous'].includes(v) || counts[v] > 0 || S.f.st === v)
     .map(([v, l]) => `<button class="chip" data-act="f-st" data-v="${v}" aria-pressed="${S.f.st === v}">${l} <span class="n">${counts[v]}</span></button>`).join('');
   const base = statusSet(S.f.st);
   const cats = CAT_ORDER.filter((c) => base.some((i) => i.category === c) || S.f.cat === c);
@@ -2793,7 +2807,7 @@ const ACT = {
   settings: () => openSettings(),
   month: (a) => { const n = addMonths(S.month, +a.dataset.d); if (n <= thisMonth()) { S.month = n; renderAccueil(); } },
   'goto-month': (a) => { S.month = a.dataset.m; setView('accueil'); },
-  'goto-sales': (a) => { S.f.st = 'vendu'; S.f.cat = 'all'; S.f.month = a.dataset.m; S.f.sort = 'recent'; setView('articles'); },
+  'goto-sales': (a) => { S.f.st = 'vendu'; S.f.cat = 'all'; S.f.month = a.dataset.m; S.f.mkind = 'vente'; S.f.sort = 'recent'; setView('articles'); },
   'stats-tab': (a) => { S.statsTab = a.dataset.v; LS.set('statsTab', S.statsTab); renderStats(); window.scrollTo(0, 0); },
   'goto-reparo': () => { S.statsTab = 'reparo'; LS.set('statsTab', 'reparo'); setView('stats'); },
   'rep-add': () => {
@@ -2904,7 +2918,7 @@ const ACT = {
   'save-quick': (a) => saveQuick(a),
   'save-settings': (a) => saveSettings(a),
   'rm-photo': (a) => removePhoto(a.dataset.key),
-  'f-st': (a) => { S.f.month = null; S.f.st = a.dataset.v; S.f.cat = 'all'; if (S.f.st === 'vendu' && S.f.sort === 'ancien') S.f.sort = 'recent'; saveFilters(); renderArticles(); },
+  'f-st': (a) => { S.f.st = a.dataset.v; S.f.cat = 'all'; if (S.f.st === 'vendu' && S.f.sort === 'ancien') S.f.sort = 'recent'; saveFilters(); renderArticles(); },
   'f-cat': (a) => { S.f.cat = a.dataset.v; saveFilters(); renderArticles(); },
   'cash-add': (a) => {
     const ret = a.dataset.type === 'retrait';
@@ -2973,6 +2987,12 @@ function bind() {
   $('#q').addEventListener('input', (e) => { S.f.q = e.target.value; renderList(); });
   $('#grp').addEventListener('change', (e) => { S.f.group = e.target.checked; saveFilters(); renderList(); });
   $('#sort').addEventListener('change', (e) => { S.f.sort = e.target.value; saveFilters(); renderList(); });
+  $('#f-month').addEventListener('change', (e) => {
+    S.f.month = e.target.value || null;
+    if (S.f.month && ['encours', 'stock', 'annonce', 'reserve', 'livraison'].includes(S.f.st)) S.f.st = 'tous'; // un mois passé : on montre aussi les vendus
+    renderArticles();
+  });
+  $('#f-mkind').addEventListener('change', (e) => { S.f.mkind = e.target.value; if (S.f.mkind === 'vente') S.f.st = 'vendu'; else if (S.f.st === 'vendu') S.f.st = 'tous'; renderArticles(); });
   $('#v-simulateur').addEventListener('change', (e) => {
     if (e.target.id !== 's-item') return;
     const it = byId(e.target.value);
