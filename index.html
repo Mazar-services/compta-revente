@@ -223,6 +223,10 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-size:14.5px;line-height:1.5}
 .refund-wait.pay{background:var(--accent-soft)} .refund-wait .btns{display:flex;gap:6px;flex-wrap:wrap}
 .sv-id small.sv-note{color:var(--ink-2);font-style:italic}
+.hero-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.mini-sw{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:800;color:var(--ink-2);padding:5px 10px;border:1px solid var(--line);border-radius:99px;cursor:pointer;background:var(--surface)}
+.mini-sw input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.hero-split{font-size:13.5px;font-weight:700;color:var(--ink-2);margin-top:-2px}
 .ship-info{margin:6px 0 0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
@@ -606,7 +610,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '2892c7595cc1';
+const APP_VERSION = '92ade30c1c03';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -944,19 +948,23 @@ function renderAccueil() {
   const goal = num(st.monthlyGoal);
   const open = S.items.filter(isOpen);
 
+  // Case « Inclure Réparo » : bénéfice revente + gain des réparations du mois
+  const withRep = !!LS.get('heroReparo', false);
+  const repM = (ym) => sum(S.repairs.filter((r) => (r.date || '').slice(0, 7) === ym), repNet);
+  const rm = repM(m), P = ms.profit + (withRep ? rm : 0), PP = pm.profit + (withRep ? repM(prevM) : 0);
   let deltaHtml;
   if (!pm.nSold && !ms.nSold) deltaHtml = `<span class="muted">Aucune vente en ${monthName(prevM)} ni en ${monthName(m)}.</span>`;
   else {
-    const d = ms.profit - pm.profit;
-    const p = pm.profit > 0 ? Math.abs(d) / pm.profit : null;
-    deltaHtml = `<span class="delta ${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${p != null ? pct(p) : eur(Math.abs(d))}</span><span class="muted">vs ${monthName(prevM)} (${eurS(pm.profit)})</span>`;
+    const d = P - PP;
+    const p = PP > 0 ? Math.abs(d) / PP : null;
+    deltaHtml = `<span class="delta ${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${p != null ? pct(p) : eur(Math.abs(d))}</span><span class="muted">vs ${monthName(prevM)} (${eurS(PP)})</span>`;
   }
 
   let goalHtml = '';
   if (goal > 0) {
-    const r = Math.max(0, ms.profit) / goal, left = goal - ms.profit, a = avgProfitAll();
+    const r = Math.max(0, P) / goal, left = goal - P, a = avgProfitAll();
     let note;
-    if (left <= 0) note = `Objectif atteint${ms.profit > goal + 0.5 ? ` · ${eurS(ms.profit - goal)} au-dessus` : ''}.`;
+    if (left <= 0) note = `Objectif atteint${P > goal + 0.5 ? ` · ${eurS(P - goal)} au-dessus` : ''}.`;
     else if (m === cur) {
       const n = a > 0 ? Math.ceil(left / a) : null;
       note = `Encore ${eur(left)}${n ? ` · environ ${plural(n, 'vente')} au bénéfice moyen de ${eur(a)}` : ''} · ${plural(daysLeftInMonth(), 'jour')} restant${daysLeftInMonth() > 1 ? 's' : ''}`;
@@ -997,8 +1005,10 @@ function renderAccueil() {
     <div class="dash">
       <div class="stack">
         <section class="card hero" aria-label="Bénéfice du mois">
-          <div class="eyebrow">Bénéfice net · ${monthName(m)}</div>
-          <div class="hero-num ${ms.profit < -0.004 ? 'neg' : ''}">${eurS(ms.profit)}</div>
+          <div class="hero-top"><div class="eyebrow">Bénéfice net${withRep ? ' total' : ''} · ${monthName(m)}</div>
+            <label class="mini-sw"><input type="checkbox" id="hero-rep" ${withRep ? 'checked' : ''}><span>Inclure Réparo</span></label></div>
+          <div class="hero-num ${P < -0.004 ? 'neg' : ''}">${eurS(P)}</div>
+          ${withRep ? `<div class="hero-split">revente ${eurS(ms.profit)} · Réparo ${eurS(rm)}</div>` : ''}
           <div class="hero-sub">${deltaHtml}</div>
           ${goalHtml}
         </section>
@@ -3024,6 +3034,7 @@ function bind() {
     if (e.target.id === 'rep-cash') { const on = e.target.checked; if (await write(() => saveSettingsData({ ...S.settings, reparoInCash: on }))) toast(on ? 'Réparo compté dans la caisse' : 'Réparo retiré de la caisse'); }
   });
   $('#v-accueil').addEventListener('change', (e) => {
+    if (e.target.id === 'hero-rep') { LS.set('heroReparo', e.target.checked); renderAccueil(); }
     if (e.target.id === 'sv-profit') { LS.set('salesProfit', e.target.checked); renderAccueil(); }
   });
   $('#v-stats').addEventListener('change', (e) => {
