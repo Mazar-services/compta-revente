@@ -606,7 +606,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'a4b584dd032a';
+const APP_VERSION = '2892c7595cc1';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -870,7 +870,8 @@ function stateLine(i) {
 // Caisse depuis le début : apports − retraits + ventes encaissées − achats.
 // Réparo : prestations de réparation (montant = quantité × prix, gain = montant − pièces)
 const repQty = (r) => Math.max(1, num(r.qty) || 1);
-const repTotal = (r) => repQty(r) * num(r.unitPrice);
+// Montant réellement payé : « total » si renseigné (geste commercial, prix de lot), sinon quantité × prix unitaire
+const repTotal = (r) => (r.total != null && r.total !== '' ? num(r.total) : repQty(r) * num(r.unitPrice));
 const repNet = (r) => repTotal(r) - num(r.partsCost);
 const repInCash = () => S.settings.reparoInCash !== false;
 function capital() {
@@ -2091,7 +2092,7 @@ function reparoHtml() {
   const table = (rows, first, lab) => `<div class="tbl-wrap"><table><thead><tr><th>${first}</th><th>Nb</th><th>Encaissé</th><th>Gain</th></tr></thead><tbody>${rows.map(([k, x]) => `<tr><td>${esc(lab(k))}</td><td>${x.n}</td><td>${eur(x.ca)}</td><td><b class="${x.net < 0 ? 'neg' : 'pos'}">${eurS(x.net)}</b></td></tr>`).join('')}</tbody></table></div>`;
   const list = R.map((r) => `<div class="cl rp">
       <span class="d">${dShort(r.date)}</span>
-      <span class="t">${esc(r.type)}${repQty(r) > 1 ? ` <b>×${repQty(r)}</b>` : ''}<small>${eur(num(r.unitPrice))} l’unité${num(r.partsCost) ? ` · pièces ${eur(num(r.partsCost))}` : ''}${r.client ? ' · ' + esc(r.client) : ''}${r.note ? ' · ' + esc(r.note) : ''} · <button class="xbtn ${S.confirmRep === r.id ? 'on' : ''}" data-act="rep-del" data-id="${esc(r.id)}">${S.confirmRep === r.id ? 'Confirmer la suppression' : 'Supprimer'}</button></small></span>
+      <span class="t">${esc(r.type)}${repQty(r) > 1 ? ` <b>×${repQty(r)}</b>` : ''}<small>${eur(num(r.unitPrice))} l’unité${repTotal(r) < repQty(r) * num(r.unitPrice) - 0.004 ? ` · payé ${eur(repTotal(r))} (remise ${eur(repQty(r) * num(r.unitPrice) - repTotal(r))})` : ''}${num(r.partsCost) ? ` · pièces ${eur(num(r.partsCost))}` : ''}${r.client ? ' · ' + esc(r.client) : ''}${r.note ? ' · ' + esc(r.note) : ''} · <button class="xbtn ${S.confirmRep === r.id ? 'on' : ''}" data-act="rep-del" data-id="${esc(r.id)}">${S.confirmRep === r.id ? 'Confirmer la suppression' : 'Supprimer'}</button></small></span>
       <span class="a"><b class="in">${eurS(repNet(r))}</b>${num(r.partsCost) ? `<small>facturé ${eur(repTotal(r))}</small>` : ''}</span>
     </div>`).join('');
   return head + `
@@ -2467,7 +2468,7 @@ function claudeSummary() {
   L.push(`Caisse depuis le début : apports ${n2(K.apports)} · retraits ${n2(K.retraits)} · investi ${n2(K.invested)} · encaissé net ${n2(K.cashed)} · réparo ${n2(K.reparo)} · remboursements en attente ${n2(K.pending)} · ventes à encaisser ${n2(K.toCome)} · bénéfice ${n2(K.profit)} · disponible ${n2(K.dispo)} · stock au coût ${n2(K.stock)} · capital ${n2(K.total)}`);
   if (S.cash.length) L.push('MOUVEMENTS DE CAISSE (date;type;montant;note)', ...S.cash.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((c) => [c.date, c.type, n2(num(c.amount)), (c.note || '').replace(/[\n;]/g, ' ')].join(';')));
   if (S.repairs.length) L.push(`REPARO (réparations, ${repInCash() ? 'comptées' : 'non comptées'} dans la caisse) : ${sum(S.repairs, repQty)} réparations · encaissé ${n2(sum(S.repairs, repTotal))} · pièces ${n2(sum(S.repairs, (r) => num(r.partsCost)))} · gain ${n2(sum(S.repairs, repNet))}`,
-    'REPARO_PRESTATIONS (date;type;quantite;prix_unitaire;pieces;gain;client;note)', ...S.repairs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((r) => [r.date, r.type, repQty(r), n2(num(r.unitPrice)), n2(num(r.partsCost)), n2(repNet(r)), r.client || '', (r.note || '').replace(/[\n;]/g, ' ')].join(';')));
+    'REPARO_PRESTATIONS (date;type;quantite;prix_unitaire;paye;pieces;gain;client;note)', ...S.repairs.slice().sort((a, b) => (a.date || '').localeCompare(b.date || '')).map((r) => [r.date, r.type, repQty(r), n2(num(r.unitPrice)), n2(repTotal(r)), n2(num(r.partsCost)), n2(repNet(r)), r.client || '', (r.note || '').replace(/[\n;]/g, ' ')].join(';')));
   if (S.cancelled.length) L.push('ACHATS ANNULES (exclus des stats) : ' + S.cancelled.map((i) => `${i.ref} ${i.model} ${n2(cost(i))} € annulé le ${i.cancelDate || '?'}${refundPending(i) ? ' (remboursement en attente, argent toujours sorti)' : ''}`).join(' · '));
   L.push('', 'MOIS;achats;investi;ventes;CA;frais_vente;benefice;ROI%');
   months.forEach((m) => { const s = monthStats(m); L.push([m, s.nBought, n2(s.invest), s.nSold, n2(s.ca), n2(s.fees), n2(s.profit), s.roi == null ? '' : Math.round(s.roi * 100)].join(';')); });
@@ -2774,9 +2775,11 @@ function syncLabel() {
 /* ---------- Navigation et rendu ---------- */
 const VIEWS = ['accueil', 'articles', 'simulateur', 'stats'];
 function repPreview() {
-  const el = $('#r-total'); if (!el) return;
-  const q = Number(val('r-qty')) || 1, p = parseNum(val('r-price')) || 0, parts = parseNum(val('r-parts')) || 0;
-  el.innerHTML = `Total facturé <b>${eur(q * p)}</b>${parts ? ` · gain <b>${eurS(q * p - parts)}</b>` : ''}`;
+  const el = $('#r-prev'), tot = $('#r-total'); if (!el || !tot) return;
+  const q = Number(val('r-qty')) || 1, p = parseNum(val('r-price')) || 0, parts = parseNum(val('r-parts')) || 0, list = q * p;
+  if (!tot.dataset.touched) tot.value = numIn(list); // suit quantité × prix tant que tu ne le modifies pas
+  const t = parseNum(tot.value) ?? list, rem = list - t;
+  el.innerHTML = `Payé par le client <b>${eur(t)}</b>${rem > 0.004 ? ` · remise <b>${eur(rem)}</b> sur ${eur(list)}` : ''}${parts ? ` · gain <b>${eurS(t - parts)}</b>` : ''}`;
 }
 function setView(v) {
   if (!VIEWS.includes(v)) v = 'accueil';
@@ -2815,18 +2818,21 @@ const ACT = {
     openSheet({ kind: 'rep', title: 'Prestation Réparo', body: `
       <div class="field"><label for="r-type">Type de prestation</label><input id="r-type" class="inp" list="dl-rep" autocomplete="off" value="${esc(last)}" placeholder="ex. Joystick drift, nettoyage, HDMI…"><datalist id="dl-rep">${[...T.keys()].map((t) => `<option value="${esc(t)}">`).join('')}</datalist>${errSlot('r-type')}</div>
       <div class="row2"><div class="field"><label for="r-qty">Nombre</label><span class="selw" style="display:block"><select id="r-qty" class="inp">${[1, 2, 3, 4, 5, 6, 8, 10].map((n) => `<option value="${n}">${n}</option>`).join('')}</select></span></div>${moneyF('r-price', 'Prix par unité', T.get(last))}</div>
+      ${moneyF('r-total', 'Prix total payé par le client', T.get(last), 'Modifie-le si tu as fait un prix (ex. 35 € les deux au lieu de 40 €)')}
       <div class="row2">${dateF('r-date', 'Date', today())}${moneyF('r-parts', 'Pièces achetées <span class="opt-l">(facultatif)</span>', null)}</div>
       ${textF('r-client', 'Client <span class="opt-l">(facultatif)</span>', '', 'Prénom, pseudo…')}
       ${textF('r-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. modules Hall, manette blanche…')}
-      <p class="preview" id="r-total"></p>`,
+      <p class="preview" id="r-prev"></p>`,
       foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="rep-save">Enregistrer</button>` });
     repPreview();
   },
   'rep-save': async (a) => {
     clearErrs();
-    const r = { type: val('r-type').trim(), qty: Number(val('r-qty')) || 1, unitPrice: parseNum(val('r-price')), date: val('r-date'), partsCost: parseNum(val('r-parts')) || 0, client: val('r-client').trim(), note: val('r-note').trim(), createdAt: new Date().toISOString() };
+    const r = { type: val('r-type').trim(), qty: Number(val('r-qty')) || 1, unitPrice: parseNum(val('r-price')), total: parseNum(val('r-total')), date: val('r-date'), partsCost: parseNum(val('r-parts')) || 0, client: val('r-client').trim(), note: val('r-note').trim(), createdAt: new Date().toISOString() };
     if (!r.type) return fieldErr('r-type', 'Indique le type de prestation.');
     if (r.unitPrice == null || r.unitPrice < 0) return fieldErr('r-price', 'Indique le prix.');
+    if (r.total == null) r.total = r.qty * r.unitPrice;
+    if (r.total < 0) return fieldErr('r-total', 'Montant négatif impossible.');
     if (!isDate(r.date)) return fieldErr('r-date', 'Date requise.');
     a.disabled = true;
     const ok = await write(() => addRepair(r));
@@ -3003,7 +3009,7 @@ function bind() {
     renderSimu();
     if (it) $('#s-resale').focus();
   });
-  document.addEventListener('input', (e) => { if (/^r-(qty|price|parts)$/.test(e.target.id)) repPreview(); if (e.target.id === 'ad-title') adCount(); });
+  document.addEventListener('input', (e) => { if (e.target.id === 'r-total') e.target.dataset.touched = '1'; if (/^r-(qty|price|parts|total)$/.test(e.target.id)) repPreview(); if (e.target.id === 'ad-title') adCount(); });
   document.addEventListener('change', (e) => {
     if (e.target.id === 'r-type') { const p = repTypes().get(e.target.value.trim()); if (p != null) { $('#r-price').value = numIn(p); } repPreview(); }
     if (e.target.id === 'r-qty') repPreview();
