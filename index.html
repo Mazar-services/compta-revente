@@ -229,6 +229,15 @@ textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-
 .hero-split{font-size:13.5px;font-weight:700;color:var(--ink-2);margin-top:-2px}
 .rp-act{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
 .pill.rp-wip{background:var(--warn-soft);color:var(--warn)} .pill.rp-ret{background:var(--accent-soft);color:var(--accent)} .pill.rp-pay{background:var(--bad-soft);color:var(--bad)} .pill.rp-ok{background:var(--good-soft);color:var(--good)}
+.tour-quick{display:flex;gap:8px;flex-wrap:wrap}
+.tour-sum .tour-line{display:grid;gap:3px;font-size:14px;margin-bottom:10px} .tour-sum .tour-line span{color:var(--ink-2);font-size:13px}
+.tour-delay{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;font-size:13px;font-weight:700;color:var(--ink-2)}
+.stop{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:grid;gap:8px}
+.stop.pk{border-left:5px solid var(--warn)} .stop.rt{border-left:5px solid var(--good)}
+.stop-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .stop-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--surface);font-weight:800;font-size:13px}
+.stop-t{font-size:16px;font-variant-numeric:tabular-nums} .stop-m{font-size:14px;line-height:1.45} .stop-m a{color:var(--accent);text-decoration:none}
+.stop-a{display:flex;flex-wrap:wrap;gap:6px} .iconbtn.sm{width:34px;height:34px;font-weight:800}
+.pill.rp-pick{background:var(--warn-soft);color:var(--warn)} .strip.tour{background:var(--warn-soft)}
 .ship-info{margin:6px 0 0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
@@ -588,13 +597,14 @@ tr.click{cursor:pointer}
   </section>
 
   <section id="v-stats" class="view" aria-label="Statistiques" hidden></section>
+  <section id="v-tournee" class="view" aria-label="Tournée" hidden></section>
 </main>
 
 <nav class="tabbar" aria-label="Navigation principale"><div class="tabbar-in">
   <button class="tab" data-act="view" data-view="accueil"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.2 12 3.5l8.5 6.7V20a1 1 0 0 1-1 1H15v-6.2H9V21H4.5a1 1 0 0 1-1-1z"/></svg><span>Accueil</span></button>
   <button class="tab" data-act="view" data-view="articles"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5 12 3.5l8.5 4-8.5 4z"/><path d="M3.5 7.5v9l8.5 4 8.5-4v-9"/><path d="M12 11.5v9"/></svg><span>Articles</span></button>
   <button class="tab tab-add" data-act="add" aria-label="Ajouter un achat"><span class="plus"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span><span>Achat</span></button>
-  <button class="tab" data-act="view" data-view="simulateur"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/></svg><span>Simulateur</span></button>
+  <button class="tab" data-act="view" data-view="tournee"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8.2 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.8"/></svg><span>Tournée</span></button>
   <button class="tab" data-act="view" data-view="stats"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V5M16 20v-6M3 20.5h18"/></svg><span>Stats</span></button>
 </div></nav>
 
@@ -612,7 +622,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'b2a93221d7a2';
+const APP_VERSION = '395abf73ea03';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -884,6 +894,7 @@ const repDone = (r) => r.done !== false;
 const repPaid = (r) => r.paid !== false;
 const repPaidOn = (r) => (isDate(r.paidDate) ? r.paidDate : r.date || '');
 function repStage(r) {
+  if (r.picked === false) return { k: 'pick', t: 'À récupérer', next: ['rep-pick', 'Récupéré'] };
   if (!repDone(r)) return { k: 'wip', t: 'En réparation', next: ['rep-done', 'Réparé'] };
   if (r.returned === false) return { k: 'ret', t: r.result === 'ko' ? 'Échec · à rendre' : 'Réparé · à rendre', next: ['rep-ret', 'Rendu'] };
   if (!repPaid(r)) return { k: 'pay', t: 'Rendu · pas encore payé', next: ['rep-pay', 'Payé'] };
@@ -1029,6 +1040,7 @@ function renderAccueil() {
         ${cashCard()}
         ${salesCard(m, ms)}
         ${reparoStrip(m)}
+        ${(() => { const st = tourStops(today()); if (!st.length) return ''; const n = st[st.length - 1].n; return `<button class="strip tour" data-act="view" data-view="tournee"><span><b>Tournée ce soir</b></span><span><b>${n}</b> arrêt${n > 1 ? 's' : ''}</span><span>${st.filter((x) => x.kind === 'pick').length} à récupérer · ${st.filter((x) => x.kind === 'ret').length} à rendre</span>${ic('right')}</button>`; })()}
         <button class="strip" data-act="goto" data-view="articles" data-st="encours">
           <span>En ce moment</span><span><b>${open.length}</b> en cours</span><span><b>${eur(capital)}</b> immobilisés</span><span><b>${eurS(pot)}</b> au prix affiché</span>${ic('right')}
         </button>
@@ -2235,7 +2247,7 @@ function renderStats() {
     : '<p class="muted" style="margin:0">Aucune annonce en ligne pour l’instant.</p>';
   const mrows = rows.slice().reverse();
   el.innerHTML = statsTabs() + `
-    <div class="ttl-row"><div><div class="eyebrow">Analyse · ${esc(pLabel)}</div><h1 class="h1">Statistiques</h1></div><button class="btn sm" data-act="export">${ic('dl')} Export CSV</button></div>
+    <div class="ttl-row"><div><div class="eyebrow">Analyse · ${esc(pLabel)}</div><h1 class="h1">Statistiques</h1></div><div class="btns"><button class="btn sm" data-act="view" data-view="simulateur">Simulateur</button><button class="btn sm" data-act="export">${ic('dl')} Export CSV</button></div></div>
     <div class="chips" role="toolbar" aria-label="Période">${chips}</div>
     <section class="card" aria-label="Bilan depuis le début"><div class="card-h"><h2 class="sec">Bilan depuis le début</h2><span class="muted" style="font-size:12.5px">toutes périodes confondues</span></div>${bilanHtml()}</section>
     <div class="tiles t4">${tiles.map(tileHtml).join('')}</div>
@@ -2688,6 +2700,261 @@ function openAd(id, focus) {
 }
 function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el.textContent = `(${t.value.length} caractères)`; }
 
+/* ---------- Tournée : demandes clients, ordre de passage Saint-Égrève → Crolles, messages prêts ---------- */
+const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', stop: 12, cutoff: '16:00', p1: 25, p2: 45, delai: '24-48 h', garantie: '30 jours' };
+const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
+// Communes dans l'ordre où on les traverse en rentrant de Saint-Égrève à Crolles (A480, rocade sud, A41)
+const ROUTE_RANK = [
+  [1, ['Voreppe', 'Le Fontanil-Cornillon', 'Fontanil', 'Saint-Égrève', 'Proveysieux', 'Quaix-en-Chartreuse']],
+  [2, ['Saint-Martin-le-Vinoux', 'Sassenage', 'Noyarey', 'Veurey-Voroize', 'Veurey']],
+  [3, ['Fontaine', 'Seyssinet-Pariset', 'Seyssinet', 'Seyssins', 'Saint-Nizier']],
+  [4, ['Grenoble']],
+  [5, ['Échirolles', 'Le Pont-de-Claix', 'Pont-de-Claix', 'Claix', 'Varces', 'Vif', 'Jarrie', 'Champ-sur-Drac', 'Vizille']],
+  [6, ['Eybens', 'Poisat', 'Bresson', 'Brié-et-Angonnes', 'Herbeys', 'Saint-Martin-d’Uriage', 'Vaulnaveys']],
+  [7, ['Saint-Martin-d’Hères', 'Gières', 'Venon', 'Murianette', 'Domène', 'Le Versoud', 'Villard-Bonnot', 'Saint-Mury']],
+  [8, ['La Tronche', 'Corenc', 'Meylan']],
+  [9, ['Montbonnot-Saint-Martin', 'Montbonnot', 'Biviers', 'Saint-Ismier', 'Saint-Nazaire-les-Eymes']],
+  [10, ['Bernin', 'Crolles', 'Lumbin', 'La Terrasse', 'Le Touvet', 'Froges', 'Brignoud']],
+];
+const CITIES = ROUTE_RANK.flatMap(([, l]) => l);
+const normC = (s) => norm(String(s || '').replace(/[’']/g, ' ').replace(/-/g, ' ')).replace(/\bst\b/g, 'saint').replace(/\s+/g, ' ').trim();
+function cityRank(c) {
+  const n = normC(c);
+  if (!n) return 50;
+  for (const [k, l] of ROUTE_RANK) if (l.some((x) => normC(x) === n || n.includes(normC(x)))) return k + (k === 4 && /38100/.test(c) ? 0.5 : 0);
+  return 50;
+}
+function findCity(text) {
+  const t = normC(text);
+  return CITIES.slice().sort((a, b) => b.length - a.length).find((c) => new RegExp(`\\b${normC(c)}\\b`).test(t)) || '';
+}
+// Lit le message du client : téléphone, adresse, commune, prénom, nombre de manettes
+function parseDemande(txt) {
+  const r = { name: '', phone: '', address: '', city: '', qty: 1 };
+  const lines = String(txt || '').split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  const ph = String(txt).match(/(?:\+33\s?|0033\s?|0)[1-9](?:[\s.-]?\d{2}){4}/);
+  if (ph) r.phone = ph[0].replace(/^(\+33|0033)\s?/, '0').replace(/[\s.-]/g, '').replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+  const street = /\d+\s*(bis|ter)?\s*,?\s*(rue|avenue|av\b|av\.|bd|boulevard|chemin|ch\.|allée|allee|place|impasse|route|rte|cours|quai|square|résidence|residence|lotissement|lot\.|montée|montee|passage|esplanade|galerie|hameau|clos)\b/i;
+  const body = String(txt).replace(ph ? ph[0] : '\u0000', ' ');
+  const sm = body.match(new RegExp(street.source + '[^,\\n\\d]*', 'i'));
+  if (sm) {
+    let a = sm[0];
+    const cty = findCity(a); if (cty) a = a.slice(0, normC(a).indexOf(normC(cty)) >= 0 ? a.toLowerCase().search(new RegExp(normC(cty).split(' ')[0], 'i')) : a.length);
+    a = a.replace(/\s+(ma|mes|une|deux|trois)\s+manettes?.*$/i, '').replace(/\s+manettes?.*$/i, '');
+    r.address = a.replace(/\s{2,}/g, ' ').replace(/[,\s.]+$/, '').trim();
+  } else { const al = lines.find((l) => /\b38\d{3}\b/.test(l)); if (al) r.address = al.replace(ph ? ph[0] : '', '').replace(/[,\s]+$/, '').trim(); }
+  const pc = String(txt).match(/\b(38\d{3})\s+([A-Za-zÀ-ÿ’' -]{3,40})/);
+  r.city = findCity(pc ? pc[2] : '') || findCity(txt) || (pc ? pc[2].trim() : '');
+  if (r.city === 'Grenoble' && pc && pc[1] === '38100') r.city = 'Grenoble';
+  const q = String(txt).match(/(\d+)\s*manettes?/i) || (/\bdeux\s+manettes?\b/i.test(txt) ? [0, 2] : /\btrois\s+manettes?\b/i.test(txt) ? [0, 3] : null);
+  if (q) r.qty = Math.max(1, Math.min(10, +q[1]));
+  const nm = String(txt).match(/(?:je m['’]appelle|moi c['’]est|c['’]est|prénom\s*:?|prenom\s*:?|nom\s*:)\s*([A-Za-zÀ-ÿ-]{2,20})/i) || String(txt).match(/\b(?:c|ct|cest)\s+([A-ZÀ-Ý][a-zà-ÿ-]{1,19})/);
+  if (nm) r.name = nm[1];
+  else {
+    const cand = lines.find((l) => !/\d/.test(l) && l.split(/\s+/).length <= 2 && l.length <= 24 && !/manette|drift|bonjour|salut|slt|hello|merci|ok|adresse/i.test(l));
+    if (cand) r.name = cand.replace(/[,.!]/g, '');
+  }
+  r.name = r.name ? r.name[0].toUpperCase() + r.name.slice(1) : '';
+  return r;
+}
+const tourPrice = (q) => { const c = tourCfg(); return q === 1 ? num(c.p1) : q === 2 ? num(c.p2) : q * num(c.p1) - 5 * (q - 1); };
+const hm = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}h${String(m % 60).padStart(2, '0')}`;
+const toMin = (s) => { const [h, m] = String(s || '19:45').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+const tourDay = () => (S.tourDay === 'demain' ? addDays(today(), 1) : today());
+function planDateNow() { const c = tourCfg(), d = new Date(); return d.getHours() * 60 + d.getMinutes() < toMin(c.cutoff) ? today() : addDays(today(), 1); }
+
+function tourStops(D) {
+  const due = (r) => !isDate(r.planDate) || r.planDate <= D;
+  const pick = S.repairs.filter((r) => r.picked === false && due(r)).map((r) => ({ r, kind: 'pick' }));
+  const ret = S.repairs.filter((r) => r.picked !== false && repDone(r) && r.returned === false && due(r)).map((r) => ({ r, kind: 'ret' }));
+  const ord = LS.get('tourOrd', {})[D] || [];
+  const all = [...pick, ...ret];
+  all.sort((a, b) => {
+    const ia = ord.indexOf(a.r.id), ib = ord.indexOf(b.r.id);
+    if (ia >= 0 && ib >= 0) return ia - ib;
+    return cityRank(a.r.city) - cityRank(b.r.city) || (a.r.address || '').localeCompare(b.r.address || '') || (a.kind === 'ret' ? -1 : 1);
+  });
+  // Même adresse (retour + nouvelle manette) : un seul arrêt, l'heure est la même
+  const c = tourCfg(), delay = num((LS.get('tourDelay', {}) || {})[D]);
+  let t = toMin(c.start) + delay, prev = null, n = 0;
+  all.forEach((s) => {
+    const key = normC((s.r.address || '') + (s.r.city || '')) || s.r.id;
+    if (key !== prev) { n += 1; if (n > 1) t += num(c.stop) || 12; prev = key; }
+    s.n = n; s.from = t; s.to = t + 20;
+  });
+  return all;
+}
+
+const firstName = (r) => (r.client || '').split(/\s+/)[0] || '';
+function tourMsg(kind, r, s) {
+  r = r || {};
+  const c = tourCfg(), nm = firstName(r), hi = nm ? `Salut ${nm} ! ` : 'Salut ! ', amt = eur(repTotal(r));
+  const when = s ? `entre ${hm(s.from)} et ${hm(s.to)}` : '';
+  const soir = s && tourDay() !== today() ? 'demain soir' : 'ce soir';
+  if (kind === 'reply') return `Salut ! Réparation drift manette PS5 : ${eur(num(c.p1))} (2 manettes : ${eur(num(c.p2))}). Je passe la récupérer devant chez toi et je te la ramène réparée sous ${c.delai}, garantie ${c.garantie}.\nEnvoie-moi : ton prénom, ton numéro, ton adresse complète, le nombre de manettes et le problème.\nJe te confirme l'heure de passage aujourd'hui avant ${c.cutoff.replace(':', 'h')}.`;
+  if (kind === 'pick') return `${hi}C'est bon pour ${soir} : je passe récupérer ${repQty(r) > 1 ? `tes ${repQty(r)} manettes` : 'ta manette'} devant chez toi ${when}. Je t'envoie un message 10 min avant. Tarif : ${amt}, à payer au retour.`;
+  if (kind === 'ret') return `${hi}${repQty(r) > 1 ? 'Tes manettes sont réparées' : 'Ta manette est réparée'} ! Je te ${repQty(r) > 1 ? 'les' : 'la'} ramène ${soir} ${when}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`;
+  if (kind === 'late') return `${hi}Petit retard ${soir}, désolé : je passe plutôt ${when}. Je t'envoie un message 10 min avant.`;
+  if (kind === 'eta') return `J'arrive dans 10 min, tu peux descendre ?`;
+  if (kind === 'ready') return `${hi}${repQty(r) > 1 ? 'Tes manettes sont prêtes' : 'Ta manette est prête'} ! Je te ${repQty(r) > 1 ? 'les' : 'la'} ramène dès la prochaine tournée, je te confirme l'heure avant ${c.cutoff.replace(':', 'h')}.`;
+  if (kind === 'thanks') return `${hi}Merci pour ta confiance ! Ta réparation est garantie ${c.garantie}, si le moindre souci revient, écris-moi. Et si tu es content, un petit partage ou un avis sur TikTok m'aide énormément.`;
+  return '';
+}
+function sendMsg(text, phone) {
+  copyText(text, 'Message copié');
+  const p = String(phone || '').replace(/\s/g, '');
+  if (p) setTimeout(() => { location.href = `sms:${p}${/iPhone|iPad|Mac/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(text)}`; }, 250);
+}
+
+function renderTournee() {
+  const el = $('#v-tournee');
+  if (S.status !== 'ok') { el.innerHTML = stateBlock(); return; }
+  const c = tourCfg(), D = tourDay(), stops = tourStops(D), sent = LS.get('tourSent', {});
+  const delay = num((LS.get('tourDelay', {}) || {})[D]);
+  const nStops = stops.length ? stops[stops.length - 1].n : 0;
+  const atelier = S.repairs.filter((r) => r.picked !== false && !repDone(r));
+  const pickN = sum(stops.filter((s) => s.kind === 'pick'), (s) => repQty(s.r)), retN = sum(stops.filter((s) => s.kind === 'ret'), (s) => repQty(s.r));
+  const cash = sum(stops.filter((s) => s.kind === 'ret' && !repPaid(s.r)), (s) => repTotal(s.r));
+  const card = (s) => {
+    const r = s.r, pick = s.kind === 'pick', k = `${D}:${r.id}:${s.kind}`, wasSent = sent[k];
+    const adr = [r.address, r.city].filter(Boolean).join(', ');
+    return `<div class="stop ${pick ? 'pk' : 'rt'}">
+      <div class="stop-h"><span class="stop-n">${s.n}</span><b class="stop-t">${hm(s.from)} – ${hm(s.to)}</b><span class="pill ${pick ? 'st-attente' : 'st-vendu'}">${pick ? `Récupérer ×${repQty(r)}` : `Rendre ×${repQty(r)} · ${eur(repTotal(r))}`}</span></div>
+      <div class="stop-m"><b>${esc(r.client || 'Client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<br>
+        ${adr ? `<a href="https://maps.google.com/?q=${encodeURIComponent(adr)}" target="_blank" rel="noopener">${esc(adr)}</a>` : '<span class="neg">Adresse manquante : touche Modifier</span>'}${cityRank(r.city) === 50 && r.city ? ' <small class="muted">(commune hors trajet : placée à la fin)</small>' : ''}
+        <small class="muted"> · ${esc(r.type)}${r.note ? ' · ' + esc(r.note) : ''}</small></div>
+      <div class="stop-a">
+        <button class="btn sm ${wasSent ? '' : 'primary'}" data-act="tour-msg" data-k="${delay && wasSent ? 'late' : s.kind}" data-id="${esc(r.id)}" data-sk="${esc(k)}">${wasSent ? (delay ? 'Prévenir du retard' : 'Créneau envoyé ✓') : 'Envoyer le créneau'}</button>
+        <button class="btn sm" data-act="tour-msg" data-k="eta" data-id="${esc(r.id)}">J'arrive</button>
+        ${pick ? `<button class="btn sm primary" data-act="rep-pick" data-id="${esc(r.id)}">Récupéré</button>` : `<button class="btn sm primary" data-act="rep-retpay" data-id="${esc(r.id)}">Rendu + payé</button><button class="btn sm" data-act="rep-ret" data-id="${esc(r.id)}">Rendu, pas payé</button>`}
+        <button class="btn sm" data-act="tour-later" data-id="${esc(r.id)}">Demain</button>
+        <button class="iconbtn sm" data-act="tour-mv" data-d="-1" data-id="${esc(r.id)}" aria-label="Monter">↑</button><button class="iconbtn sm" data-act="tour-mv" data-d="1" data-id="${esc(r.id)}" aria-label="Descendre">↓</button>
+        <button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button>
+      </div></div>`;
+  };
+  el.innerHTML = `
+    <div class="ttl-row"><div><div class="eyebrow">Réparo · récupérations et retours</div><h1 class="h1">Tournée</h1></div><button class="btn sm" data-act="tour-cfg">Réglages</button></div>
+    <div class="tour-quick">
+      <button class="btn primary grow" data-act="dem-add">${ic('plus')} Nouvelle demande</button>
+      <button class="btn grow" data-act="tour-reply">${ic('copy')} Copier la réponse type</button>
+    </div>
+    <div class="stabs" role="tablist">${[['ce-soir', 'Ce soir'], ['demain', 'Demain']].map(([v, l]) => `<button role="tab" data-act="tour-day" data-v="${v}" aria-selected="${(S.tourDay || 'ce-soir') === v}">${l}</button>`).join('')}</div>
+    <section class="card tour-sum">
+      ${stops.length ? `<div class="tour-line"><b>${plural(nStops, 'arrêt')}</b><span>${pickN} à récupérer · ${retN} à rendre${cash ? ` · ${eur(cash)} à encaisser` : ''}</span><span>départ ${esc(c.from)} ${hm(toMin(c.start) + delay)} → ${esc(c.to)} vers ${hm(stops[stops.length - 1].to + 15)}</span></div>
+      <div class="btns"><button class="btn primary grow" data-act="tour-go">Lancer la tournée (Google Maps)</button></div>
+      <div class="tour-delay"><span>Retard ce soir :</span>${[0, 10, 20, 30, 45].map((m) => `<button class="chip" data-act="tour-delay" data-m="${m}" aria-pressed="${delay === m}">${m ? '+' + m + ' min' : 'aucun'}</button>`).join('')}</div>
+      ${delay ? '<p class="hint" style="margin:0">Les heures ont été décalées : touche « Prévenir du retard » sur chaque arrêt déjà prévenu.</p>' : ''}`
+      : `<p style="margin:0">Aucun arrêt ${D === today() ? 'ce soir' : 'demain'}. Ajoute une demande dès qu'un client t'écrit : elle se place toute seule dans la bonne tournée (avant ${c.cutoff.replace(':', 'h')} ce soir, après demain).</p>`}
+    </section>
+    ${stops.map(card).join('')}
+    <section class="card"><div class="card-h"><h2 class="sec">Atelier</h2><span class="muted" style="font-size:12.5px">${plural(sum(atelier, repQty), 'manette')} à réparer</span></div>
+      ${atelier.length ? atelier.map((r) => `<div class="cl rp"><span class="d">${dShort(r.gotDate || r.date)}</span><span class="t">${esc(r.client || 'Client')} · ${esc(r.type)} ×${repQty(r)}<small>${esc(r.city || '')}</small></span><span class="a"><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></span></div>`).join('')
+        + (atelier.length > 1 ? `<div class="btns" style="margin-top:8px"><button class="btn sm" data-act="rep-ready-all">Tout est réparé</button></div>` : '') : '<p class="muted" style="margin:0">Rien à réparer pour l’instant.</p>'}
+    </section>
+    <section class="card"><div class="card-h"><h2 class="sec">Messages utiles</h2></div>
+      <div class="btns"><button class="btn sm" data-act="tour-reply">Réponse type</button><button class="btn sm" data-act="tour-msg" data-k="thanks">Remerciement + avis</button></div>
+      <p class="hint" style="margin:6px 0 0">« Envoyer » copie le message et ouvre tes SMS avec le numéro du client. Pour TikTok, colle simplement le message dans la conversation.</p>
+    </section>`;
+}
+
+function openDemande() {
+  const T = repTypes(), last = [...T.keys()].find((t) => /drift/i.test(t)) || [...T.keys()].pop(), c = tourCfg(), pd = planDateNow();
+  openSheet({ kind: 'dem', title: 'Nouvelle demande', body: `
+    <div class="field"><label for="d-paste">Colle ici le message du client</label><textarea id="d-paste" class="inp" rows="4" placeholder="Ex. : Yanis, 06 12 34 56 78, 12 rue des Alpes 38400 Saint-Martin-d’Hères, 2 manettes qui driftent"></textarea>
+      <div class="btns" style="margin-top:6px"><button class="btn sm" data-act="dem-pastebtn">${ic('copy')} Coller depuis le presse-papiers</button></div>
+      <small class="hint">Les champs ci-dessous se remplissent tout seuls. Vérifie et corrige si besoin.</small></div>
+    <div class="row2">${textF('d-name', 'Prénom', '', 'Prénom ou pseudo')}${textF('d-phone', 'Téléphone', '', '06 …', 'inputmode="tel"')}</div>
+    ${textF('d-addr', 'Adresse', '', 'n° et rue')}
+    <div class="row2"><div class="field"><label for="d-city">Commune</label><input id="d-city" class="inp" list="dl-city" autocomplete="off"><datalist id="dl-city">${CITIES.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
+      <div class="field"><label for="d-qty">Manettes</label><span class="selw" style="display:block"><select id="d-qty" class="inp">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}">${n}</option>`).join('')}</select></span></div></div>
+    <div class="row2"><div class="field"><label for="d-type">Prestation</label><input id="d-type" class="inp" list="dl-rep2" autocomplete="off" value="${esc(last)}"><datalist id="dl-rep2">${[...T.keys()].map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>${moneyF('d-total', 'Prix total', tourPrice(1))}</div>
+    <div class="row2">${dateF('d-plan', 'Passage prévu', pd)}${textF('d-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. manette blanche, mineur : n° parent')}</div>
+    <p class="hint" id="d-info">${pd === today() ? 'Avant ' + c.cutoff.replace(':', 'h') + ' : passage ce soir.' : 'Après ' + c.cutoff.replace(':', 'h') + ' : passage demain soir.'}</p>`,
+    foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="dem-save">Ajouter à la tournée</button>` });
+}
+function demFill() {
+  const p = parseDemande(val('d-paste'));
+  [['d-name', p.name], ['d-phone', p.phone], ['d-addr', p.address], ['d-city', p.city]].forEach(([id, v]) => { const x = $('#' + id); if (x && v && !x.dataset.touched) x.value = v; });
+  // Client déjà venu : on reprend son adresse
+  const known = p.phone && S.repairs.slice().reverse().find((r) => r.phone && r.phone.replace(/\s/g, '') === p.phone.replace(/\s/g, ''));
+  if (known) { [['d-name', known.client], ['d-addr', known.address], ['d-city', known.city]].forEach(([id, v]) => { const x = $('#' + id); if (x && !x.value && v) x.value = v; }); toast(`Client connu : ${known.client || p.phone}`); }
+  const q = $('#d-qty'); if (q && !q.dataset.touched) { q.value = String(p.qty); const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(p.qty)); }
+}
+async function demSave(a) {
+  clearErrs();
+  const qty = Number(val('d-qty')) || 1, T = repTypes(), type = val('d-type').trim() || 'Joystick drift (manette PS5)';
+  const total = parseNum(val('d-total')) ?? tourPrice(qty);
+  const r = { type, qty, unitPrice: num(T.get(type)) || num(tourCfg().p1), total, partsCost: 0, client: val('d-name').trim(), phone: val('d-phone').trim(), address: val('d-addr').trim(), city: val('d-city').trim(), note: val('d-note').trim(),
+    picked: false, gotDate: '', done: false, result: '', returned: false, returnDate: '', paid: false, paidDate: '', planDate: isDate(val('d-plan')) ? val('d-plan') : planDateNow() };
+  r.date = r.planDate;
+  if (!r.client && !r.phone) return fieldErr('d-name', 'Indique au moins le prénom ou le numéro.');
+  if (!r.address) return fieldErr('d-addr', 'Adresse nécessaire pour passer chez le client.');
+  if (total < 0) return fieldErr('d-total', 'Montant négatif impossible.');
+  a.disabled = true;
+  const ok = await write(() => addRepair({ ...r, createdAt: new Date().toISOString() }));
+  a.disabled = false;
+  if (ok) { closeSheet(); S.tourDay = r.planDate === today() ? 'ce-soir' : 'demain'; if (S.view !== 'tournee') setView('tournee'); else renderTournee(); toast(`${r.client || 'Client'} ajouté à la tournée de ${r.planDate === today() ? 'ce soir' : dShort(r.planDate)}`); }
+}
+function tourMapsUrl(stops) {
+  const c = tourCfg(), pts = [];
+  stops.forEach((s) => { const a = [s.r.address, s.r.city].filter(Boolean).join(', '); if (a && !pts.includes(a)) pts.push(a); });
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(c.from)}&destination=${encodeURIComponent(c.to)}&travelmode=driving${pts.length ? '&waypoints=' + encodeURIComponent(pts.slice(0, 9).join('|')) : ''}`;
+}
+function openTourCfg() {
+  const c = tourCfg();
+  openSheet({ kind: 'tourcfg', title: 'Réglages de la tournée', body: `
+    <div class="row2">${textF('t-from', 'Départ', c.from)}${textF('t-to', 'Arrivée (domicile)', c.to)}</div>
+    <div class="row2"><div class="field"><label for="t-start">Heure de départ</label><input id="t-start" class="inp" type="time" value="${esc(c.start)}"></div><div class="field"><label for="t-stop">Minutes par arrêt</label><input id="t-stop" class="inp" inputmode="numeric" value="${esc(String(c.stop))}"></div></div>
+    <div class="row2"><div class="field"><label for="t-cut">Heure limite (passage le soir même)</label><input id="t-cut" class="inp" type="time" value="${esc(c.cutoff)}"></div>${textF('t-delai', 'Délai annoncé', c.delai)}</div>
+    <div class="row2">${moneyF('t-p1', 'Tarif 1 manette', c.p1)}${moneyF('t-p2', 'Tarif 2 manettes', c.p2)}</div>
+    ${textF('t-gar', 'Garantie', c.garantie)}
+    <p class="hint">Ces infos remplissent automatiquement les messages (réponse type, créneaux, retard…).</p>`,
+    foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="tour-cfg-save">Enregistrer</button>` });
+}
+
+const TOUR_ACT = {
+  'dem-add': () => openDemande(),
+  'dem-save': (a) => demSave(a),
+  'dem-pastebtn': async () => { try { const t = await navigator.clipboard.readText(); $('#d-paste').value = t; demFill(); } catch (e) { toast('Appuie longuement dans la case puis « Coller »'); } },
+  'tour-reply': () => copyText(tourMsg('reply'), 'Réponse type copiée : colle-la au client'),
+  'tour-day': (a) => { S.tourDay = a.dataset.v; renderTournee(); },
+  'tour-msg': (a) => {
+    const r = S.repairs.find((x) => x.id === a.dataset.id), k = a.dataset.k;
+    if (k === 'thanks' && !r) { copyText(tourMsg('thanks', {}), 'Message copié'); return; }
+    if (!r) return;
+    const s = tourStops(tourDay()).find((x) => x.r.id === r.id);
+    sendMsg(tourMsg(k, r, s), r.phone);
+    if (a.dataset.sk) { const m = LS.get('tourSent', {}); m[a.dataset.sk] = 1; LS.set('tourSent', m); setTimeout(renderTournee, 400); }
+  },
+  'tour-later': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { planDate: addDays(tourDay(), 1) }))) toast(`${r.client || 'Client'} reporté au ${dShort(addDays(tourDay(), 1))}`); },
+  'tour-mv': (a) => {
+    const D = tourDay(), ids = tourStops(D).map((s) => s.r.id).filter((v, i, arr) => arr.indexOf(v) === i), i = ids.indexOf(a.dataset.id), j = i + Number(a.dataset.d);
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    const o = LS.get('tourOrd', {}); o[D] = ids; LS.set('tourOrd', o); renderTournee();
+  },
+  'tour-delay': (a) => { const o = LS.get('tourDelay', {}); o[tourDay()] = Number(a.dataset.m); LS.set('tourDelay', o); renderTournee(); },
+  'tour-go': () => { const stops = tourStops(tourDay()); if (stops.length > 9) toast('Google Maps prend 9 arrêts max : les suivants seront à ajouter'); window.open(tourMapsUrl(stops), '_blank'); },
+  'tour-cfg': () => openTourCfg(),
+  'tour-cfg-save': async (a) => {
+    const t = { from: val('t-from').trim() || TOUR_DEF.from, to: val('t-to').trim() || TOUR_DEF.to, start: val('t-start') || TOUR_DEF.start, stop: Math.max(3, parseInt(val('t-stop'), 10) || 12), cutoff: val('t-cut') || TOUR_DEF.cutoff,
+      p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie };
+    a.disabled = true; const ok = await write(() => saveSettingsData({ ...S.settings, tour: t })); a.disabled = false;
+    if (ok) { closeSheet(); toast('Réglages de la tournée enregistrés'); }
+  },
+  'rep-pick': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { picked: true, gotDate: today(), date: today(), planDate: '' }))) toast(`${r.client || 'Manette'} récupérée : direction l’atelier`); },
+  'rep-ready': async (a) => {
+    const r = S.repairs.find((x) => x.id === a.dataset.id);
+    if (r && await write(() => updRepair(r.id, { done: true, result: 'ok', date: today(), returned: false, planDate: '' }))) { toast('Réparé : ajouté aux retours de la prochaine tournée'); if (r.phone || r.client) setTimeout(() => sendMsg(tourMsg('ready', r), r.phone), 300); }
+  },
+  'rep-ready-all': async () => {
+    const ids = S.repairs.filter((r) => r.picked !== false && !repDone(r)).map((r) => r.id);
+    for (const id of ids) { if (!(await write(() => updRepair(id, { done: true, result: 'ok', date: today(), returned: false, planDate: '' })))) return; }
+    toast(`${plural(ids.length, 'prestation')} réparée${ids.length > 1 ? 's' : ''} : ajoutées aux retours`);
+  },
+  'rep-retpay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { returned: true, returnDate: today(), paid: true, paidDate: today() }))) toast(`Rendu et payé : +${eur(repNet(r))}${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); },
+};
+
 /* ---------- Réglages et export ---------- */
 function openSettings() {
   const st = S.settings, micro = st.legal === 'micro';
@@ -2803,7 +3070,7 @@ function syncLabel() {
 }
 
 /* ---------- Navigation et rendu ---------- */
-const VIEWS = ['accueil', 'articles', 'simulateur', 'stats'];
+const VIEWS = ['accueil', 'articles', 'simulateur', 'stats', 'tournee'];
 function openRep(id) {
   const T = repTypes(), last = [...T.keys()].pop(), r = id ? S.repairs.find((x) => x.id === id) : null;
   const v = r || { type: last, qty: 1, unitPrice: T.get(last), gotDate: today(), done: false, returned: false, paid: false };
@@ -2814,15 +3081,18 @@ function openRep(id) {
     <div class="row2"><div class="field"><label for="r-qty">Nombre</label><span class="selw" style="display:block"><select id="r-qty" class="inp">${[1, 2, 3, 4, 5, 6, 8, 10].map((n) => `<option value="${n}" ${n === repQty(v) ? 'selected' : ''}>${n}</option>`).join('')}</select></span></div>${moneyF('r-price', 'Prix par unité', v.unitPrice)}</div>
     ${moneyF('r-total', 'Prix total payé par le client', r ? repTotal(r) : v.unitPrice, 'Modifie-le si tu as fait un prix (ex. 35 € les deux au lieu de 40 €)')}
     <div class="fs"><p class="fs-t">Suivi</p>
-      ${dateF('r-got', 'Objet récupéré le', isDate(v.gotDate) ? v.gotDate : v.date)}
-      ${sw('r-done', done, 'Réparation terminée', 'Coche quand tu as fini (réussie ou non)')}
+      ${sw('r-picked', v.picked !== false, 'Objet récupéré', 'Décoche si tu dois encore passer le chercher (il apparaît alors dans la Tournée)')}
+      <div id="r-sec-pick" class="sub">${dateF('r-got', 'Objet récupéré le', isDate(v.gotDate) ? v.gotDate : isDate(v.date) ? v.date : today())}</div>
+      <div id="r-wrap-done">${sw('r-done', done, 'Réparation terminée', 'Coche quand tu as fini (réussie ou non)')}
       <div id="r-sec-done" class="sub">${radios('r-res', [['ok', 'Réussie'], ['ko', 'Échec']], v.result === 'ko' ? 'ko' : 'ok')}${dateF('r-date', 'Réparé le', done && isDate(v.date) ? v.date : today())}</div>
       <div id="r-wrap-ret">${sw('r-ret', ret && done, 'Rendu au client', 'L’objet est reparti chez le client')}
-      <div id="r-sec-ret" class="sub">${dateF('r-retDate', 'Rendu le', isDate(v.returnDate) ? v.returnDate : today())}</div></div>
+      <div id="r-sec-ret" class="sub">${dateF('r-retDate', 'Rendu le', isDate(v.returnDate) ? v.returnDate : today())}</div></div></div>
       ${sw('r-paid', paid, 'Argent reçu', 'L’argent entre dans la caisse à cette date')}
       <div id="r-sec-paid" class="sub">${dateF('r-paidDate', 'Payé le', isDate(v.paidDate) ? v.paidDate : r && repPaid(r) ? v.date : today())}</div>
     </div>
     <div class="row2">${moneyF('r-parts', 'Pièces achetées <span class="opt-l">(facultatif)</span>', num(v.partsCost) || null)}${textF('r-client', 'Client <span class="opt-l">(facultatif)</span>', v.client || '', 'Prénom, pseudo…')}</div>
+    <div class="row2">${textF('r-phone', 'Téléphone <span class="opt-l">(facultatif)</span>', v.phone || '', '06 …', 'inputmode="tel"')}${textF('r-city', 'Commune <span class="opt-l">(facultatif)</span>', v.city || '', 'ex. Meylan')}</div>
+    ${textF('r-addr', 'Adresse <span class="opt-l">(pour la tournée)</span>', v.address || '', 'n° et rue')}
     ${textF('r-note', 'Note <span class="opt-l">(facultatif)</span>', v.note || '', 'ex. modules Hall, manette blanche…')}
     <p class="preview" id="r-prev"></p>`,
     foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="rep-save" ${id ? `data-id="${esc(id)}"` : ''}>Enregistrer</button>` });
@@ -2831,6 +3101,7 @@ function openRep(id) {
 }
 function repSections() {
   const d = $('#r-done'); if (!d) return;
+  const pk = $('#r-picked').checked; $('#r-sec-pick').hidden = !pk; $('#r-wrap-done').hidden = !pk;
   $('#r-sec-done').hidden = !d.checked; $('#r-wrap-ret').hidden = !d.checked;
   $('#r-sec-ret').hidden = !$('#r-ret').checked; $('#r-sec-paid').hidden = !$('#r-paid').checked;
 }
@@ -2860,6 +3131,7 @@ function render() {
   if (S.view === 'accueil') renderAccueil();
   else if (S.view === 'articles') renderArticles();
   else if (S.view === 'simulateur') renderSimu();
+  else if (S.view === 'tournee') renderTournee();
   else renderStats();
 }
 const saveFilters = () => LS.set('filters', { st: S.f.st, cat: S.f.cat, sort: S.f.sort, group: S.f.group, view: S.f.view });
@@ -2878,15 +3150,17 @@ const ACT = {
   'rep-save': async (a) => {
     clearErrs();
     const id = a.dataset.id || null, old = id ? S.repairs.find((x) => x.id === id) : null;
-    const done = $('#r-done').checked, ret = done && $('#r-ret').checked, paid = $('#r-paid').checked;
+    const picked = $('#r-picked').checked, done = picked && $('#r-done').checked, ret = done && $('#r-ret').checked, paid = $('#r-paid').checked;
     const r = { type: val('r-type').trim(), qty: Number(val('r-qty')) || 1, unitPrice: parseNum(val('r-price')), total: parseNum(val('r-total')), partsCost: parseNum(val('r-parts')) || 0, client: val('r-client').trim(), note: val('r-note').trim(),
-      gotDate: val('r-got'), done, result: done ? radioVal('r-res') || 'ok' : '', returned: ret, returnDate: ret ? val('r-retDate') : '', paid, paidDate: paid ? val('r-paidDate') : '' };
-    r.date = done ? val('r-date') : r.gotDate;
+      phone: val('r-phone').trim(), address: val('r-addr').trim(), city: val('r-city').trim(), picked,
+      gotDate: picked ? val('r-got') : '', done, result: done ? radioVal('r-res') || 'ok' : '', returned: ret, returnDate: ret ? val('r-retDate') : '', paid, paidDate: paid ? val('r-paidDate') : '' };
+    r.date = done ? val('r-date') : picked ? r.gotDate : (old && isDate(old.planDate) ? old.planDate : today());
+    if (!picked && !(old && isDate(old.planDate))) r.planDate = planDateNow();
     if (!r.type) return fieldErr('r-type', 'Indique le type de prestation.');
     if (r.unitPrice == null || r.unitPrice < 0) return fieldErr('r-price', 'Indique le prix.');
     if (r.total == null) r.total = r.qty * r.unitPrice;
     if (r.total < 0) return fieldErr('r-total', 'Montant négatif impossible.');
-    if (!isDate(r.gotDate)) return fieldErr('r-got', 'Date requise.');
+    if (picked && !isDate(r.gotDate)) return fieldErr('r-got', 'Date requise.');
     if (done && !isDate(r.date)) return fieldErr('r-date', 'Date requise.');
     if (done && r.date < r.gotDate) return fieldErr('r-date', 'La réparation ne peut pas précéder la récupération.');
     if (ret && !isDate(r.returnDate)) return fieldErr('r-retDate', 'Date requise.');
@@ -2897,7 +3171,7 @@ const ACT = {
     a.disabled = false;
     if (ok) { closeSheet(); toast(`Réparo : ${repStage(r).t}${paid && repInCash() ? ` · +${eur(repNet(r))} · caisse ${eur(capital().dispo)}` : ''}`); }
   },
-  'rep-done': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { done: true, result: 'ok', date: today(), returned: false }))) toast('Réparé : le gain sera compté quand tu toucheras « Payé »'); },
+  'rep-done': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { done: true, result: 'ok', date: today(), returned: false, planDate: '' }))) toast('Réparé : le gain sera compté quand tu toucheras « Payé »'); },
   'rep-ret': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { returned: true, returnDate: today() }))) toast(repPaid(r) ? 'Rendu au client' : 'Rendu : touche « Payé » quand tu as l’argent'); },
   'rep-pay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { paid: true, paidDate: today() }))) toast(`Payé : +${eur(repNet(r))} de bénéfice${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); },
   'rep-del': async (a) => {
@@ -3034,6 +3308,7 @@ const ACT = {
     openForm('new', null, { category: a.dataset.cat || 'autre', model: g ? g.name : model, buyPrice: parseNum(val('s-price')), buyCosts: parseNum(val('s-costs')) });
   },
 };
+Object.assign(ACT, TOUR_ACT);
 
 function bind() {
   document.addEventListener('click', (e) => {
@@ -3070,10 +3345,16 @@ function bind() {
     renderSimu();
     if (it) $('#s-resale').focus();
   });
-  document.addEventListener('input', (e) => { if (e.target.id === 'r-total') e.target.dataset.touched = '1'; if (/^r-(qty|price|parts|total)$/.test(e.target.id)) repPreview(); if (e.target.id === 'ad-title') adCount(); });
+  document.addEventListener('input', (e) => {
+    if (e.target.id === 'd-paste') demFill();
+    if (/^d-(name|phone|addr|city|total)$/.test(e.target.id)) e.target.dataset.touched = '1';
+    if (e.target.id === 'r-total') e.target.dataset.touched = '1'; if (/^r-(qty|price|parts|total)$/.test(e.target.id)) repPreview(); if (e.target.id === 'ad-title') adCount(); });
   document.addEventListener('change', (e) => {
     if (e.target.id === 'r-type') { const p = repTypes().get(e.target.value.trim()); if (p != null) { $('#r-price').value = numIn(p); } repPreview(); }
     if (e.target.id === 'r-qty') repPreview();
+    if (e.target.id === 'd-qty') { e.target.dataset.touched = '1'; const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(e.target.value) || 1)); }
+    if (e.target.id === 'd-type') { const p = repTypes().get(e.target.value.trim()); const t = $('#d-total'); if (p != null && t && !t.dataset.touched) t.value = numIn(p * (Number(val('d-qty')) || 1)); }
+    if (e.target.id === 'r-picked') repSections();
     if (['r-done', 'r-ret', 'r-paid'].includes(e.target.id)) repSections();
     if (e.target.id === 'ad-ref') {
       LS.set('adRef', e.target.checked);
