@@ -612,7 +612,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '2b6a87e4599b';
+const APP_VERSION = 'b2a93221d7a2';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -962,7 +962,8 @@ function renderAccueil() {
 
   // Case « Inclure Réparo » : bénéfice revente + gain des réparations du mois
   const withRep = !!LS.get('heroReparo', false);
-  const repM = (ym) => sum(S.repairs.filter((r) => repDone(r) && (r.date || '').slice(0, 7) === ym), repNet);
+  // Réparo compte dans le bénéfice quand c'est payé, à la date du paiement
+  const repM = (ym) => sum(S.repairs.filter((r) => repPaid(r) && repPaidOn(r).slice(0, 7) === ym), repNet);
   const rm = repM(m), P = ms.profit + (withRep ? rm : 0), PP = pm.profit + (withRep ? repM(prevM) : 0);
   let deltaHtml;
   if (!pm.nSold && !ms.nSold) deltaHtml = `<span class="muted">Aucune vente en ${monthName(prevM)} ni en ${monthName(m)}.</span>`;
@@ -1059,7 +1060,7 @@ function renderAccueil() {
 
 function reparoStrip(m) {
   if (!S.repairs.length) return '';
-  const R = S.repairs.filter((r) => repDone(r) && (r.date || '').slice(0, 7) === m);
+  const R = S.repairs.filter((r) => repPaid(r) && repPaidOn(r).slice(0, 7) === m);
   return `<button class="strip rep" data-act="goto-reparo"><span><b>Réparo</b> · ${monthName(m)}</span><span><b>${sum(R, repQty)}</b> réparation${sum(R, repQty) > 1 ? 's' : ''}</span><span><b>${eurS(sum(R, repNet))}</b> gagnés</span>${ic('right')}</button>`;
 }
 
@@ -2096,15 +2097,16 @@ const statsTabs = () => `<div class="stabs" role="tablist">${[['revente', 'Reven
 
 function reparoHtml() {
   const all = S.repairs.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
-  const R = all.filter(repDone), open = all.filter((r) => repStage(r).k !== 'ok');
-  const cur = thisMonth(), Rm = R.filter((r) => (r.date || '').slice(0, 7) === cur);
+  // Comptées dans le bénéfice et les stats une fois payées, à la date du paiement
+  const R = all.filter(repPaid), open = all.filter((r) => repStage(r).k !== 'ok');
+  const cur = thisMonth(), Rm = R.filter((r) => repPaidOn(r).slice(0, 7) === cur);
   const nb = sum(R, repQty), ca = sum(R, repTotal), parts = sum(R, (r) => num(r.partsCost)), net = ca - parts;
-  const unpaid = sum(R.filter((r) => !repPaid(r)), repTotal), ko = R.filter((r) => r.result === 'ko').length;
+  const unpaid = sum(all.filter((r) => !repPaid(r)), repTotal), ko = R.filter((r) => r.result === 'ko').length;
   const head = `<div class="ttl-row"><div><div class="eyebrow">Prestations de réparation</div><h1 class="h1">Réparo</h1></div><button class="btn sm primary" data-act="rep-add">${ic('plus')} Prestation</button></div>`;
   if (!all.length) return head + `<section class="card"><p style="margin:0">Aucune prestation pour l’instant. Ajoute chaque réparation avec « Prestation » dès que tu récupères l’objet, puis coche réparé, rendu et payé au fil de l’eau.</p></section>`;
   const tiles = R.length ? [
     ['Réparations', String(nb), `${plural(R.length, 'prestation')}${ko ? ` · ${ko} échec${ko > 1 ? 's' : ''}` : ''}`, '', 'c-info'],
-    ['Facturé', eur(ca), unpaid ? `dont ${eur(unpaid)} pas encore payés` : 'tout est payé', '', 'c-info'],
+    ['Encaissé', eur(ca), unpaid ? `+ ${eur(unpaid)} pas encore payés` : 'tout est payé', '', 'c-info'],
     ['Gain net', eurS(net), parts ? `après ${eur(parts)} de pièces` : 'aucune pièce déduite', '', sign(net)],
     [`${monthName(cur)[0].toUpperCase()}${monthName(cur).slice(1)}`, eurS(sum(Rm, repNet)), `${sum(Rm, repQty)} réparation${sum(Rm, repQty) > 1 ? 's' : ''}`, '', sign(sum(Rm, repNet))],
     ['Prix moyen', eur(ca / nb), 'par réparation'],
@@ -2112,8 +2114,8 @@ function reparoHtml() {
   ] : [];
   const by = (key) => { const g = new Map(); R.forEach((r) => { const k = key(r); const x = g.get(k) || { n: 0, ca: 0, net: 0 }; x.n += repQty(r); x.ca += repTotal(r); x.net += repNet(r); g.set(k, x); }); return [...g.entries()]; };
   const types = by((r) => r.type || '?').sort((a, b) => b[1].net - a[1].net);
-  const months = by((r) => (r.date || '').slice(0, 7)).sort((a, b) => b[0].localeCompare(a[0]));
-  const table = (rows, first, lab) => `<div class="tbl-wrap"><table><thead><tr><th>${first}</th><th>Nb</th><th>Facturé</th><th>Gain</th></tr></thead><tbody>${rows.map(([k, x]) => `<tr><td>${esc(lab(k))}</td><td>${x.n}</td><td>${eur(x.ca)}</td><td><b class="${x.net < 0 ? 'neg' : 'pos'}">${eurS(x.net)}</b></td></tr>`).join('')}</tbody></table></div>`;
+  const months = by((r) => repPaidOn(r).slice(0, 7)).sort((a, b) => b[0].localeCompare(a[0]));
+  const table = (rows, first, lab) => `<div class="tbl-wrap"><table><thead><tr><th>${first}</th><th>Nb</th><th>Encaissé</th><th>Gain</th></tr></thead><tbody>${rows.map(([k, x]) => `<tr><td>${esc(lab(k))}</td><td>${x.n}</td><td>${eur(x.ca)}</td><td><b class="${x.net < 0 ? 'neg' : 'pos'}">${eurS(x.net)}</b></td></tr>`).join('')}</tbody></table></div>`;
   const steps = (r) => [isDate(r.gotDate) ? `récupéré ${dShort(r.gotDate)}` : '', repDone(r) && isDate(r.date) ? `${r.result === 'ko' ? 'échec' : 'réparé'} ${dShort(r.date)}` : '', r.returned !== false && isDate(r.returnDate) ? `rendu ${dShort(r.returnDate)}` : '', repPaid(r) && isDate(r.paidDate) ? `payé ${dShort(r.paidDate)}` : ''].filter(Boolean).join(' → ');
   const row = (r) => { const st = repStage(r); return `<div class="cl rp">
       <span class="d">${dShort(r.date || r.gotDate)}</span>
@@ -2125,7 +2127,7 @@ function reparoHtml() {
     ${open.length ? `<section class="card"><div class="card-h"><h2 class="sec">En cours</h2><span class="muted" style="font-size:12.5px">${plural(open.length, 'prestation')} à suivre</span></div><div>${open.map(row).join('')}</div></section>` : ''}
     ${tiles.length ? `<div class="tiles t4">${tiles.map(tileHtml).join('')}</div>` : ''}
     ${R.length ? `<section class="card"><div class="card-h"><h2 class="sec">Par type de prestation</h2></div>${table(types, 'Type', (k) => k)}</section>
-    <section class="card"><div class="card-h"><h2 class="sec">Par mois</h2><span class="muted" style="font-size:12.5px">date de réparation</span></div>${table(months, 'Mois', (k) => monthLabel(k))}</section>` : ''}
+    <section class="card"><div class="card-h"><h2 class="sec">Par mois</h2><span class="muted" style="font-size:12.5px">date de paiement</span></div>${table(months, 'Mois', (k) => monthLabel(k))}</section>` : ''}
     <section class="card"><div class="card-h"><h2 class="sec">Toutes les prestations</h2><span class="muted" style="font-size:12.5px">${plural(all.length, 'prestation')}</span></div><div>${all.map(row).join('')}</div></section>
     <section class="card"><label class="sw"><span class="sw-t"><b>Compter Réparo dans la caisse</b><small>L’argent reçu pour les réparations s’ajoute à l’argent disponible pour acheter, à la date du paiement</small></span><input type="checkbox" id="rep-cash" role="switch" ${repInCash() ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label></section>`;
 }
@@ -2895,9 +2897,9 @@ const ACT = {
     a.disabled = false;
     if (ok) { closeSheet(); toast(`Réparo : ${repStage(r).t}${paid && repInCash() ? ` · +${eur(repNet(r))} · caisse ${eur(capital().dispo)}` : ''}`); }
   },
-  'rep-done': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { done: true, result: 'ok', date: today(), returned: false }))) toast('Réparé : coche « Rendu » quand tu l’as rendu'); },
+  'rep-done': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { done: true, result: 'ok', date: today(), returned: false }))) toast('Réparé : le gain sera compté quand tu toucheras « Payé »'); },
   'rep-ret': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { returned: true, returnDate: today() }))) toast(repPaid(r) ? 'Rendu au client' : 'Rendu : touche « Payé » quand tu as l’argent'); },
-  'rep-pay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { paid: true, paidDate: today() }))) toast(`Payé : +${eur(repNet(r))}${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); },
+  'rep-pay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { paid: true, paidDate: today() }))) toast(`Payé : +${eur(repNet(r))} de bénéfice${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); },
   'rep-del': async (a) => {
     const id = a.dataset.id;
     if (S.confirmRep !== id) { S.confirmRep = id; render(); setTimeout(() => { if (S.confirmRep === id) { S.confirmRep = null; render(); } }, 5000); return; }
