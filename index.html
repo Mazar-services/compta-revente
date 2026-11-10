@@ -623,7 +623,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '2dc4d6044c6f';
+const APP_VERSION = '89a5c2454b24';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2126,7 +2126,9 @@ function reparoHtml() {
     ['Gain moyen', eurS(net / R.length), 'par prestation', '', sign(net)],
   ] : [];
   const by = (key) => { const g = new Map(); R.forEach((r) => { const k = key(r); const x = g.get(k) || { n: 0, ca: 0, net: 0 }; x.n += repQty(r); x.ca += repTotal(r); x.net += repNet(r); g.set(k, x); }); return [...g.entries()]; };
-  const types = by((r) => r.type || '?').sort((a, b) => b[1].net - a[1].net);
+  // Même prestation écrite avec d'autres majuscules ou accents : regroupée
+  const lbl = new Map(); R.forEach((r) => { const k = norm(r.type || '?'); if (!lbl.has(k)) lbl.set(k, r.type || '?'); });
+  const types = by((r) => lbl.get(norm(r.type || '?'))).sort((a, b) => b[1].net - a[1].net);
   const months = by((r) => repPaidOn(r).slice(0, 7)).sort((a, b) => b[0].localeCompare(a[0]));
   const table = (rows, first, lab) => `<div class="tbl-wrap"><table><thead><tr><th>${first}</th><th>Nb</th><th>Encaissé</th><th>Gain</th></tr></thead><tbody>${rows.map(([k, x]) => `<tr><td>${esc(lab(k))}</td><td>${x.n}</td><td>${eur(x.ca)}</td><td><b class="${x.net < 0 ? 'neg' : 'pos'}">${eurS(x.net)}</b></td></tr>`).join('')}</tbody></table></div>`;
   const steps = (r) => [isDate(r.gotDate) ? `récupéré ${dShort(r.gotDate)}` : '', repDone(r) && isDate(r.date) ? `${r.result === 'ko' ? 'échec' : 'réparé'} ${dShort(r.date)}` : '', r.returned !== false && isDate(r.returnDate) ? `rendu ${dShort(r.returnDate)}` : '', repPaid(r) && isDate(r.paidDate) ? `payé ${dShort(r.paidDate)}` : ''].filter(Boolean).join(' → ');
@@ -2702,7 +2704,8 @@ function openAd(id, focus) {
 function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el.textContent = `(${t.value.length} caractères)`; }
 
 /* ---------- Tournée : demandes clients, ordre de passage Saint-Égrève → Crolles, messages prêts ---------- */
-const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', stop: 12, p1: 25, p2: 45, delai: '24-48 h', garantie: '30 jours' };
+const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', stop: 12,
+  services: 'Joystick drift (manette PS5) : 25 € (45 € les deux)\nManette PS5 : 25 € (bouton, gâchette, autre panne)\nPS5 nettoyage liquide métal : 70 € (surchauffe, bruit)\nHDMI PS5 : sur devis (port HDMI abîmé)', p1: 25, p2: 45, delai: '24-48 h', garantie: '30 jours' };
 const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
 // Communes dans l'ordre où on les traverse en rentrant de Saint-Égrève à Crolles (A480, rocade sud, A41)
 const ROUTE_RANK = [
@@ -2771,7 +2774,34 @@ function parseDemande(txt) {
   r.name = r.name ? r.name[0].toUpperCase() + r.name.slice(1) : '';
   return r;
 }
-const tourPrice = (q) => { const c = tourCfg(); return q === 1 ? num(c.p1) : q === 2 ? num(c.p2) : q * num(c.p1) - 5 * (q - 1); };
+// Prestations proposées (Réglages de la tournée) : « Nom : 25 € … » par ligne
+const services = () => String(tourCfg().services || '').split('\n').map((l) => l.trim().replace(/^[-•]\s*/, '')).filter(Boolean).map((l) => {
+  const m = l.match(/^(.+?)\s*:\s*(.*)$/); const name = m ? m[1].trim() : l, rest = m ? m[2] : '';
+  const pm = rest.match(/(\d+(?:[.,]\d+)?)\s*€/); return { name, line: l, price: pm ? parseNum(pm[1]) : null };
+});
+// Devine la prestation d'après le message du client
+function guessService(txt) {
+  const t = norm(txt || ''), S2 = services();
+  const pick = (re) => S2.find((s) => re.test(norm(s.name)));
+  if (/hdmi/.test(t)) return pick(/hdmi/);
+  if (/liquide|nettoy|surchauf|chauffe|bruit|ventil|souffl/.test(t)) return pick(/nettoy|liquide/);
+  if (/drift|joystick|stick|derive|bouge tout seul/.test(t)) return pick(/drift/);
+  if (/manette|bouton|gachette|r2|l2|batterie/.test(t)) return S2.find((s) => /manette/.test(norm(s.name)) && !/drift|joystick/.test(norm(s.name)));
+  return null;
+}
+// Le bon mot selon ce qu'on répare : manette, console, téléphone…
+function objWord(r) {
+  const t = norm(r.type || ''), n = repQty(r);
+  const o = /manette|joystick|drift|dualsense|joy ?con/.test(t) ? ['manette', 'f'] : /console|ps5|ps4|switch|xbox|hdmi|liquide|nettoy/.test(t) ? ['console', 'f'] : /iphone|telephone|samsung|vitre|ecran|smartphone/.test(t) ? ['téléphone', 'm'] : ['appareil', 'm'];
+  const f = o[1] === 'f';
+  return n > 1 ? { ta: `tes ${n} ${o[0]}s`, Ta: `Tes ${o[0]}s`, la: 'les', pret: f ? 'prêtes' : 'prêts', rep: f ? 'réparées' : 'réparés', sont: 'sont' }
+    : { ta: `${f ? 'ta' : 'ton'} ${o[0]}`, Ta: `${f ? 'Ta' : 'Ton'} ${o[0]}`, la: f ? 'la' : 'le', pret: f ? 'prête' : 'prêt', rep: f ? 'réparée' : 'réparé', sont: 'est' };
+}
+const tourPrice = (q, type) => {
+  const c = tourCfg(), sv = services().find((s) => s.name === type), drift = !type || /drift|joystick/i.test(type);
+  if (sv && !drift) return sv.price != null ? sv.price * q : 0; // « sur devis » : à remplir
+  return q === 1 ? num(c.p1) : q === 2 ? num(c.p2) : q * num(c.p1) - 5 * (q - 1);
+};
 const hm = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}h${String(m % 60).padStart(2, '0')}`;
 const toMin = (s) => { const [h, m] = String(s || '19:45').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
 const tourDay = () => (S.tourDay === 'demain' ? addDays(today(), 1) : today());
@@ -2806,16 +2836,17 @@ function tourStops(D) {
 const firstName = (r) => (r.client || '').split(/\s+/)[0] || '';
 function tourMsg(kind, r, s) {
   r = r || {};
-  const c = tourCfg(), nm = firstName(r), hi = nm ? `Salut ${nm} ! ` : 'Salut ! ', amt = eur(repTotal(r));
+  const c = tourCfg(), nm = firstName(r), hi = nm ? `Salut ${nm} ! ` : 'Salut ! ', amt = repTotal(r) > 0 ? eur(repTotal(r)) : 'sur devis';
   const when = s ? `entre ${hm(s.from)} et ${hm(s.to)}` : '';
   const soir = s && tourDay() !== today() ? 'demain soir' : 'ce soir';
-  if (kind === 'reply') return `Salut ! Réparation drift manette PS5 : ${eur(num(c.p1))} (2 manettes : ${eur(num(c.p2))}). Je passe la récupérer devant chez toi et je te la ramène réparée sous ${c.delai}, garantie ${c.garantie}.\nEnvoie-moi : ton prénom, ton numéro, ton adresse complète, le nombre de manettes et le problème.\nJe passe dès ce soir si c'est bon pour toi.`;
-  if (kind === 'confirm') return `${hi}C'est noté ! Je passe récupérer ${repQty(r) > 1 ? `tes ${repQty(r)} manettes` : 'ta manette'} devant chez toi ${r.planDate && r.planDate !== today() ? (r.planDate === addDays(today(), 1) ? 'demain soir' : 'le ' + dShort(r.planDate) + ' au soir') : 'ce soir'} ${plage()}. Je t'envoie un message 10 min avant d'arriver. Tarif : ${amt}, à payer au retour.`;
-  if (kind === 'pick') return `${hi}C'est bon pour ${soir} : je passe récupérer ${repQty(r) > 1 ? `tes ${repQty(r)} manettes` : 'ta manette'} devant chez toi ${when}. Je t'envoie un message 10 min avant. Tarif : ${amt}, à payer au retour.`;
-  if (kind === 'ret') return `${hi}${repQty(r) > 1 ? 'Tes manettes sont réparées' : 'Ta manette est réparée'} ! Je te ${repQty(r) > 1 ? 'les' : 'la'} ramène ${soir} ${when}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`;
+  if (kind === 'reply') return `Salut ! Voici mes réparations :\n${services().map((s) => '- ' + s.line).join('\n')}\nJe passe récupérer devant chez toi et je te ramène tout réparé sous ${c.delai}, garantie ${c.garantie}.\nEnvoie-moi : ton prénom, ton numéro, ton adresse complète, ce qu'il faut réparer (et combien de manettes).\nJe passe dès ce soir si c'est bon pour toi.`;
+  const w = objWord(r);
+  if (kind === 'confirm') return `${hi}C'est noté ! Je passe récupérer ${w.ta} devant chez toi ${r.planDate && r.planDate !== today() ? (r.planDate === addDays(today(), 1) ? 'demain soir' : 'le ' + dShort(r.planDate) + ' au soir') : 'ce soir'} ${plage()}. Je t'envoie un message 10 min avant d'arriver. Tarif : ${amt}, à payer au retour.`;
+  if (kind === 'pick') return `${hi}C'est bon pour ${soir} : je passe récupérer ${w.ta} devant chez toi ${when}. Je t'envoie un message 10 min avant. Tarif : ${amt}, à payer au retour.`;
+  if (kind === 'ret') return `${hi}${w.Ta} ${w.sont} ${w.rep} ! Je te ${w.la} ramène ${soir} ${when}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`;
   if (kind === 'late') return `${hi}Petit retard ${soir}, désolé : je passe plutôt ${when}. Je t'envoie un message 10 min avant.`;
   if (kind === 'eta') return `J'arrive dans 10 min, tu peux descendre ?`;
-  if (kind === 'ready') return `${hi}${repQty(r) > 1 ? 'Tes manettes sont prêtes' : 'Ta manette est prête'} ! Je te ${repQty(r) > 1 ? 'les' : 'la'} ramène ${nowMin() < toMin(c.end || '21:00') - 30 ? 'ce soir' : 'demain soir'} ${plage()}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`;
+  if (kind === 'ready') return `${hi}${w.Ta} ${w.sont} ${w.pret} ! Je te ${w.la} ramène ${nowMin() < toMin(c.end || '21:00') - 30 ? 'ce soir' : 'demain soir'} ${plage()}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`;
   if (kind === 'thanks') return `${hi}Merci pour ta confiance ! Ta réparation est garantie ${c.garantie}, si le moindre souci revient, écris-moi. Et si tu es content, un petit partage ou un avis sur TikTok m'aide énormément.`;
   return '';
 }
@@ -2866,7 +2897,7 @@ function renderTournee() {
       : `<p style="margin:0">Aucun arrêt ${D === today() ? 'ce soir' : 'demain'}. Ajoute une demande dès qu'un client t'écrit : elle va dans la tournée de ce soir (ou de demain si tu le choisis), à la bonne place sur ton trajet.</p>`}
     </section>
     ${stops.map(card).join('')}
-    <section class="card"><div class="card-h"><h2 class="sec">Atelier</h2><span class="muted" style="font-size:12.5px">${plural(sum(atelier, repQty), 'manette')} à réparer</span></div>
+    <section class="card"><div class="card-h"><h2 class="sec">Atelier</h2><span class="muted" style="font-size:12.5px">${sum(atelier, repQty)} à réparer</span></div>
       ${atelier.length ? atelier.map((r) => `<div class="cl rp"><span class="d">${dShort(r.gotDate || r.date)}</span><span class="t">${esc(r.client || 'Client')} · ${esc(r.type)} ×${repQty(r)}<small>${esc(r.city || '')}</small></span><span class="a"><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></span></div>`).join('')
         + (atelier.length > 1 ? `<div class="btns" style="margin-top:8px"><button class="btn sm" data-act="rep-ready-all">Tout est réparé</button></div>` : '') : '<p class="muted" style="margin:0">Rien à réparer pour l’instant.</p>'}
     </section>
@@ -2877,7 +2908,7 @@ function renderTournee() {
 }
 
 function openDemande() {
-  const T = repTypes(), last = [...T.keys()].find((t) => /drift/i.test(t)) || [...T.keys()].pop();
+  const T = repTypes(), sv = services(), last = (sv[0] && sv[0].name) || [...T.keys()].find((t) => /drift/i.test(t)) || [...T.keys()].pop();
   openSheet({ kind: 'dem', title: 'Nouvelle demande', body: `
     <div class="field"><label for="d-paste">Colle ici le message du client</label><textarea id="d-paste" class="inp" rows="4" placeholder="Ex. : Yanis, 06 12 34 56 78, 12 rue des Alpes 38400 Saint-Martin-d’Hères, 2 manettes qui driftent"></textarea>
       <div class="btns" style="margin-top:6px"><button class="btn sm" data-act="dem-pastebtn">${ic('copy')} Coller depuis le presse-papiers</button></div>
@@ -2885,8 +2916,8 @@ function openDemande() {
     <div class="row2">${textF('d-name', 'Prénom', '', 'Prénom ou pseudo')}${textF('d-phone', 'Téléphone', '', '06 …', 'inputmode="tel"')}</div>
     ${textF('d-addr', 'Adresse', '', 'n° et rue')}
     <div class="row2"><div class="field"><label for="d-city">Commune</label><input id="d-city" class="inp" list="dl-city" autocomplete="off"><datalist id="dl-city">${CITIES.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
-      <div class="field"><label for="d-qty">Manettes</label><span class="selw" style="display:block"><select id="d-qty" class="inp">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}">${n}</option>`).join('')}</select></span></div></div>
-    <div class="row2"><div class="field"><label for="d-type">Prestation</label><input id="d-type" class="inp" list="dl-rep2" autocomplete="off" value="${esc(last)}"><datalist id="dl-rep2">${[...T.keys()].map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>${moneyF('d-total', 'Prix total', tourPrice(1))}</div>
+      <div class="field"><label for="d-qty">Nombre</label><span class="selw" style="display:block"><select id="d-qty" class="inp">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}">${n}</option>`).join('')}</select></span></div></div>
+    <div class="row2"><div class="field"><label for="d-type">Prestation</label><input id="d-type" class="inp" list="dl-rep2" autocomplete="off" value="${esc(last)}"><datalist id="dl-rep2">${[...new Set([...sv.map((s) => s.name), ...T.keys()])].map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>${moneyF('d-total', 'Prix total', tourPrice(1))}</div>
     <div class="field"><span class="lbl">Passage</span>${radios('d-when', [['soir', 'Ce soir'], ['demain', 'Demain soir']], 'soir', 'opts seg2')}</div>
     ${textF('d-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. urgent, manette blanche, mineur : n° parent')}
     <p class="hint">« Ajouter et envoyer » enregistre le client et ouvre le message de confirmation (passage ${plage()}) : un seul geste.</p>`,
@@ -2900,12 +2931,14 @@ function demFill() {
   if (known) { [['d-name', known.client], ['d-addr', known.address], ['d-city', known.city]].forEach(([id, v]) => { const x = $('#' + id); if (x && !x.value && v) x.value = v; }); toast(`Client connu : ${known.client || p.phone}`); }
   if (p.when) { const w = $(`input[name="d-when"][value="${p.when}"]`); if (w) w.checked = true; }
   if (p.note) { const n = $('#d-note'); if (n && !n.value) n.value = p.note; }
-  const q = $('#d-qty'); if (q && !q.dataset.touched) { q.value = String(p.qty); const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(p.qty)); }
+  const gs = guessService(val('d-paste')), ty = $('#d-type');
+  if (gs && ty && !ty.dataset.touched) ty.value = gs.name;
+  const q = $('#d-qty'); if (q && !q.dataset.touched) { q.value = String(p.qty); const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(p.qty, val('d-type'))); }
 }
 async function demSave(a) {
   clearErrs();
   const qty = Number(val('d-qty')) || 1, T = repTypes(), type = val('d-type').trim() || 'Joystick drift (manette PS5)';
-  const total = parseNum(val('d-total')) ?? tourPrice(qty);
+  const total = parseNum(val('d-total')) ?? tourPrice(qty, type);
   const r = { type, qty, unitPrice: num(T.get(type)) || num(tourCfg().p1), total, partsCost: 0, client: val('d-name').trim(), phone: val('d-phone').trim(), address: val('d-addr').trim(), city: val('d-city').trim(), note: val('d-note').trim(),
     picked: false, gotDate: '', done: false, result: '', returned: false, returnDate: '', paid: false, paidDate: '', planDate: radioVal('d-when') === 'demain' ? addDays(today(), 1) : today() };
   r.date = r.planDate;
@@ -2932,8 +2965,9 @@ function openTourCfg() {
     <div class="row2">${textF('t-from', 'Départ', c.from)}${textF('t-to', 'Arrivée (domicile)', c.to)}</div>
     <div class="row2"><div class="field"><label for="t-start">Heure de départ</label><input id="t-start" class="inp" type="time" value="${esc(c.start)}"></div><div class="field"><label for="t-stop">Minutes par arrêt</label><input id="t-stop" class="inp" inputmode="numeric" value="${esc(String(c.stop))}"></div></div>
     <div class="row2"><div class="field"><label for="t-end">Fin de tournée habituelle</label><input id="t-end" class="inp" type="time" value="${esc(c.end || '21:00')}"></div>${textF('t-delai', 'Délai annoncé', c.delai)}</div>
-    <div class="row2">${moneyF('t-p1', 'Tarif 1 manette', c.p1)}${moneyF('t-p2', 'Tarif 2 manettes', c.p2)}</div>
+    <div class="row2">${moneyF('t-p1', 'Drift : 1 manette', c.p1)}${moneyF('t-p2', 'Drift : 2 manettes', c.p2)}</div>
     ${textF('t-gar', 'Garantie', c.garantie)}
+    <div class="field"><label for="t-serv">Tes prestations et prix (une par ligne, « Nom : prix »)</label><textarea id="t-serv" class="inp" rows="5">${esc(c.services || '')}</textarea><small class="hint">Elles apparaissent dans la réponse type et dans la liste « Prestation » des demandes.</small></div>
     <p class="hint">Les clients reçoivent la plage « entre l'heure de départ et la fin de tournée » dès que tu les ajoutes. Ces infos remplissent tous les messages.</p>`,
     foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="tour-cfg-save">Enregistrer</button>` });
 }
@@ -2964,7 +2998,7 @@ const TOUR_ACT = {
   'tour-cfg': () => openTourCfg(),
   'tour-cfg-save': async (a) => {
     const t = { from: val('t-from').trim() || TOUR_DEF.from, to: val('t-to').trim() || TOUR_DEF.to, start: val('t-start') || TOUR_DEF.start, stop: Math.max(3, parseInt(val('t-stop'), 10) || 12), end: val('t-end') || TOUR_DEF.end,
-      p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie };
+      p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie, services: $('#t-serv').value.trim() || TOUR_DEF.services };
     a.disabled = true; const ok = await write(() => saveSettingsData({ ...S.settings, tour: t })); a.disabled = false;
     if (ok) { closeSheet(); toast('Réglages de la tournée enregistrés'); }
   },
@@ -3378,8 +3412,8 @@ function bind() {
   document.addEventListener('change', (e) => {
     if (e.target.id === 'r-type') { const p = repTypes().get(e.target.value.trim()); if (p != null) { $('#r-price').value = numIn(p); } repPreview(); }
     if (e.target.id === 'r-qty') repPreview();
-    if (e.target.id === 'd-qty') { e.target.dataset.touched = '1'; const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(e.target.value) || 1)); }
-    if (e.target.id === 'd-type') { const p = repTypes().get(e.target.value.trim()); const t = $('#d-total'); if (p != null && t && !t.dataset.touched) t.value = numIn(p * (Number(val('d-qty')) || 1)); }
+    if (e.target.id === 'd-qty') { e.target.dataset.touched = '1'; const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(e.target.value) || 1, val('d-type'))); }
+    if (e.target.id === 'd-type') { e.target.dataset.touched = '1'; const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(val('d-qty')) || 1, e.target.value.trim())); }
     if (e.target.id === 'r-picked') repSections();
     if (['r-done', 'r-ret', 'r-paid'].includes(e.target.id)) repSections();
     if (e.target.id === 'ad-ref') {
