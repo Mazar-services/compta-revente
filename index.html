@@ -623,7 +623,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '91efd4de5607';
+const APP_VERSION = '81c09fcda067';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2135,7 +2135,7 @@ function reparoHtml() {
   const row = (r) => { const st = repStage(r); return `<div class="cl rp">
       <span class="d">${dShort(r.date || r.gotDate)}</span>
       <span class="t">${esc(r.type)}${repQty(r) > 1 ? ` <b>×${repQty(r)}</b>` : ''} <span class="pill rp-${st.k}">${st.t}</span><small>${steps(r) ? steps(r) + ' · ' : ''}${eur(num(r.unitPrice))} l’unité${repTotal(r) < repQty(r) * num(r.unitPrice) - 0.004 ? ` · payé ${eur(repTotal(r))} (remise ${eur(repQty(r) * num(r.unitPrice) - repTotal(r))})` : ''}${num(r.partsCost) ? ` · pièces ${eur(num(r.partsCost))}` : ''}${r.client ? ' · ' + esc(r.client) : ''}${r.note ? ' · ' + esc(r.note) : ''}</small>
-        <span class="rp-act">${st.next ? `<button class="btn sm primary" data-act="${st.next[0]}" data-id="${esc(r.id)}">${st.next[1]}</button>` : ''}<button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button><button class="xbtn ${S.confirmRep === r.id ? 'on' : ''}" data-act="rep-del" data-id="${esc(r.id)}">${S.confirmRep === r.id ? 'Confirmer la suppression' : 'Supprimer'}</button></span></span>
+        <span class="rp-act">${st.next ? `<button class="btn sm primary" data-act="${st.next[0]}" data-id="${esc(r.id)}">${st.next[1]}</button>` : ''}<button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button><button class="btn sm" data-act="rep-copy" data-id="${esc(r.id)}">Dupliquer</button><button class="xbtn ${S.confirmRep === r.id ? 'on' : ''}" data-act="rep-del" data-id="${esc(r.id)}">${S.confirmRep === r.id ? 'Confirmer la suppression' : 'Supprimer'}</button></span></span>
       <span class="a"><b class="${repPaid(r) ? 'in' : ''}">${eurS(repNet(r))}</b>${!repPaid(r) ? '<small>à encaisser</small>' : num(r.partsCost) ? `<small>facturé ${eur(repTotal(r))}</small>` : ''}</span>
     </div>`; };
   return head + `
@@ -2887,7 +2887,7 @@ function renderTournee() {
         ${pick ? `<button class="btn sm primary" data-act="rep-pick" data-id="${esc(r.id)}">Récupéré</button>` : `<button class="btn sm primary" data-act="rep-retpay" data-id="${esc(r.id)}">Rendu + payé</button><button class="btn sm" data-act="rep-ret" data-id="${esc(r.id)}">Rendu, pas payé</button>`}
         <button class="btn sm" data-act="tour-later" data-id="${esc(r.id)}">Demain</button>
         <button class="iconbtn sm" data-act="tour-mv" data-d="-1" data-id="${esc(r.id)}" aria-label="Monter">↑</button><button class="iconbtn sm" data-act="tour-mv" data-d="1" data-id="${esc(r.id)}" aria-label="Descendre">↓</button>
-        <button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button>
+        <button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button><button class="btn sm" data-act="rep-copy" data-id="${esc(r.id)}">Dupliquer</button>
       </div></div>`;
   };
   el.innerHTML = `
@@ -3201,15 +3201,17 @@ function syncLabel() {
 
 /* ---------- Navigation et rendu ---------- */
 const VIEWS = ['accueil', 'articles', 'simulateur', 'stats', 'tournee'];
-function openRep(id) {
+function openRep(id, copyOf) {
   const T = repTypes(), last = [...T.keys()].pop(), r = id ? S.repairs.find((x) => x.id === id) : null;
-  const v = r || { type: last, qty: 1, unitPrice: T.get(last), gotDate: today(), done: false, returned: false, paid: false };
+  const src = copyOf ? S.repairs.find((x) => x.id === copyOf) : null;
+  // copie : même prestation, même prix, même suivi ; les infos du client sont vidées (nouveau client)
+  const v = r || (src && { ...src, client: '', phone: '', address: '', city: '', note: '' }) || { type: last, qty: 1, unitPrice: T.get(last), gotDate: today(), done: false, returned: false, paid: false };
   const done = repDone(v), ret = v.returned !== false, paid = repPaid(v);
   const sw = (id2, on, label, hint) => `<label class="sw"><span class="sw-t"><b>${label}</b><small>${hint}</small></span><input type="checkbox" id="${id2}" role="switch" ${on ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>`;
-  openSheet({ kind: 'rep', id, title: r ? 'Modifier la prestation' : 'Prestation Réparo', body: `
+  openSheet({ kind: 'rep', id, title: r ? 'Modifier la prestation' : src ? 'Copie de la prestation' : 'Prestation Réparo', body: `
     <div class="field"><label for="r-type">Type de prestation</label><input id="r-type" class="inp" list="dl-rep" autocomplete="off" value="${esc(v.type)}" placeholder="ex. Joystick drift, nettoyage, HDMI…"><datalist id="dl-rep">${[...T.keys()].map((t) => `<option value="${esc(t)}">`).join('')}</datalist>${errSlot('r-type')}</div>
     <div class="row2"><div class="field"><label for="r-qty">Nombre</label><span class="selw" style="display:block"><select id="r-qty" class="inp">${[1, 2, 3, 4, 5, 6, 8, 10].map((n) => `<option value="${n}" ${n === repQty(v) ? 'selected' : ''}>${n}</option>`).join('')}</select></span></div>${moneyF('r-price', 'Prix par unité', v.unitPrice)}</div>
-    ${moneyF('r-total', 'Prix total payé par le client', r ? repTotal(r) : v.unitPrice, 'Modifie-le si tu as fait un prix (ex. 35 € les deux au lieu de 40 €)')}
+    ${moneyF('r-total', 'Prix total payé par le client', r || src ? repTotal(r || src) : v.unitPrice, 'Modifie-le si tu as fait un prix (ex. 35 € les deux au lieu de 40 €)')}
     <div class="fs"><p class="fs-t">Suivi</p>
       ${sw('r-picked', v.picked !== false, 'Objet récupéré', 'Décoche si tu dois encore passer le chercher (il apparaît alors dans la Tournée)')}
       <div id="r-sec-pick" class="sub">${dateF('r-got', 'Objet récupéré le', isDate(v.gotDate) ? v.gotDate : isDate(v.date) ? v.date : today())}</div>
@@ -3218,15 +3220,16 @@ function openRep(id) {
       <div id="r-wrap-ret">${sw('r-ret', ret && done, 'Rendu au client', 'L’objet est reparti chez le client')}
       <div id="r-sec-ret" class="sub">${dateF('r-retDate', 'Rendu le', isDate(v.returnDate) ? v.returnDate : today())}</div></div></div>
       ${sw('r-paid', paid, 'Argent reçu', 'L’argent entre dans la caisse à cette date')}
-      <div id="r-sec-paid" class="sub">${dateF('r-paidDate', 'Payé le', isDate(v.paidDate) ? v.paidDate : r && repPaid(r) ? v.date : today())}</div>
+      <div id="r-sec-paid" class="sub">${dateF('r-paidDate', 'Payé le', isDate(v.paidDate) ? v.paidDate : (r || src) && repPaid(r || src) ? v.date : today())}</div>
     </div>
     <div class="row2">${moneyF('r-parts', 'Pièces achetées <span class="opt-l">(facultatif)</span>', num(v.partsCost) || null)}${textF('r-client', 'Client <span class="opt-l">(facultatif)</span>', v.client || '', 'Prénom, pseudo…')}</div>
     <div class="row2">${textF('r-phone', 'Téléphone <span class="opt-l">(facultatif)</span>', v.phone || '', '06 …', 'inputmode="tel"')}${textF('r-city', 'Commune <span class="opt-l">(facultatif)</span>', v.city || '', 'ex. Meylan')}</div>
     ${textF('r-addr', 'Adresse <span class="opt-l">(pour la tournée)</span>', v.address || '', 'n° et rue')}
     ${textF('r-note', 'Note <span class="opt-l">(facultatif)</span>', v.note || '', 'ex. modules Hall, manette blanche…')}
     <p class="preview" id="r-prev"></p>`,
-    foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="rep-save" ${id ? `data-id="${esc(id)}"` : ''}>Enregistrer</button>` });
-  if (r) $('#r-total').dataset.touched = '1';
+    foot: `<button class="btn" data-act="close">Annuler</button>${r ? `<button class="btn" data-act="rep-copy" data-id="${esc(id)}">Dupliquer</button>` : ''}<button class="btn primary grow" data-act="rep-save" ${id ? `data-id="${esc(id)}"` : ''}>${src ? 'Créer la copie' : 'Enregistrer'}</button>` });
+  if (r || src) $('#r-total').dataset.touched = '1';
+  if (src) setTimeout(() => { const c = $('#r-client'); if (c) c.focus(); }, 60);
   repSections(); repPreview();
 }
 function repSections() {
@@ -3277,6 +3280,7 @@ const ACT = {
   'goto-reparo': () => { S.statsTab = 'reparo'; LS.set('statsTab', 'reparo'); setView('stats'); },
   'rep-add': () => openRep(null),
   'rep-edit': (a) => openRep(a.dataset.id),
+  'rep-copy': (a) => openRep(null, a.dataset.id),
   'rep-save': async (a) => {
     clearErrs();
     const id = a.dataset.id || null, old = id ? S.repairs.find((x) => x.id === id) : null;
