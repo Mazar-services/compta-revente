@@ -623,7 +623,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '941e266fb383';
+const APP_VERSION = 'd463e295ec86';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2705,7 +2705,7 @@ function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el
 
 /* ---------- Tournée : demandes clients, ordre de passage Saint-Égrève → Crolles, messages prêts ---------- */
 const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', stop: 12,
-  services: 'Joystick drift (manette PS5) : 25 € (45 € les deux)\nManette PS5 : 25 € (bouton, gâchette, autre panne)\nPS5 nettoyage liquide métal : 70 € (surchauffe, bruit)\nHDMI PS5 : sur devis (port HDMI abîmé)', p1: 25, p2: 45, delai: '24-48 h', garantie: '30 jours' };
+  services: 'Joystick drift (manette PS5) : 25 € (50 € les deux, 20 € la manette à partir de la 3e)\nJoystick drift (manette Xbox) : 25 € (mêmes tarifs que PS5)\nJoysticks à effet Hall (plus jamais de drift) : 45 € la manette\nManette PS5 : 25 € (bouton, gâchette, port de charge, batterie : à partir de 20 €)\nPS5 nettoyage simple : 40 € (poussière, ventilateur)\nPS5 nettoyage liquide métal : 80 € (surchauffe, bruit, nettoyage complet)\nHDMI PS5 : 75 € (port HDMI remplacé)\nTéléphone (batterie, écran, vitre arrière) : sur devis\nDiagnostic : gratuit si tu répares, 15 € sinon', p1: 25, p2: 50, delai: '24-48 h', garantie: '30 jours' };
 const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
 // Communes dans l'ordre où on les traverse en rentrant de Saint-Égrève à Crolles (A480, rocade sud, A41)
 const ROUTE_RANK = [
@@ -2784,7 +2784,11 @@ function guessService(txt) {
   const t = norm(txt || ''), S2 = services();
   const pick = (re) => S2.find((s) => re.test(norm(s.name)));
   if (/hdmi/.test(t)) return pick(/hdmi/);
-  if (/liquide|nettoy|surchauf|chauffe|bruit|ventil|souffl/.test(t)) return pick(/nettoy|liquide/);
+  if (/iphone|telephone|samsung|ecran casse|batterie.*(iphone|tel)|vitre|smartphone|xiaomi|redmi|pixel/.test(t)) return pick(/telephone/);
+  if (/hall/.test(t)) return pick(/hall/);
+  if (/xbox/.test(t) && /drift|joystick|stick|derive/.test(t)) return pick(/xbox/);
+  if (/liquide|surchauf|chauffe|bruit|ventil|souffl/.test(t)) return pick(/liquide/) || pick(/nettoy/);
+  if (/nettoy|poussiere/.test(t)) return pick(/nettoyage simple/) || pick(/nettoy/);
   if (/drift|joystick|stick|derive|bouge tout seul/.test(t)) return pick(/drift/);
   if (/bouton|gachette|r2|l2|batterie|charge|vibr/.test(t)) return S2.find((s) => /manette/.test(norm(s.name)) && !/drift|joystick/.test(norm(s.name)));
   return null;
@@ -2792,15 +2796,17 @@ function guessService(txt) {
 // Le bon mot selon ce qu'on répare : manette, console, téléphone…
 function objWord(r) {
   const t = norm(r.type || ''), n = repQty(r);
-  const o = /manette|joystick|drift|dualsense|joy ?con/.test(t) ? ['manette', 'f'] : /console|ps5|ps4|switch|xbox|hdmi|liquide|nettoy/.test(t) ? ['console', 'f'] : /iphone|telephone|samsung|vitre|ecran|smartphone/.test(t) ? ['téléphone', 'm'] : ['appareil', 'm'];
+  const o = /manette|joystick|drift|dualsense|joy ?con|hall/.test(t) ? ['manette', 'f'] : /console|ps5|ps4|switch|xbox|hdmi|liquide|nettoy/.test(t) ? ['console', 'f'] : /iphone|telephone|samsung|vitre|ecran|smartphone/.test(t) ? ['téléphone', 'm'] : ['appareil', 'm'];
   const f = o[1] === 'f';
   return n > 1 ? { ta: `tes ${n} ${o[0]}s`, Ta: `Tes ${o[0]}s`, la: 'les', pret: f ? 'prêtes' : 'prêts', rep: f ? 'réparées' : 'réparés', sont: 'sont' }
     : { ta: `${f ? 'ta' : 'ton'} ${o[0]}`, Ta: `${f ? 'Ta' : 'Ton'} ${o[0]}`, la: f ? 'la' : 'le', pret: f ? 'prête' : 'prêt', rep: f ? 'réparée' : 'réparé', sont: 'est' };
 }
 const tourPrice = (q, type) => {
-  const c = tourCfg(), sv = services().find((s) => s.name === type), drift = !type || /drift|joystick/i.test(type);
+  const c = tourCfg(), sv = services().find((s) => s.name === type), drift = !type || (/drift|joystick/i.test(type) && !/hall/i.test(type));
+  if (sv && /diagnostic/i.test(sv.name)) return 0;
   if (sv && !drift) return sv.price != null ? sv.price * q : 0; // « sur devis » : à remplir
-  return q === 1 ? num(c.p1) : q === 2 ? num(c.p2) : q * num(c.p1) - 5 * (q - 1);
+  // Drift : 1 = tarif 1, 2 = tarif 2, puis 20 € par manette à partir de la 3e
+  return q === 1 ? num(c.p1) : q === 2 ? num(c.p2) : num(c.p2) + (q - 2) * Math.max(0, num(c.p1) - 5);
 };
 const hm = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}h${String(m % 60).padStart(2, '0')}`;
 const toMin = (s) => { const [h, m] = String(s || '19:45').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
