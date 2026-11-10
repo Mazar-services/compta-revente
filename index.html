@@ -623,7 +623,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'd49e2fa2812b';
+const APP_VERSION = '2dc4d6044c6f';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2756,6 +2756,18 @@ function parseDemande(txt) {
     const cand = lines.find((l) => !/\d/.test(l) && l.split(/\s+/).length <= 2 && l.length <= 24 && !/manette|drift|bonjour|salut|slt|hello|merci|ok|adresse/i.test(l));
     if (cand) r.name = cand.replace(/[,.!]/g, '');
   }
+  // Demande venue du formulaire : lignes « Champ : valeur », plus fiables que tout le reste
+  const lab = {};
+  lines.forEach((l) => { const m = l.match(/^\s*([A-Za-zÀ-ÿ' ]{3,20})\s*[:：]\s*(.+)$/); if (m) lab[normC(m[1])] = m[2].trim(); });
+  const g = (...k) => { for (const x of k) if (lab[x]) return lab[x]; return ''; };
+  if (g('prenom', 'nom', 'prenom ou pseudo')) r.name = g('prenom', 'nom', 'prenom ou pseudo').split(/\s+/)[0];
+  if (g('telephone', 'tel', 'numero')) r.phone = g('telephone', 'tel', 'numero').replace(/^(\+33|0033)\s?/, '0').replace(/[\s.-]/g, '').replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+  if (g('adresse')) r.address = g('adresse');
+  if (g('commune', 'ville')) r.city = findCity(g('commune', 'ville')) || g('commune', 'ville');
+  if (g('manettes', 'nombre de manettes', 'nombre')) r.qty = Math.max(1, Math.min(10, parseInt(g('manettes', 'nombre de manettes', 'nombre'), 10) || 1));
+  const when = g('quand', 'passage');
+  if (when) r.when = /demain/i.test(when) ? 'demain' : 'soir';
+  if (g('probleme', 'panne', 'remarque')) r.note = g('probleme', 'panne', 'remarque');
   r.name = r.name ? r.name[0].toUpperCase() + r.name.slice(1) : '';
   return r;
 }
@@ -2886,6 +2898,8 @@ function demFill() {
   // Client déjà venu : on reprend son adresse
   const known = p.phone && S.repairs.slice().reverse().find((r) => r.phone && r.phone.replace(/\s/g, '') === p.phone.replace(/\s/g, ''));
   if (known) { [['d-name', known.client], ['d-addr', known.address], ['d-city', known.city]].forEach(([id, v]) => { const x = $('#' + id); if (x && !x.value && v) x.value = v; }); toast(`Client connu : ${known.client || p.phone}`); }
+  if (p.when) { const w = $(`input[name="d-when"][value="${p.when}"]`); if (w) w.checked = true; }
+  if (p.note) { const n = $('#d-note'); if (n && !n.value) n.value = p.note; }
   const q = $('#d-qty'); if (q && !q.dataset.touched) { q.value = String(p.qty); const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(p.qty)); }
 }
 async function demSave(a) {
