@@ -238,6 +238,7 @@ textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-
 .stop-t{font-size:16px;font-variant-numeric:tabular-nums} .stop-m{font-size:14px;line-height:1.45} .stop-m a{color:var(--accent);text-decoration:none}
 .stop-a{display:flex;flex-wrap:wrap;gap:6px} .iconbtn.sm{width:34px;height:34px;font-weight:800}
 .pill.rp-pick{background:var(--warn-soft);color:var(--warn)} .strip.tour{background:var(--warn-soft)}
+.opts.seg2{display:grid;grid-template-columns:1fr 1fr}
 .ship-info{margin:6px 0 0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
@@ -622,7 +623,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '395abf73ea03';
+const APP_VERSION = 'd49e2fa2812b';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2701,7 +2702,7 @@ function openAd(id, focus) {
 function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el.textContent = `(${t.value.length} caractères)`; }
 
 /* ---------- Tournée : demandes clients, ordre de passage Saint-Égrève → Crolles, messages prêts ---------- */
-const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', stop: 12, cutoff: '16:00', p1: 25, p2: 45, delai: '24-48 h', garantie: '30 jours' };
+const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', stop: 12, p1: 25, p2: 45, delai: '24-48 h', garantie: '30 jours' };
 const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
 // Communes dans l'ordre où on les traverse en rentrant de Saint-Égrève à Crolles (A480, rocade sud, A41)
 const ROUTE_RANK = [
@@ -2750,6 +2751,7 @@ function parseDemande(txt) {
   if (q) r.qty = Math.max(1, Math.min(10, +q[1]));
   const nm = String(txt).match(/(?:je m['’]appelle|moi c['’]est|c['’]est|prénom\s*:?|prenom\s*:?|nom\s*:)\s*([A-Za-zÀ-ÿ-]{2,20})/i) || String(txt).match(/\b(?:c|ct|cest)\s+([A-ZÀ-Ý][a-zà-ÿ-]{1,19})/);
   if (nm) r.name = nm[1];
+  else if (/^\s*([A-ZÀ-Ý][a-zà-ÿ-]{1,19})(?=[\s,.:]|$)/.test(txt) && !/^\s*(salut|bonjour|bonsoir|slt|hello|coucou|yo|wesh|cc|hey|oui|ok)\b/i.test(txt)) r.name = String(txt).trim().match(/^([A-ZÀ-Ý][a-zà-ÿ-]{1,19})/)[1];
   else {
     const cand = lines.find((l) => !/\d/.test(l) && l.split(/\s+/).length <= 2 && l.length <= 24 && !/manette|drift|bonjour|salut|slt|hello|merci|ok|adresse/i.test(l));
     if (cand) r.name = cand.replace(/[,.!]/g, '');
@@ -2761,7 +2763,11 @@ const tourPrice = (q) => { const c = tourCfg(); return q === 1 ? num(c.p1) : q =
 const hm = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}h${String(m % 60).padStart(2, '0')}`;
 const toMin = (s) => { const [h, m] = String(s || '19:45').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
 const tourDay = () => (S.tourDay === 'demain' ? addDays(today(), 1) : today());
-function planDateNow() { const c = tourCfg(), d = new Date(); return d.getHours() * 60 + d.getMinutes() < toMin(c.cutoff) ? today() : addDays(today(), 1); }
+// Par défaut ce soir ; « Demain » se choisit en un geste dans la demande
+function planDateNow() { return today(); }
+const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+// Plage large annoncée au client dès l'ajout : pas besoin de renvoyer une heure précise ensuite
+const plage = () => { const c = tourCfg(); return `entre ${hm(toMin(c.start))} et ${hm(toMin(c.end || '21:00'))}`; };
 
 function tourStops(D) {
   const due = (r) => !isDate(r.planDate) || r.planDate <= D;
@@ -2791,12 +2797,13 @@ function tourMsg(kind, r, s) {
   const c = tourCfg(), nm = firstName(r), hi = nm ? `Salut ${nm} ! ` : 'Salut ! ', amt = eur(repTotal(r));
   const when = s ? `entre ${hm(s.from)} et ${hm(s.to)}` : '';
   const soir = s && tourDay() !== today() ? 'demain soir' : 'ce soir';
-  if (kind === 'reply') return `Salut ! Réparation drift manette PS5 : ${eur(num(c.p1))} (2 manettes : ${eur(num(c.p2))}). Je passe la récupérer devant chez toi et je te la ramène réparée sous ${c.delai}, garantie ${c.garantie}.\nEnvoie-moi : ton prénom, ton numéro, ton adresse complète, le nombre de manettes et le problème.\nJe te confirme l'heure de passage aujourd'hui avant ${c.cutoff.replace(':', 'h')}.`;
+  if (kind === 'reply') return `Salut ! Réparation drift manette PS5 : ${eur(num(c.p1))} (2 manettes : ${eur(num(c.p2))}). Je passe la récupérer devant chez toi et je te la ramène réparée sous ${c.delai}, garantie ${c.garantie}.\nEnvoie-moi : ton prénom, ton numéro, ton adresse complète, le nombre de manettes et le problème.\nJe passe dès ce soir si c'est bon pour toi.`;
+  if (kind === 'confirm') return `${hi}C'est noté ! Je passe récupérer ${repQty(r) > 1 ? `tes ${repQty(r)} manettes` : 'ta manette'} devant chez toi ${r.planDate && r.planDate !== today() ? (r.planDate === addDays(today(), 1) ? 'demain soir' : 'le ' + dShort(r.planDate) + ' au soir') : 'ce soir'} ${plage()}. Je t'envoie un message 10 min avant d'arriver. Tarif : ${amt}, à payer au retour.`;
   if (kind === 'pick') return `${hi}C'est bon pour ${soir} : je passe récupérer ${repQty(r) > 1 ? `tes ${repQty(r)} manettes` : 'ta manette'} devant chez toi ${when}. Je t'envoie un message 10 min avant. Tarif : ${amt}, à payer au retour.`;
   if (kind === 'ret') return `${hi}${repQty(r) > 1 ? 'Tes manettes sont réparées' : 'Ta manette est réparée'} ! Je te ${repQty(r) > 1 ? 'les' : 'la'} ramène ${soir} ${when}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`;
   if (kind === 'late') return `${hi}Petit retard ${soir}, désolé : je passe plutôt ${when}. Je t'envoie un message 10 min avant.`;
   if (kind === 'eta') return `J'arrive dans 10 min, tu peux descendre ?`;
-  if (kind === 'ready') return `${hi}${repQty(r) > 1 ? 'Tes manettes sont prêtes' : 'Ta manette est prête'} ! Je te ${repQty(r) > 1 ? 'les' : 'la'} ramène dès la prochaine tournée, je te confirme l'heure avant ${c.cutoff.replace(':', 'h')}.`;
+  if (kind === 'ready') return `${hi}${repQty(r) > 1 ? 'Tes manettes sont prêtes' : 'Ta manette est prête'} ! Je te ${repQty(r) > 1 ? 'les' : 'la'} ramène ${nowMin() < toMin(c.end || '21:00') - 30 ? 'ce soir' : 'demain soir'} ${plage()}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`;
   if (kind === 'thanks') return `${hi}Merci pour ta confiance ! Ta réparation est garantie ${c.garantie}, si le moindre souci revient, écris-moi. Et si tu es content, un petit partage ou un avis sur TikTok m'aide énormément.`;
   return '';
 }
@@ -2824,8 +2831,8 @@ function renderTournee() {
         ${adr ? `<a href="https://maps.google.com/?q=${encodeURIComponent(adr)}" target="_blank" rel="noopener">${esc(adr)}</a>` : '<span class="neg">Adresse manquante : touche Modifier</span>'}${cityRank(r.city) === 50 && r.city ? ' <small class="muted">(commune hors trajet : placée à la fin)</small>' : ''}
         <small class="muted"> · ${esc(r.type)}${r.note ? ' · ' + esc(r.note) : ''}</small></div>
       <div class="stop-a">
-        <button class="btn sm ${wasSent ? '' : 'primary'}" data-act="tour-msg" data-k="${delay && wasSent ? 'late' : s.kind}" data-id="${esc(r.id)}" data-sk="${esc(k)}">${wasSent ? (delay ? 'Prévenir du retard' : 'Créneau envoyé ✓') : 'Envoyer le créneau'}</button>
-        <button class="btn sm" data-act="tour-msg" data-k="eta" data-id="${esc(r.id)}">J'arrive</button>
+        <button class="btn sm primary" data-act="tour-msg" data-k="eta" data-id="${esc(r.id)}">J'arrive (10 min)</button>
+        ${delay ? `<button class="btn sm" data-act="tour-msg" data-k="late" data-id="${esc(r.id)}" data-sk="${esc(k)}">${wasSent ? 'Retard prévenu ✓' : 'Prévenir du retard'}</button>` : `<button class="btn sm" data-act="tour-msg" data-k="${s.kind}" data-id="${esc(r.id)}" data-sk="${esc(k)}">${wasSent ? 'Heure précise envoyée ✓' : 'Heure précise'}</button>`}
         ${pick ? `<button class="btn sm primary" data-act="rep-pick" data-id="${esc(r.id)}">Récupéré</button>` : `<button class="btn sm primary" data-act="rep-retpay" data-id="${esc(r.id)}">Rendu + payé</button><button class="btn sm" data-act="rep-ret" data-id="${esc(r.id)}">Rendu, pas payé</button>`}
         <button class="btn sm" data-act="tour-later" data-id="${esc(r.id)}">Demain</button>
         <button class="iconbtn sm" data-act="tour-mv" data-d="-1" data-id="${esc(r.id)}" aria-label="Monter">↑</button><button class="iconbtn sm" data-act="tour-mv" data-d="1" data-id="${esc(r.id)}" aria-label="Descendre">↓</button>
@@ -2844,7 +2851,7 @@ function renderTournee() {
       <div class="btns"><button class="btn primary grow" data-act="tour-go">Lancer la tournée (Google Maps)</button></div>
       <div class="tour-delay"><span>Retard ce soir :</span>${[0, 10, 20, 30, 45].map((m) => `<button class="chip" data-act="tour-delay" data-m="${m}" aria-pressed="${delay === m}">${m ? '+' + m + ' min' : 'aucun'}</button>`).join('')}</div>
       ${delay ? '<p class="hint" style="margin:0">Les heures ont été décalées : touche « Prévenir du retard » sur chaque arrêt déjà prévenu.</p>' : ''}`
-      : `<p style="margin:0">Aucun arrêt ${D === today() ? 'ce soir' : 'demain'}. Ajoute une demande dès qu'un client t'écrit : elle se place toute seule dans la bonne tournée (avant ${c.cutoff.replace(':', 'h')} ce soir, après demain).</p>`}
+      : `<p style="margin:0">Aucun arrêt ${D === today() ? 'ce soir' : 'demain'}. Ajoute une demande dès qu'un client t'écrit : elle va dans la tournée de ce soir (ou de demain si tu le choisis), à la bonne place sur ton trajet.</p>`}
     </section>
     ${stops.map(card).join('')}
     <section class="card"><div class="card-h"><h2 class="sec">Atelier</h2><span class="muted" style="font-size:12.5px">${plural(sum(atelier, repQty), 'manette')} à réparer</span></div>
@@ -2858,7 +2865,7 @@ function renderTournee() {
 }
 
 function openDemande() {
-  const T = repTypes(), last = [...T.keys()].find((t) => /drift/i.test(t)) || [...T.keys()].pop(), c = tourCfg(), pd = planDateNow();
+  const T = repTypes(), last = [...T.keys()].find((t) => /drift/i.test(t)) || [...T.keys()].pop();
   openSheet({ kind: 'dem', title: 'Nouvelle demande', body: `
     <div class="field"><label for="d-paste">Colle ici le message du client</label><textarea id="d-paste" class="inp" rows="4" placeholder="Ex. : Yanis, 06 12 34 56 78, 12 rue des Alpes 38400 Saint-Martin-d’Hères, 2 manettes qui driftent"></textarea>
       <div class="btns" style="margin-top:6px"><button class="btn sm" data-act="dem-pastebtn">${ic('copy')} Coller depuis le presse-papiers</button></div>
@@ -2868,9 +2875,10 @@ function openDemande() {
     <div class="row2"><div class="field"><label for="d-city">Commune</label><input id="d-city" class="inp" list="dl-city" autocomplete="off"><datalist id="dl-city">${CITIES.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
       <div class="field"><label for="d-qty">Manettes</label><span class="selw" style="display:block"><select id="d-qty" class="inp">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}">${n}</option>`).join('')}</select></span></div></div>
     <div class="row2"><div class="field"><label for="d-type">Prestation</label><input id="d-type" class="inp" list="dl-rep2" autocomplete="off" value="${esc(last)}"><datalist id="dl-rep2">${[...T.keys()].map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>${moneyF('d-total', 'Prix total', tourPrice(1))}</div>
-    <div class="row2">${dateF('d-plan', 'Passage prévu', pd)}${textF('d-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. manette blanche, mineur : n° parent')}</div>
-    <p class="hint" id="d-info">${pd === today() ? 'Avant ' + c.cutoff.replace(':', 'h') + ' : passage ce soir.' : 'Après ' + c.cutoff.replace(':', 'h') + ' : passage demain soir.'}</p>`,
-    foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="dem-save">Ajouter à la tournée</button>` });
+    <div class="field"><span class="lbl">Passage</span>${radios('d-when', [['soir', 'Ce soir'], ['demain', 'Demain soir']], 'soir', 'opts seg2')}</div>
+    ${textF('d-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. urgent, manette blanche, mineur : n° parent')}
+    <p class="hint">« Ajouter et envoyer » enregistre le client et ouvre le message de confirmation (passage ${plage()}) : un seul geste.</p>`,
+    foot: `<button class="btn" data-act="dem-save">Ajouter</button><button class="btn primary grow" data-act="dem-save" data-send="1">Ajouter et envoyer</button>` });
 }
 function demFill() {
   const p = parseDemande(val('d-paste'));
@@ -2885,7 +2893,7 @@ async function demSave(a) {
   const qty = Number(val('d-qty')) || 1, T = repTypes(), type = val('d-type').trim() || 'Joystick drift (manette PS5)';
   const total = parseNum(val('d-total')) ?? tourPrice(qty);
   const r = { type, qty, unitPrice: num(T.get(type)) || num(tourCfg().p1), total, partsCost: 0, client: val('d-name').trim(), phone: val('d-phone').trim(), address: val('d-addr').trim(), city: val('d-city').trim(), note: val('d-note').trim(),
-    picked: false, gotDate: '', done: false, result: '', returned: false, returnDate: '', paid: false, paidDate: '', planDate: isDate(val('d-plan')) ? val('d-plan') : planDateNow() };
+    picked: false, gotDate: '', done: false, result: '', returned: false, returnDate: '', paid: false, paidDate: '', planDate: radioVal('d-when') === 'demain' ? addDays(today(), 1) : today() };
   r.date = r.planDate;
   if (!r.client && !r.phone) return fieldErr('d-name', 'Indique au moins le prénom ou le numéro.');
   if (!r.address) return fieldErr('d-addr', 'Adresse nécessaire pour passer chez le client.');
@@ -2893,7 +2901,11 @@ async function demSave(a) {
   a.disabled = true;
   const ok = await write(() => addRepair({ ...r, createdAt: new Date().toISOString() }));
   a.disabled = false;
-  if (ok) { closeSheet(); S.tourDay = r.planDate === today() ? 'ce-soir' : 'demain'; if (S.view !== 'tournee') setView('tournee'); else renderTournee(); toast(`${r.client || 'Client'} ajouté à la tournée de ${r.planDate === today() ? 'ce soir' : dShort(r.planDate)}`); }
+  if (ok) {
+    closeSheet(); S.tourDay = r.planDate === today() ? 'ce-soir' : 'demain';
+    if (S.view !== 'tournee') setView('tournee'); else renderTournee();
+    if (a.dataset.send) { sendMsg(tourMsg('confirm', r), r.phone); } else toast(`${r.client || 'Client'} ajouté à la tournée de ${r.planDate === today() ? 'ce soir' : 'demain soir'}`);
+  }
 }
 function tourMapsUrl(stops) {
   const c = tourCfg(), pts = [];
@@ -2905,10 +2917,10 @@ function openTourCfg() {
   openSheet({ kind: 'tourcfg', title: 'Réglages de la tournée', body: `
     <div class="row2">${textF('t-from', 'Départ', c.from)}${textF('t-to', 'Arrivée (domicile)', c.to)}</div>
     <div class="row2"><div class="field"><label for="t-start">Heure de départ</label><input id="t-start" class="inp" type="time" value="${esc(c.start)}"></div><div class="field"><label for="t-stop">Minutes par arrêt</label><input id="t-stop" class="inp" inputmode="numeric" value="${esc(String(c.stop))}"></div></div>
-    <div class="row2"><div class="field"><label for="t-cut">Heure limite (passage le soir même)</label><input id="t-cut" class="inp" type="time" value="${esc(c.cutoff)}"></div>${textF('t-delai', 'Délai annoncé', c.delai)}</div>
+    <div class="row2"><div class="field"><label for="t-end">Fin de tournée habituelle</label><input id="t-end" class="inp" type="time" value="${esc(c.end || '21:00')}"></div>${textF('t-delai', 'Délai annoncé', c.delai)}</div>
     <div class="row2">${moneyF('t-p1', 'Tarif 1 manette', c.p1)}${moneyF('t-p2', 'Tarif 2 manettes', c.p2)}</div>
     ${textF('t-gar', 'Garantie', c.garantie)}
-    <p class="hint">Ces infos remplissent automatiquement les messages (réponse type, créneaux, retard…).</p>`,
+    <p class="hint">Les clients reçoivent la plage « entre l'heure de départ et la fin de tournée » dès que tu les ajoutes. Ces infos remplissent tous les messages.</p>`,
     foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="tour-cfg-save">Enregistrer</button>` });
 }
 
@@ -2937,7 +2949,7 @@ const TOUR_ACT = {
   'tour-go': () => { const stops = tourStops(tourDay()); if (stops.length > 9) toast('Google Maps prend 9 arrêts max : les suivants seront à ajouter'); window.open(tourMapsUrl(stops), '_blank'); },
   'tour-cfg': () => openTourCfg(),
   'tour-cfg-save': async (a) => {
-    const t = { from: val('t-from').trim() || TOUR_DEF.from, to: val('t-to').trim() || TOUR_DEF.to, start: val('t-start') || TOUR_DEF.start, stop: Math.max(3, parseInt(val('t-stop'), 10) || 12), cutoff: val('t-cut') || TOUR_DEF.cutoff,
+    const t = { from: val('t-from').trim() || TOUR_DEF.from, to: val('t-to').trim() || TOUR_DEF.to, start: val('t-start') || TOUR_DEF.start, stop: Math.max(3, parseInt(val('t-stop'), 10) || 12), end: val('t-end') || TOUR_DEF.end,
       p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie };
     a.disabled = true; const ok = await write(() => saveSettingsData({ ...S.settings, tour: t })); a.disabled = false;
     if (ok) { closeSheet(); toast('Réglages de la tournée enregistrés'); }
