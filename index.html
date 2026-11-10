@@ -623,7 +623,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'd463e295ec86';
+const APP_VERSION = '91efd4de5607';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2704,7 +2704,7 @@ function openAd(id, focus) {
 function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el.textContent = `(${t.value.length} caractères)`; }
 
 /* ---------- Tournée : demandes clients, ordre de passage Saint-Égrève → Crolles, messages prêts ---------- */
-const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', stop: 12,
+const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', stop: 12, formUrl: '', ntfy: '',
   services: 'Joystick drift (manette PS5) : 25 € (50 € les deux, 20 € la manette à partir de la 3e)\nJoystick drift (manette Xbox) : 25 € (mêmes tarifs que PS5)\nJoysticks à effet Hall (plus jamais de drift) : 45 € la manette\nManette PS5 : 25 € (bouton, gâchette, port de charge, batterie : à partir de 20 €)\nPS5 nettoyage simple : 40 € (poussière, ventilateur)\nPS5 nettoyage liquide métal : 80 € (surchauffe, bruit, nettoyage complet)\nHDMI PS5 : 75 € (port HDMI remplacé)\nTéléphone (batterie, écran, vitre arrière) : sur devis\nDiagnostic : gratuit si tu répares, 15 € sinon', p1: 25, p2: 50, delai: '24-48 h', garantie: '30 jours' };
 const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
 // Communes dans l'ordre où on les traverse en rentrant de Saint-Égrève à Crolles (A480, rocade sud, A41)
@@ -2768,6 +2768,8 @@ function parseDemande(txt) {
   if (g('adresse')) r.address = g('adresse');
   if (g('commune', 'ville')) r.city = findCity(g('commune', 'ville')) || g('commune', 'ville');
   if (g('manettes', 'nombre de manettes', 'nombre')) r.qty = Math.max(1, Math.min(10, parseInt(g('manettes', 'nombre de manettes', 'nombre'), 10) || 1));
+  const pr = g('prestation', 'reparation');
+  if (pr) { const sv = services().find((s) => s.line === pr || norm(pr).startsWith(norm(s.name))); r.type = sv ? sv.name : pr; }
   const when = g('quand', 'passage');
   if (when) r.when = /demain/i.test(when) ? 'demain' : 'soir';
   if (g('probleme', 'panne', 'remarque')) r.note = g('probleme', 'panne', 'remarque');
@@ -2845,7 +2847,7 @@ function tourMsg(kind, r, s) {
   const c = tourCfg(), nm = firstName(r), hi = nm ? `Salut ${nm} ! ` : 'Salut ! ', amt = repTotal(r) > 0 ? eur(repTotal(r)) : 'sur devis';
   const when = s ? `entre ${hm(s.from)} et ${hm(s.to)}` : '';
   const soir = s && tourDay() !== today() ? 'demain soir' : 'ce soir';
-  if (kind === 'reply') return `Salut ! Voici mes réparations :\n${services().map((s) => '- ' + s.line).join('\n')}\nJe passe récupérer devant chez toi et je te ramène tout réparé sous ${c.delai}, garantie ${c.garantie}.\nEnvoie-moi : ton prénom, ton numéro, ton adresse complète, ce qu'il faut réparer (et combien de manettes).\nJe passe dès ce soir si c'est bon pour toi.`;
+  if (kind === 'reply') return `Salut ! Voici mes réparations :\n${services().map((s) => '- ' + s.line).join('\n')}\nJe passe récupérer devant chez toi et je te ramène tout réparé sous ${c.delai}, garantie ${c.garantie}.\n${c.formUrl ? `Remplis ce petit formulaire (30 secondes) et je te confirme le passage par SMS : ${c.formUrl}` : `Envoie-moi : ton prénom, ton numéro, ton adresse complète, ce qu'il faut réparer (et combien de manettes).`}\nJe passe dès ce soir si c'est bon pour toi.`;
   const w = objWord(r);
   if (kind === 'confirm') return `${hi}C'est noté ! Je passe récupérer ${w.ta} devant chez toi ${r.planDate && r.planDate !== today() ? (r.planDate === addDays(today(), 1) ? 'demain soir' : 'le ' + dShort(r.planDate) + ' au soir') : 'ce soir'} ${plage()}. Je t'envoie un message 10 min avant d'arriver. Tarif : ${amt}, à payer au retour.`;
   if (kind === 'pick') return `${hi}C'est bon pour ${soir} : je passe récupérer ${w.ta} devant chez toi ${when}. Je t'envoie un message 10 min avant. Tarif : ${amt}, à payer au retour.`;
@@ -2937,7 +2939,7 @@ function demFill() {
   if (known) { [['d-name', known.client], ['d-addr', known.address], ['d-city', known.city]].forEach(([id, v]) => { const x = $('#' + id); if (x && !x.value && v) x.value = v; }); toast(`Client connu : ${known.client || p.phone}`); }
   if (p.when) { const w = $(`input[name="d-when"][value="${p.when}"]`); if (w) w.checked = true; }
   if (p.note) { const n = $('#d-note'); if (n && !n.value) n.value = p.note; }
-  const gs = guessService(val('d-paste')), ty = $('#d-type');
+  const gs = p.type ? { name: p.type } : guessService(val('d-paste')), ty = $('#d-type');
   if (gs && ty && !ty.dataset.touched) ty.value = gs.name;
   const q = $('#d-qty'); if (q && !q.dataset.touched) { q.value = String(p.qty); const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(p.qty, val('d-type'))); }
 }
@@ -2965,6 +2967,52 @@ function tourMapsUrl(stops) {
   stops.forEach((s) => { const a = [s.r.address, s.r.city].filter(Boolean).join(', '); if (a && !pts.includes(a)) pts.push(a); });
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(c.from)}&destination=${encodeURIComponent(c.to)}&travelmode=driving${pts.length ? '&waypoints=' + encodeURIComponent(pts.slice(0, 9).join('|')) : ''}`;
 }
+function formScript(topic) {
+  const sv = services().map((s) => s.line);
+  return `// Réparo : formulaire de réservation + envoi de chaque demande sur ton téléphone.
+// 1. Colle tout ce texte dans un nouveau projet sur script.google.com
+// 2. Enregistre, choisis la fonction « installer » en haut, puis touche « Exécuter » et accepte les autorisations.
+// 3. Le lien du formulaire s'affiche dans le journal d'exécution, en bas.
+
+const MODE = 'notification';            // 'notification' (gratuit, appli ntfy) ou 'sms' (vrai SMS, service Brevo payant)
+const SUJET_NTFY = '${topic}';          // ton sujet privé dans l'appli ntfy
+const CLE_BREVO = '';                   // seulement pour le mode 'sms' : ta clé API Brevo
+const MON_NUMERO = '';                  // seulement pour le mode 'sms' : ton numéro au format +336… (jamais visible des clients)
+
+const PRESTATIONS = ${JSON.stringify(sv, null, 2)};
+
+function installer() {
+  const f = FormApp.create('Réparo : demande de réparation');
+  f.setDescription('Je passe récupérer ton appareil devant chez toi et je te le ramène réparé sous ${tourCfg().delai}, garantie ${tourCfg().garantie}. Remplis ce formulaire et je te confirme le passage par SMS.');
+  f.setConfirmationMessage("C'est envoyé ! Je te confirme le passage par SMS très vite.");
+  f.addTextItem().setTitle('Prénom').setRequired(true);
+  f.addTextItem().setTitle('Téléphone').setHelpText('Je te confirme le passage par SMS sur ce numéro').setRequired(true);
+  f.addTextItem().setTitle('Adresse').setHelpText('Numéro et rue (je passe devant chez toi)').setRequired(true);
+  f.addTextItem().setTitle('Commune').setRequired(true);
+  f.addListItem().setTitle('Prestation').setChoiceValues(PRESTATIONS).setRequired(true);
+  f.addListItem().setTitle('Nombre').setHelpText("Nombre de manettes ou d'appareils").setChoiceValues(['1', '2', '3', '4', '5']).setRequired(true);
+  f.addMultipleChoiceItem().setTitle('Quand').setChoiceValues(['Ce soir', 'Demain soir']).setRequired(true);
+  f.addParagraphTextItem().setTitle('Problème').setHelpText('Décris la panne en quelques mots');
+  ScriptApp.newTrigger('aChaqueDemande').forForm(f).onFormSubmit().create();
+  Logger.log('LIEN À METTRE DANS TA BIO TIKTOK ET DANS L\\'APPLI : ' + f.getPublishedUrl());
+  Logger.log('Pour modifier le formulaire plus tard : ' + f.getEditUrl());
+}
+
+function aChaqueDemande(e) {
+  const v = {};
+  e.response.getItemResponses().forEach((r) => { v[r.getItem().getTitle()] = r.getResponse(); });
+  const texte = 'Demande Réparo\\n' + ['Prénom', 'Téléphone', 'Adresse', 'Commune', 'Prestation', 'Nombre', 'Quand', 'Problème']
+    .filter((k) => v[k]).map((k) => k + ' : ' + v[k]).join('\\n');
+  if (MODE === 'sms') {
+    UrlFetchApp.fetch('https://api.brevo.com/v3/transactionalSMS/sms', { method: 'post', contentType: 'application/json',
+      headers: { 'api-key': CLE_BREVO }, payload: JSON.stringify({ sender: 'Reparo', recipient: MON_NUMERO.replace('+', ''), content: texte, type: 'transactional' }) });
+  } else {
+    UrlFetchApp.fetch('https://ntfy.sh/' + SUJET_NTFY, { method: 'post', payload: texte,
+      headers: { Title: 'Nouvelle demande Reparo', Priority: 'high', Tags: 'wrench' } });
+  }
+}
+`;
+}
 function openTourCfg() {
   const c = tourCfg();
   openSheet({ kind: 'tourcfg', title: 'Réglages de la tournée', body: `
@@ -2974,6 +3022,12 @@ function openTourCfg() {
     <div class="row2">${moneyF('t-p1', 'Drift : 1 manette', c.p1)}${moneyF('t-p2', 'Drift : 2 manettes', c.p2)}</div>
     ${textF('t-gar', 'Garantie', c.garantie)}
     <div class="field"><label for="t-serv">Tes prestations et prix (une par ligne, « Nom : prix »)</label><textarea id="t-serv" class="inp" rows="5">${esc(c.services || '')}</textarea><small class="hint">Elles apparaissent dans la réponse type et dans la liste « Prestation » des demandes.</small></div>
+    <div class="fs"><p class="fs-t">Formulaire de réservation</p>
+      ${textF('t-form', 'Lien de ton formulaire', c.formUrl || '', 'https://docs.google.com/forms/…')}
+      <p class="hint" style="margin:0">Une fois rempli, ce lien est ajouté à ta réponse type. Les demandes arrivent sur ton téléphone sans que ton numéro soit visible.</p>
+      <div class="btns"><button class="btn sm primary" data-act="tour-script">${ic('copy')} Copier le script d'installation</button>${c.ntfy ? `<button class="btn sm" data-act="tour-topic">${ic('copy')} Copier mon sujet ntfy</button>` : ''}</div>
+      ${c.ntfy ? `<p class="hint" style="margin:0">Ton sujet ntfy (à saisir dans l'appli ntfy) : <b>${esc(c.ntfy)}</b></p>` : ''}
+    </div>
     <p class="hint">Les clients reçoivent la plage « entre l'heure de départ et la fin de tournée » dès que tu les ajoutes. Ces infos remplissent tous les messages.</p>`,
     foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="tour-cfg-save">Enregistrer</button>` });
 }
@@ -3003,11 +3057,21 @@ const TOUR_ACT = {
   'tour-go': () => { const stops = tourStops(tourDay()); if (stops.length > 9) toast('Google Maps prend 9 arrêts max : les suivants seront à ajouter'); window.open(tourMapsUrl(stops), '_blank'); },
   'tour-cfg': () => openTourCfg(),
   'tour-cfg-save': async (a) => {
-    const t = { from: val('t-from').trim() || TOUR_DEF.from, to: val('t-to').trim() || TOUR_DEF.to, start: val('t-start') || TOUR_DEF.start, stop: Math.max(3, parseInt(val('t-stop'), 10) || 12), end: val('t-end') || TOUR_DEF.end,
+    const t = { ...tourCfg(), formUrl: val('t-form').trim(), from: val('t-from').trim() || TOUR_DEF.from, to: val('t-to').trim() || TOUR_DEF.to, start: val('t-start') || TOUR_DEF.start, stop: Math.max(3, parseInt(val('t-stop'), 10) || 12), end: val('t-end') || TOUR_DEF.end,
       p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie, services: $('#t-serv').value.trim() || TOUR_DEF.services };
     a.disabled = true; const ok = await write(() => saveSettingsData({ ...S.settings, tour: t })); a.disabled = false;
     if (ok) { closeSheet(); toast('Réglages de la tournée enregistrés'); }
   },
+  'tour-script': async () => {
+    let c = tourCfg();
+    if (!c.ntfy) {
+      const topic = 'reparo-' + Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
+      if (!(await write(() => saveSettingsData({ ...S.settings, tour: { ...c, ntfy: topic } })))) return;
+      c = tourCfg(); openTourCfg();
+    }
+    copyText(formScript(c.ntfy), `Script copié · ton sujet ntfy : ${c.ntfy}`);
+  },
+  'tour-topic': () => copyText(tourCfg().ntfy, 'Sujet ntfy copié'),
   'rep-pick': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { picked: true, gotDate: today(), date: today(), planDate: '' }))) toast(`${r.client || 'Manette'} récupérée : direction l’atelier`); },
   'rep-ready': async (a) => {
     const r = S.repairs.find((x) => x.id === a.dataset.id);
