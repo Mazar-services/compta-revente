@@ -623,7 +623,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '89a5c2454b24';
+const APP_VERSION = '941e266fb383';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2786,7 +2786,7 @@ function guessService(txt) {
   if (/hdmi/.test(t)) return pick(/hdmi/);
   if (/liquide|nettoy|surchauf|chauffe|bruit|ventil|souffl/.test(t)) return pick(/nettoy|liquide/);
   if (/drift|joystick|stick|derive|bouge tout seul/.test(t)) return pick(/drift/);
-  if (/manette|bouton|gachette|r2|l2|batterie/.test(t)) return S2.find((s) => /manette/.test(norm(s.name)) && !/drift|joystick/.test(norm(s.name)));
+  if (/bouton|gachette|r2|l2|batterie|charge|vibr/.test(t)) return S2.find((s) => /manette/.test(norm(s.name)) && !/drift|joystick/.test(norm(s.name)));
   return null;
 }
 // Le bon mot selon ce qu'on répare : manette, console, téléphone…
