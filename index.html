@@ -623,7 +623,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '81c09fcda067';
+const APP_VERSION = '6492af3e42f3';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -730,9 +730,15 @@ const isShipSale = (ch) => SHIP_CHANNELS.includes(ch);
 const addDays = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 const payDelay = () => (S.settings.payDelay == null ? 3 : num(S.settings.payDelay));
 const autoPayDate = (i) => (isDate(i.buyerRecvDate) ? addDays(i.buyerRecvDate, payDelay()) : null);
-const isPaid = (i) => isSold(i) && (i.paid !== false || (autoPayDate(i) != null && autoPayDate(i) <= today()));
+// Règle : une vente ne compte (caisse, chiffre d'affaires, bénéfice) qu'une fois l'argent reçu, à la date du paiement.
+// Main propre : payé le jour de la vente. Livraison : seulement quand tu touches « Argent reçu » (plus de paiement supposé automatique).
+const paidOn = (i) => (!isSold(i) || i.paid === false ? '' : !isShipSale(i.sellChannel) ? i.sellDate : isDate(i.paidDate) && i.paidDate >= i.sellDate ? i.paidDate : i.sellDate);
+const isPaid = (i) => isSold(i) && i.paid !== false && paidOn(i) <= today();
 const awaitingPay = (i) => isSold(i) && !isPaid(i);
-const paidOn = (i) => (i.paid !== false ? i.paidDate || i.sellDate : autoPayDate(i));
+// Mois où la vente compte : celui du paiement
+const paidIn = (i, p) => isPaid(i) && paidOn(i).startsWith(p);
+// Paiement en retard : l'acheteur a reçu depuis plus de N jours et l'argent n'est pas marqué reçu
+const payLate = (i) => awaitingPay(i) && autoPayDate(i) != null && autoPayDate(i) <= today();
 // Achat annulé dont l'argent n'est pas encore revenu : il reste sorti de la caisse
 const refundPending = (i) => isCancelled(i) && i.refunded === false;
 // Achat à distance pas encore envoyé par le vendeur (case « Envoyé » pas cochée)
@@ -782,8 +788,12 @@ function aggregate(bought, sold) {
 }
 function monthStats(ym) {
   const bought = S.items.filter((i) => (i.buyDate || '').slice(0, 7) === ym);
-  const sold = S.items.filter((i) => isSold(i) && i.sellDate.slice(0, 7) === ym);
+  // Ventes comptées ce mois-ci : celles dont l'argent est arrivé ce mois-ci
+  const sold = S.items.filter((i) => paidIn(i, ym));
   const A = aggregate(bought, sold);
+  // Vendues ce mois-ci mais pas encore payées : affichées à part, jamais dans les totaux
+  A.waiting = S.items.filter((i) => awaitingPay(i) && i.sellDate.slice(0, 7) <= ym);
+  A.waitProfit = sum(A.waiting, profit);
   // Flux de caisse : argent réellement entré / sorti ce mois-ci pour la revente (paiements reçus, achats, remboursements)
   const ev = cashLedger().filter((e) => (e.k === 1 || e.k === 2) && (e.d || '').slice(0, 7) === ym);
   A.cashIn = sum(ev.filter((e) => e.a > 0), (e) => e.a); A.cashOut = -sum(ev.filter((e) => e.a < 0), (e) => e.a);
@@ -791,7 +801,7 @@ function monthStats(ym) {
   // Encaissé : argent des ventes reçu ce mois-ci (frais déduits), à la date du paiement
   const paidEv = ev.filter((e) => e.k === 2 && e.i && !isCancelled(e.i));
   A.salesIn = sum(paidEv, (e) => e.a); A.nPaid = paidEv.length;
-  A.toCome = sum(sold.filter(awaitingPay), (i) => num(i.sellPrice) - num(i.sellFees));
+  A.toCome = sum(A.waiting, (i) => num(i.sellPrice) - num(i.sellFees));
   return A;
 }
 function modelTable(soldSet) {
@@ -901,17 +911,19 @@ function repStage(r) {
   if (!repPaid(r)) return { k: 'pay', t: 'Rendu · pas encore payé', next: ['rep-pay', 'Payé'] };
   return { k: 'ok', t: r.result === 'ko' ? 'Échec' : 'Terminé' };
 }
+// Réparo réparé ou rendu mais pas encore payé (affiché à part, jamais compté)
+const repWait = () => sum(S.repairs.filter((r) => !repPaid(r) && r.picked !== false), repTotal);
 const repInCash = () => S.settings.reparoInCash !== false;
 function capital() {
-  const sold = S.items.filter(isSold), open = S.items.filter((i) => !isSold(i));
+  const allSold = S.items.filter(isSold), sold = allSold.filter(isPaid), open = S.items.filter((i) => !isSold(i));
   const apports = sum(S.cash.filter((c) => c.type !== 'retrait'), (c) => num(c.amount));
   const retraits = sum(S.cash.filter((c) => c.type === 'retrait'), (c) => num(c.amount));
-  const invested = sum(S.items, cost), cashed = sum(sold.filter(isPaid), (i) => num(i.sellPrice) - num(i.sellFees));
-  const toCome = sum(sold.filter(awaitingPay), (i) => num(i.sellPrice) - num(i.sellFees));
+  const invested = sum(S.items, cost), cashed = sum(sold, (i) => num(i.sellPrice) - num(i.sellFees));
+  const waiting = allSold.filter(awaitingPay), toCome = sum(waiting, (i) => num(i.sellPrice) - num(i.sellFees));
   const reparo = repInCash() ? sum(S.repairs.filter(repPaid), repNet) : 0;
   const pending = sum(S.cancelled.filter(refundPending), cost);
   const stock = sum(open, cost), dispo = apports - retraits + cashed - invested + reparo - pending;
-  return { toCome, pending, reparo, apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), stock, dispo, total: dispo + stock + toCome, nSold: sold.length };
+  return { toCome, pending, reparo, apports, retraits, invested, cashed, ca: sum(sold, (i) => num(i.sellPrice)), profit: sum(sold, profit), waitProfit: sum(waiting, profit), nWait: waiting.length, stock, dispo, total: dispo + stock + toCome, nSold: sold.length };
 }
 // Une tuile : [titre, valeur, sous-titre, classe de la valeur, couleur de fond c-good|c-bad|c-info|c-warn]
 const tileHtml = (t) => `<div class="tile ${t[4] || ''}"><span class="k">${t[0]}</span><span class="v ${t[3] || ''}">${t[1]}</span><span class="s">${t[2]}</span></div>`;
@@ -936,7 +948,7 @@ function cashLedger() {
   });
   S.items.forEach((i) => {
     ev.push({ d: isDate(i.buyDate) ? i.buyDate : '', k: 1, label: 'Achat', a: -cost(i), i });
-    if (isPaid(i)) ev.push({ d: paidOn(i) || i.sellDate, k: 2, label: i.paid === false || i.paidDate ? 'Paiement de la vente' : 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
+    if (isPaid(i)) ev.push({ d: paidOn(i), k: 2, label: isShipSale(i.sellChannel) ? 'Paiement de la vente' : 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
   });
   if (repInCash()) S.repairs.filter(repPaid).forEach((r) => ev.push({ d: repPaidOn(r), k: 3, label: 'Réparo', note: `${r.type}${repQty(r) > 1 ? ' ×' + repQty(r) : ''}`, a: repNet(r) }));
   ev.forEach((e) => { if (!isDate(e.d)) e.d = ''; });
@@ -1034,6 +1046,8 @@ function renderAccueil() {
             <label class="mini-sw"><input type="checkbox" id="hero-rep" ${withRep ? 'checked' : ''}><span>Inclure Réparo</span></label></div>
           <div class="hero-num ${P < -0.004 ? 'neg' : ''}">${eurS(P)}</div>
           ${withRep ? `<div class="hero-split">revente ${eurS(ms.profit)} · Réparo ${eurS(rm)}</div>` : ''}
+          ${m === cur && ms.waiting.length ? `<div class="hero-split">Pas encore compté : ${eurS(ms.waitProfit)} de bénéfice en attente de paiement (${ms.waiting.map((i) => esc(i.ref)).join(', ')})</div>` : ''}
+          ${m === cur && repWait() ? `<div class="hero-split">Réparo pas encore payé : ${eur(repWait())}, compté quand tu touches « Payé »</div>` : ''}
           <div class="hero-sub">${deltaHtml}</div>
           ${goalHtml}
         </section>
@@ -1078,14 +1092,15 @@ function reparoStrip(m) {
 }
 
 function salesCard(m, ms) {
-  const sold = ms.sold.slice().sort((a, b) => b.sellDate.localeCompare(a.sellDate));
+  // Ventes payées ce mois-ci (comptées) + ventes de ce mois en attente de paiement (affichées, pas comptées)
+  const sold = ms.sold.concat(ms.waiting.filter((i) => i.sellDate.slice(0, 7) === m)).sort((a, b) => b.sellDate.localeCompare(a.sellDate));
   return `<section class="card" aria-label="Ventes du mois">
     <div class="card-h"><h2 class="sec">Ventes de ${monthName(m)} : ${sold.length}</h2>${sold.length ? `<button class="btn sm" data-act="goto-sales" data-m="${m}">Tout voir</button>` : ''}</div>
     ${sold.length ? `<div class="sv-list">${sold.map((i) => { const p = profit(i); return `<div class="sv" role="button" tabindex="0" data-act="open" data-id="${esc(i.id)}">
-        <div class="sv-top">${mini(i, 'mini lg')}<div class="sv-id"><b>${esc(i.model)}</b>${i.details ? `<small>${esc(i.details)}</small>` : ''}<span>Réf ${tag(i)}</span><small>Vendu le ${dShort(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}</small>${i.sellNotes ? `<small class="sv-note">${esc(i.sellNotes)}</small>` : ''}${awaitingPay(i) ? '<span class="pill st-attente" style="justify-self:start">Paiement en attente</span>' : ''}</div></div>
+        <div class="sv-top">${mini(i, 'mini lg')}<div class="sv-id"><b>${esc(i.model)}</b>${i.details ? `<small>${esc(i.details)}</small>` : ''}<span>Réf ${tag(i)}</span><small>Vendu le ${dShort(i.sellDate)}${i.sellChannel ? ' · ' + esc(i.sellChannel) : ''} · ${saleDays(i)}${NB}j ${marketStart(i) ? 'd’annonce' : 'après réception'}</small>${i.sellNotes ? `<small class="sv-note">${esc(i.sellNotes)}</small>` : ''}${awaitingPay(i) ? '<span class="pill st-attente" style="justify-self:start">Paiement en attente</span><small>Pas encore compté dans la caisse ni le bénéfice</small>' : isShipSale(i.sellChannel) && paidOn(i).slice(0, 7) !== i.sellDate.slice(0, 7) ? `<small>Argent reçu le ${dShort(paidOn(i))}</small>` : ''}</div></div>
         <div class="sv-nums"><span>Acheté<b>${eur(cost(i))}</b></span><span>Vendu<b>${eur(num(i.sellPrice))}</b></span><span>Bénéfice<b class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</b></span></div>
       </div>`; }).join('')}</div>
-      ${(() => { const pr = LS.get('salesProfit', false); return `<div class="sv-total ${pr ? (ms.profit < -0.004 ? 'r' : 'g') : 'i'}"><span>${pr ? 'Bénéfice total' : 'Chiffre d’affaires total'}<small>${plural(sold.length, 'vente')} en ${monthName(m)}</small></span><b>${pr ? eurS(ms.profit) : eur(ms.ca)}</b></div>
+      ${(() => { const pr = LS.get('salesProfit', false); return `<div class="sv-total ${pr ? (ms.profit < -0.004 ? 'r' : 'g') : 'i'}"><span>${pr ? 'Bénéfice total' : 'Chiffre d’affaires total'}<small>${plural(ms.sold.length, 'vente payée', 'ventes payées')} en ${monthName(m)}${sold.length > ms.sold.length ? ` · ${sold.length - ms.sold.length} en attente, pas comptée${sold.length - ms.sold.length > 1 ? 's' : ''}` : ''}</small></span><b>${pr ? eurS(ms.profit) : eur(ms.ca)}</b></div>
       <label class="sw"><span class="sw-t"><b>Voir le bénéfice total</b><small>Au lieu du chiffre d’affaires</small></span><input type="checkbox" id="sv-profit" role="switch" ${pr ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>`; })()}`
       : `<p class="muted" style="margin:0">Aucune vente en ${monthName(m)} pour l’instant.</p>`}
   </section>`;
@@ -1102,17 +1117,17 @@ function cashCard() {
     </div>
     ${(() => { const L = S.lastMove; if (!L || Date.now() - L.at > 15 * 60000) return ''; const d = L.after - L.before;
       return `<div class="lastmove ${d < 0 ? 'out' : 'in'}" role="status"><span>${esc(L.label.replace(/ · .*$/, '').replace(/^Ajout /, 'Achat '))}</span><b>${eur(L.before)} → ${eur(L.after)}</b><em>${eurS(d)}</em></div>`; })()}
-    ${S.items.filter(awaitingPay).map((i) => `<div class="refund-wait pay"><span>${tag(i)} vendu ${eur(num(i.sellPrice) - num(i.sellFees))} · ${isDate(i.buyerRecvDate) ? `reçu par l’acheteur, paiement auto le ${dShort(autoPayDate(i))}` : 'colis en route vers l’acheteur'}</span><span class="btns">${isDate(i.buyerRecvDate) ? '' : `<button class="btn sm" data-act="buyer-recv" data-id="${esc(i.id)}">Reçu par l’acheteur</button>`}<button class="btn sm primary" data-act="pay-ok" data-id="${esc(i.id)}">Argent reçu</button></span></div>`).join('')}
+    ${S.items.filter(awaitingPay).map((i) => `<div class="refund-wait pay"><span>${tag(i)} vendu ${eur(num(i.sellPrice) - num(i.sellFees))} · ${isDate(i.buyerRecvDate) ? (payLate(i) ? `<b>paiement attendu depuis le ${dShort(autoPayDate(i))}</b> : vérifie ton compte` : `reçu par l’acheteur, paiement attendu vers le ${dShort(autoPayDate(i))}`) : 'colis en route vers l’acheteur'} · pas encore compté</span><span class="btns">${isDate(i.buyerRecvDate) ? '' : `<button class="btn sm" data-act="buyer-recv" data-id="${esc(i.id)}">Reçu par l’acheteur</button>`}<button class="btn sm primary" data-act="pay-ok" data-id="${esc(i.id)}">Argent reçu</button></span></div>`).join('')}
     ${S.cancelled.filter(refundPending).map((i) => `<div class="refund-wait"><span>${tag(i)} annulé le ${dShort(i.cancelDate)} · <b>${eur(cost(i))}</b> pas encore remboursés</span><button class="btn sm primary" data-act="refund-ok" data-id="${esc(i.id)}">Remboursement reçu</button></div>`).join('')}
     <div class="cc-calc" aria-label="Calcul de l’argent disponible">
       <span>Argent apporté</span><b class="in">+${eur(K.apports)}</b>
-      <span>Ventes encaissées <small>bénéfice des ventes : ${eurS(K.profit)}</small></span><b class="in">+${eur(K.cashed)}</b>
+      <span>Ventes encaissées <small>bénéfice des ventes payées : ${eurS(K.profit)}</small></span><b class="in">+${eur(K.cashed)}</b>
       ${K.reparo ? `<span>Réparo</span><b class="in">+${eur(K.reparo)}</b>` : ''}
       <span>Achats</span><b class="out">−${eur(K.invested)}</b>
       ${K.pending ? `<span>Annulés, remboursement en attente</span><b class="out">−${eur(K.pending)}</b>` : ''}
       ${K.retraits ? `<span>Retraits</span><b class="out">−${eur(K.retraits)}</b>` : ''}
       <span class="tot">Argent disponible</span><b class="tot">${eur(K.dispo)}</b>
-      ${K.toCome ? `<span class="muted">À venir : ventes en livraison pas encore payées</span><b class="muted">${eur(K.toCome)}</b>` : ''}
+      ${K.toCome ? `<span class="muted">À venir, pas compté : ventes en livraison pas encore payées</span><b class="muted">${eur(K.toCome)}</b>` : ''}
     </div>
     ${breakEvenHtml(true)}
     ${!K.apports ? '<p class="hint" style="margin:0">Ajoute ton argent de départ avec « Argent » pour voir ce qu’il te reste à investir.</p>' : ''}
@@ -1154,7 +1169,7 @@ function alerts() {
   }));
   recv.filter((i) => i.status === 'stock' && held(i) >= 2).sort((a, b) => held(b) - held(a)).forEach((i) => rows.push({ i, t: held(i) > stale ? 'warn' : 'info', txt: `Reçu il y a ${held(i)}${NB}j, pas encore en annonce`, act: ['list', 'Annonce'] }));
   S.items.filter(awaitingPay).forEach((i) => rows.push(isDate(i.buyerRecvDate)
-    ? { i, t: 'info', txt: `Reçu par l’acheteur ${agoTxt(i.buyerRecvDate)} : paiement automatique le ${dShort(autoPayDate(i))}`, act: ['pay-ok', 'Payé'] }
+    ? { i, t: payLate(i) ? 'warn' : 'info', txt: payLate(i) ? `Reçu par l’acheteur ${agoTxt(i.buyerRecvDate)} : l’argent devrait être arrivé, vérifie puis touche « Payé »` : `Reçu par l’acheteur ${agoTxt(i.buyerRecvDate)} : paiement attendu vers le ${dShort(autoPayDate(i))}`, act: ['pay-ok', 'Payé'] }
     : { i, t: ago(i.sellDate) > 5 ? 'warn' : 'info', txt: `Vendu en livraison ${agoTxt(i.sellDate)} : l’acheteur a reçu le colis ?`, act: ['buyer-recv', 'Reçu'] }));
   recv.filter((i) => i.status === 'reserve' && !(marketDays(i) > stale)).forEach((i) => rows.push({ i, t: 'info', txt: 'Réservé : pense à finaliser la vente', act: ['sell', 'Vendu'] }));
   const noLink = open.filter((i) => i.status !== 'stock' && !safeUrl(i.listUrl)).length;
@@ -1163,7 +1178,7 @@ function alerts() {
 
 function insights() {
   const out = [];
-  const sold = S.items.filter(isSold);
+  const sold = S.items.filter(isPaid);
   const mt = modelTable(sold).filter((g) => g.n >= 2);
   if (mt.length) {
     const best = mt.slice().sort((a, b) => b.avgProfit - a.avgProfit)[0];
@@ -1231,7 +1246,7 @@ function journal(m, ms) {
       <span class="lg-d">${dShort(e.d)}</span>
       ${mini(e.i)}
       <span class="lg-m"><span class="lg-t ${e.t}">${e.t === 'achat' ? 'Achat' : 'Vente'}</span>${tag(e.i)}<span class="lg-n">${esc(e.i.model)}</span></span>
-      <span class="lg-a">${e.t === 'achat' ? `<b class="out">${eur(-cost(e.i))}</b>` : `<b>${eurS(num(e.i.sellPrice))}</b><small class="${p >= 0 ? 'pos' : 'neg'}">${eurS(p)}</small>`}</span>
+      <span class="lg-a">${e.t === 'achat' ? `<b class="out">${eur(-cost(e.i))}</b>` : `<b>${eurS(num(e.i.sellPrice))}</b><small class="${!isPaid(e.i) ? 'muted' : p >= 0 ? 'pos' : 'neg'}">${isPaid(e.i) ? eurS(p) : 'en attente'}</small>`}</span>
     </div>`;
   }).join('')}</div>
   <div class="lg-tot"><span>Sorties ${eur(-ms.cashOut)}</span><span>Entrées ${eurS(ms.cashIn)}</span><span>Flux de caisse ${eurS(ms.cash)}</span></div>`;
@@ -1309,7 +1324,9 @@ function renderList() {
   const bits = [plural(arr.length, 'article')];
   if (open.length) bits.push(`${eur(sum(open, cost))} investis`);
   if (open.some(listed)) bits.push(`${eur(sum(open.filter(listed), (i) => num(i.listPrice)))} affichés`);
-  if (sold.length) bits.push(`bénéfice ${eurS(sum(sold, profit))}`);
+  const sp = sold.filter(isPaid), sw = sold.filter(awaitingPay);
+  if (sp.length) bits.push(`bénéfice ${eurS(sum(sp, profit))}`);
+  if (sw.length) bits.push(`${eurS(sum(sw, profit))} en attente de paiement, pas comptés`);
   sumEl.textContent = bits.join(' · ');
   if (!arr.length) {
     el.innerHTML = S.items.length
@@ -1455,8 +1472,8 @@ function detailBody(i) {
   else if (!inTransit(i) && !isCancelled(i)) tl.push(`<li><span class="dot"></span><div><b>${i.status === 'stock' ? 'À mettre en annonce' : 'En attente d’acheteur'}</b><small>J+${h} depuis la réception</small></div></li>`);
   if (sold && (i.paid === false || i.paidDate || isDate(i.buyerRecvDate))) {
     tl.push(`<li><span class="dot ${isDate(i.buyerRecvDate) ? 'ok' : 'on'}"></span><div><b>${isDate(i.buyerRecvDate) ? 'Reçu par l’acheteur' : 'En route vers l’acheteur'}</b><small>${isDate(i.buyerRecvDate) ? dLong(i.buyerRecvDate) : `envoyé ${agoTxt(i.sellDate)}`}</small></div></li>`);
-    tl.push(isPaid(i) ? `<li><span class="dot ok"></span><div><b>Paiement reçu · ${eur(num(i.sellPrice) - num(i.sellFees))} dans la caisse</b><small>${dLong(paidOn(i))}${i.paid === false ? ` · automatique ${payDelay()}${NB}j après réception` : ''}</small></div></li>`
-      : `<li><span class="dot on"></span><div><b>Paiement en attente · ${eur(num(i.sellPrice) - num(i.sellFees))}</b><small>${isDate(i.buyerRecvDate) ? `automatique le ${dLong(autoPayDate(i))} si l’acheteur ne valide pas avant` : `l’acheteur a ${payDelay()}${NB}j après réception pour valider`}</small></div></li>`);
+    tl.push(isPaid(i) ? `<li><span class="dot ok"></span><div><b>Paiement reçu · ${eur(num(i.sellPrice) - num(i.sellFees))} dans la caisse</b><small>${dLong(paidOn(i))}</small></div></li>`
+      : `<li><span class="dot on"></span><div><b>Paiement en attente · ${eur(num(i.sellPrice) - num(i.sellFees))} · pas encore compté</b><small>${isDate(i.buyerRecvDate) ? `attendu vers le ${dLong(autoPayDate(i))} : touche « Argent reçu » quand il est sur ton compte` : 'compté dans la caisse et le bénéfice seulement quand tu touches « Argent reçu »'}</small></div></li>`);
   }
   const specs = [
     ['Catégorie', (CATS[i.category] || CATS.autre).label],
@@ -1547,7 +1564,13 @@ const radios = (name, opts, cur, cls = 'opts') => `<div class="${cls}" role="rad
 const checks = (name, opts, cur) => `<div class="opts">${opts.map((v) => `<label class="opt"><input type="checkbox" name="${name}" value="${esc(v)}" ${(cur || []).includes(v) ? 'checked' : ''}><span>${esc(v)}</span></label>`).join('')}</div>`;
 const errSlot = (id) => `<div class="err" data-err="${id}" hidden></div>`;
 const moneyF = (id, label, v, hint) => `<div class="field"><label for="${id}">${label}</label><div class="affix"><input id="${id}" class="inp money" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(numIn(v))}"></div>${hint ? `<small class="hint">${hint}</small>` : ''}${errSlot(id)}</div>`;
-const dateF = (id, label, v) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" class="inp" type="date" value="${esc(v || '')}">${errSlot(id)}</div>`;
+const dateF = (id, label, v) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" class="inp" type="date" max="${today()}" value="${esc(v || '')}">${errSlot(id)}</div>`;
+// Refuse toute date dans le futur (une faute de frappe décalait l'argent d'un mois)
+function noFuture() {
+  const t = today(), bad = $$('#sheet-root input[type="date"]').find((x) => x.value && x.value > t && !x.closest('[hidden]'));
+  if (bad) { fieldErr(bad.id, `Date dans le futur : aujourd’hui on est le ${dShort(t)}`); return false; }
+  return true;
+}
 const textF = (id, label, v, ph, extra = '') => `<div class="field"><label for="${id}">${label}</label><input id="${id}" class="inp" autocomplete="off" placeholder="${esc(ph || '')}" value="${esc(v || '')}" ${extra}>${errSlot(id)}</div>`;
 function fieldErr(id, msg) {
   const e = $(`[data-err="${id}"]`), inp = $('#' + id);
@@ -1756,6 +1779,7 @@ function cleanupForm() {
 async function saveForm(btn) {
   if (!F) return;
   clearErrs();
+  if (!noFuture()) return;
   if (F.photos.some((p) => p.state === 'up')) { toast('Patiente, les photos sont en cours d’envoi.'); return; }
   const v = {
     category: radioVal('f-cat') || 'autre', model: val('f-model'), details: val('f-details'), condition: val('f-cond'),
@@ -1841,7 +1865,7 @@ function openQuick(mode, id) {
     body = `${head}<div class="row2">${moneyF('q-price', 'Prix de vente', listed(i) ? i.listPrice : null)}${dateF('q-date', 'Date de vente', today())}</div>
       ${moneyF('q-fees', 'Frais de vente', null, 'Envoi, commission, essence…')}
       <div class="field"><span class="lbl">Vendu via</span>${radios('q-chan', CHANNELS.map((c) => [c, c]), lastChannel())}</div>
-      <div id="q-pay" class="sub" ${isShipSale(lastChannel()) ? '' : 'hidden'}><p class="hint" style="margin:0">Paiement sécurisé : l’argent n’entre dans la caisse qu’une fois le colis reçu par l’acheteur et validé (ou automatiquement ${payDelay()}${NB}j après réception).</p>
+      <div id="q-pay" class="sub" ${isShipSale(lastChannel()) ? '' : 'hidden'}><p class="hint" style="margin:0">Paiement sécurisé : l’argent et le bénéfice ne sont comptés que quand tu touches « Argent reçu ».</p>
         <label class="sw"><span class="sw-t"><b>Argent déjà reçu</b><small>Coche seulement si le paiement est déjà arrivé</small></span><input type="checkbox" id="q-paid" role="switch"><span class="sw-ui" aria-hidden="true"></span></label></div>
       ${textF('q-buyer', 'Acheteur <span class="opt-l">(pseudo)</span>', '', '')}
       ${`<div class="field"><label for="q-snotes">Détails de la vente <span class="opt-l">(facultatif)</span></label><textarea id="q-snotes" class="inp" rows="2" placeholder="ex. revendue avec une seule manette, jeux gardés, remise de 20 €…">${esc(i.sellNotes || '')}</textarea></div>`}
@@ -1877,6 +1901,7 @@ async function saveQuick(btn) {
   const mode = btn.dataset.mode, i = byId(btn.dataset.id);
   if (!i) { closeSheet(); return; }
   clearErrs();
+  if (!noFuture()) return;
   let patch, msg;
   if (mode === 'recv') {
     const d = val('q-recv');
@@ -1905,7 +1930,7 @@ async function saveQuick(btn) {
       if (r < i.buyDate || r > d) return fieldErr('q-recv', 'La réception doit être entre l’achat et la vente.');
       Object.assign(patch, { received: true, receiveDate: r });
     }
-    msg = `${i.ref} vendu : ${eurS(price - fees - cost(i))} de bénéfice${waitPay ? ` · ${eur(price - fees)} en attente de paiement` : ''}`;
+    msg = waitPay ? `${i.ref} vendu : ${eurS(price - fees - cost(i))} de bénéfice prévu, compté quand tu toucheras « Argent reçu »` : `${i.ref} vendu : ${eurS(price - fees - cost(i))} de bénéfice`;
   } else {
     const log = (Array.isArray(i.priceLog) ? i.priceLog : []).map((e) => ({ d: e.d, p: e.p }));
     if (!log.length && i.listPrice != null && isDate(i.listDate) && i.listPrice !== price) log.push({ d: i.listDate, p: i.listPrice });
@@ -2068,9 +2093,9 @@ function drawMonthChart(host, rows) {
 }
 
 function bilanHtml() {
-  const K = capital(), cs = sum(S.items.filter(isSold), cost);
+  const K = capital(), cs = sum(S.items.filter(isPaid), cost);
   const t = [
-    ['Bénéfice net total', eurS(K.profit), `${plural(K.nSold, 'vente')} · ROI ${pctS(cs ? K.profit / cs : null)}`, '', sign(K.profit)],
+    ['Bénéfice net total', eurS(K.profit), `${plural(K.nSold, 'vente payée', 'ventes payées')} · ROI ${pctS(cs ? K.profit / cs : null)}${K.nWait ? ` · ${eurS(K.waitProfit)} en attente, pas compté` : ''}`, '', sign(K.profit)],
     ['Total investi', eur(K.invested), `${plural(S.items.length, 'achat')}, prix + frais`, '', 'c-warn'],
     ['Total encaissé', eur(K.cashed), `ventes payées, frais déduits${K.toCome ? ` · ${eur(K.toCome)} à venir` : ''}`, '', 'c-info'],
     ['Apports nets', eur(K.apports - K.retraits), K.apports ? `bénéfice ${pctS((K.apports - K.retraits) > 0 ? K.profit / (K.apports - K.retraits) : null)} des apports` : 'aucun apport déclaré'],
@@ -2098,7 +2123,7 @@ function projHtml() {
       ${rows.length ? `<div class="tiles">${[
         ['CA du stock', eur(ca), plural(rows.length, 'article'), '', 'c-info'],
         ['Bénéfice du stock', eurS(pr), `ROI ${pctS(K.stock ? pr / K.stock : null)}`, '', sign(pr)],
-        ['Bénéfice total', eurS(K.profit + pr), `${eurS(K.profit)} déjà réalisés + ${eurS(pr)}`, '', sign(K.profit + pr)],
+        ['Bénéfice total', eurS(K.profit + K.waitProfit + pr), `${eurS(K.profit)} déjà encaissés${K.waitProfit ? ` + ${eurS(K.waitProfit)} en attente` : ''} + ${eurS(pr)}`, '', sign(K.profit + K.waitProfit + pr)],
         ['Récupéré − dépensé', eurS(after), after >= 0 ? 'rentré dans tes frais' : 'toujours pas rentré dans tes frais', '', sign(after)],
       ].map(tileHtml).join('')}</div>
       <div class="tbl-wrap"><table><thead><tr><th>Article</th><th>Coût</th><th>Vente</th><th>Bénéfice</th></tr></thead><tbody>${rows.map((r) => `<tr class="click" data-act="open" data-id="${esc(r.i.id)}"><td><span class="cellm">${mini(r.i)}<span>${tag(r.i)} <span style="white-space:normal">${esc(r.i.model)}</span></span></span></td><td>${eur(cost(r.i))}</td><td>${eur(r.sale)}</td><td><b class="${r.p >= 0 ? 'pos' : 'neg'}">${eurS(r.p)}</b></td></tr>`).join('')}</tbody></table></div>`
@@ -2161,7 +2186,8 @@ function renderStats() {
   const P = S.period, cur = thisMonth(), start12 = addMonths(cur, -11);
   const years = [...new Set(S.items.flatMap((i) => [i.buyDate, isSold(i) ? i.sellDate : null]).filter(isDate).map((d) => d.slice(0, 4)))].sort().reverse();
   const inP = (d) => isDate(d) && (P === 'all' || (P === '12m' ? d.slice(0, 7) >= start12 : d.slice(0, 4) === P));
-  const sold = S.items.filter((i) => isSold(i) && inP(i.sellDate)), bought = S.items.filter((i) => inP(i.buyDate));
+  // Ventes comptées à la date où l'argent est arrivé
+  const sold = S.items.filter((i) => isPaid(i) && inP(paidOn(i))), bought = S.items.filter((i) => inP(i.buyDate));
   const A = aggregate(bought, sold);
   let months;
   if (P === '12m') months = monthRange(start12, cur);
@@ -2201,7 +2227,7 @@ function renderStats() {
   const stockHtml = `<dl class="kv"><dt>Articles en cours</dt><dd>${open.length}</dd><dt>Dont en livraison</dt><dd>${transitOpen.length} · ${eur(sum(transitOpen, cost))}</dd><dt>Capital immobilisé</dt><dd>${eur(sum(open, cost))}</dd><dt>Valeur affichée (${lst.length} annonces)</dt><dd>${eur(sum(lst, (i) => num(i.listPrice)))}</dd><dt>Bénéfice potentiel affiché</dt><dd class="pos">${eurS(sum(lst, potential))}</dd><dt>Pas encore en annonce</dt><dd>${open.filter((i) => i.status === 'stock').length}</dd><dt>Âge moyen depuis réception</dt><dd>${recvOpen.length ? days(sum(recvOpen, held) / recvOpen.length) : '—'}</dd></dl>
     <div class="hbars" style="margin-top:14px">${buckets.map((b) => `<div class="hbar"><span class="hb-l">${b.l}<small>${eur(b.c)}</small></span><span class="hb-t"><span class="hb-f" style="width:${(b.n / maxB * 100).toFixed(1)}%"></span></span><span class="hb-v">${b.n}</span></div>`).join('')}</div>`;
 
-  const bySrc = Object.entries(groupBy(bought, (i) => i.buySource || 'Non renseigné')).map(([k, a]) => { const s = a.filter(isSold); const sh = a.map(shipDays).filter((d) => d != null); return { k, n: a.length, sn: s.length, ap: s.length ? sum(s, profit) / s.length : null, inv: sum(a, cost), ship: sh.length ? avg(sh) : null }; }).sort((a, b) => b.n - a.n);
+  const bySrc = Object.entries(groupBy(bought, (i) => i.buySource || 'Non renseigné')).map(([k, a]) => { const s = a.filter(isPaid); const sh = a.map(shipDays).filter((d) => d != null); return { k, n: a.length, sn: s.length, ap: s.length ? sum(s, profit) / s.length : null, inv: sum(a, cost), ship: sh.length ? avg(sh) : null }; }).sort((a, b) => b.n - a.n);
   const byChan = Object.entries(groupBy(sold, (i) => i.sellChannel || 'Non renseigné')).map(([k, a]) => ({ k, n: a.length, ca: sum(a, (i) => num(i.sellPrice)), ap: sum(a, profit) / a.length, d: sum(a, saleDays) / a.length })).sort((a, b) => b.n - a.n);
   const disc = avgDiscount(sold), atAsk = sold.filter((i) => num(i.listPrice) > 0 && num(i.sellPrice) >= num(i.listPrice)).length, withList = sold.filter((i) => num(i.listPrice) > 0).length;
   const drops = sold.length ? sum(sold, (i) => Math.max(0, (Array.isArray(i.priceLog) ? i.priceLog.length : 0) - 1)) / sold.length : null;
@@ -2220,8 +2246,8 @@ function renderStats() {
   const wkHtml = sold.length ? `<div class="wk">${wk.map((n, k) => `<div class="col"><span class="n">${n}</span><span class="b" style="height:${(n / maxW * 100).toFixed(1)}%"></span><span class="l">${['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'][k]}</span></div>`).join('')}</div>` : '<p class="muted" style="margin:0">Pas encore de vente sur la période.</p>';
 
   const Y = /^\d{4}$/.test(P) ? P : cur.slice(0, 4);
-  const soldY = S.items.filter((i) => isSold(i) && i.sellDate.slice(0, 4) === Y);
-  const plat = ['Leboncoin', 'Vinted'].map((p) => { const s = soldY.filter((i) => platformOf(i.sellChannel) === p && isPaid(i)); return { p, n: s.length, amt: sum(s, (i) => num(i.sellPrice)) }; });
+  const soldY = S.items.filter((i) => paidIn(i, Y));
+  const plat = ['Leboncoin', 'Vinted'].map((p) => { const s = soldY.filter((i) => platformOf(i.sellChannel) === p); return { p, n: s.length, amt: sum(s, (i) => num(i.sellPrice)) }; });
   const caY = sum(soldY, (i) => num(i.sellPrice)), profY = sum(soldY, profit);
   const st = S.settings, rate = num(st.urssafRate), capM = num(st.microCap);
   const fiscHtml = `<div class="meters">${plat.map((x) => {
@@ -2783,7 +2809,9 @@ const services = () => String(tourCfg().services || '').split('\n').map((l) => l
 });
 // Devine la prestation d'après le message du client
 function guessService(txt) {
-  const t = norm(txt || ''), S2 = services();
+  // Les lignes d'identité du formulaire (« Téléphone : 06… », « Adresse : … ») ne disent rien de la panne : on les ignore
+  const body = String(txt || '').split('\n').filter((l) => !/^\s*(pr[eé]nom|nom|t[eé]l[eé]phone|t[eé]l|portable|adresse|commune|ville|quand|nombre|manettes?|demande r[eé]paro)\s*:/i.test(l)).join(' ');
+  const t = norm(body), S2 = services();
   const pick = (re) => S2.find((s) => re.test(norm(s.name)));
   if (/hdmi/.test(t)) return pick(/hdmi/);
   if (/iphone|telephone|samsung|ecran casse|batterie.*(iphone|tel)|vitre|smartphone|xiaomi|redmi|pixel/.test(t)) return pick(/telephone/);
@@ -3107,7 +3135,7 @@ function openSettings() {
     </div>
     <div class="fs"><p class="fs-t">Annonces Leboncoin</p>
       ${textF('s-city', 'Ville pour la remise en main propre', st.adCity, 'ex. Grenoble')}
-      <div class="field"><label for="s-pay">Paiement automatique après réception par l’acheteur</label><span class="selw" style="display:block"><select id="s-pay" class="inp">${[1, 2, 3, 4, 5, 7].map((d) => `<option value="${d}" ${payDelay() === d ? 'selected' : ''}>${d} jour${d > 1 ? 's' : ''}</option>`).join('')}</select></span><small class="hint">Ventes en livraison : l’argent entre dans la caisse à cette date, sauf si tu indiques « Argent reçu » avant.</small></div>
+      <div class="field"><label for="s-pay">Paiement attendu après réception par l’acheteur</label><span class="selw" style="display:block"><select id="s-pay" class="inp">${[1, 2, 3, 4, 5, 7].map((d) => `<option value="${d}" ${payDelay() === d ? 'selected' : ''}>${d} jour${d > 1 ? 's' : ''}</option>`).join('')}</select></span><small class="hint">Ventes en livraison : sert seulement à te rappeler de vérifier ton compte. L’argent est compté quand tu touches « Argent reçu ».</small></div>
     </div>
     <div class="fs"><p class="fs-t">Statut</p>
       ${radios('s-legal', [['particulier', 'Particulier'], ['micro', 'Micro-entreprise']], micro ? 'micro' : 'particulier', 'opts')}
@@ -3204,14 +3232,14 @@ const VIEWS = ['accueil', 'articles', 'simulateur', 'stats', 'tournee'];
 function openRep(id, copyOf) {
   const T = repTypes(), last = [...T.keys()].pop(), r = id ? S.repairs.find((x) => x.id === id) : null;
   const src = copyOf ? S.repairs.find((x) => x.id === copyOf) : null;
-  // copie : même prestation, même prix, même suivi ; les infos du client sont vidées (nouveau client)
-  const v = r || (src && { ...src, client: '', phone: '', address: '', city: '', note: '' }) || { type: last, qty: 1, unitPrice: T.get(last), gotDate: today(), done: false, returned: false, paid: false };
+  // copie : même prestation, même prix unitaire, même suivi ; client vidé, prix total recalculé, argent pas encore reçu
+  const v = r || (src && { ...src, client: '', phone: '', address: '', city: '', note: '', total: null, paid: false, paidDate: '' }) || { type: last, qty: 1, unitPrice: T.get(last), gotDate: today(), done: false, returned: false, paid: false };
   const done = repDone(v), ret = v.returned !== false, paid = repPaid(v);
   const sw = (id2, on, label, hint) => `<label class="sw"><span class="sw-t"><b>${label}</b><small>${hint}</small></span><input type="checkbox" id="${id2}" role="switch" ${on ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>`;
   openSheet({ kind: 'rep', id, title: r ? 'Modifier la prestation' : src ? 'Copie de la prestation' : 'Prestation Réparo', body: `
     <div class="field"><label for="r-type">Type de prestation</label><input id="r-type" class="inp" list="dl-rep" autocomplete="off" value="${esc(v.type)}" placeholder="ex. Joystick drift, nettoyage, HDMI…"><datalist id="dl-rep">${[...T.keys()].map((t) => `<option value="${esc(t)}">`).join('')}</datalist>${errSlot('r-type')}</div>
     <div class="row2"><div class="field"><label for="r-qty">Nombre</label><span class="selw" style="display:block"><select id="r-qty" class="inp">${[1, 2, 3, 4, 5, 6, 8, 10].map((n) => `<option value="${n}" ${n === repQty(v) ? 'selected' : ''}>${n}</option>`).join('')}</select></span></div>${moneyF('r-price', 'Prix par unité', v.unitPrice)}</div>
-    ${moneyF('r-total', 'Prix total payé par le client', r || src ? repTotal(r || src) : v.unitPrice, 'Modifie-le si tu as fait un prix (ex. 35 € les deux au lieu de 40 €)')}
+    ${moneyF('r-total', 'Prix total payé par le client', r ? repTotal(r) : src ? repQty(src) * num(src.unitPrice) : v.unitPrice, 'Modifie-le si tu as fait un prix (ex. 35 € les deux au lieu de 40 €)')}
     <div class="fs"><p class="fs-t">Suivi</p>
       ${sw('r-picked', v.picked !== false, 'Objet récupéré', 'Décoche si tu dois encore passer le chercher (il apparaît alors dans la Tournée)')}
       <div id="r-sec-pick" class="sub">${dateF('r-got', 'Objet récupéré le', isDate(v.gotDate) ? v.gotDate : isDate(v.date) ? v.date : today())}</div>
@@ -3220,7 +3248,7 @@ function openRep(id, copyOf) {
       <div id="r-wrap-ret">${sw('r-ret', ret && done, 'Rendu au client', 'L’objet est reparti chez le client')}
       <div id="r-sec-ret" class="sub">${dateF('r-retDate', 'Rendu le', isDate(v.returnDate) ? v.returnDate : today())}</div></div></div>
       ${sw('r-paid', paid, 'Argent reçu', 'L’argent entre dans la caisse à cette date')}
-      <div id="r-sec-paid" class="sub">${dateF('r-paidDate', 'Payé le', isDate(v.paidDate) ? v.paidDate : (r || src) && repPaid(r || src) ? v.date : today())}</div>
+      <div id="r-sec-paid" class="sub">${dateF('r-paidDate', 'Payé le', isDate(v.paidDate) ? v.paidDate : r && repPaid(r) ? v.date : today())}</div>
     </div>
     <div class="row2">${moneyF('r-parts', 'Pièces achetées <span class="opt-l">(facultatif)</span>', num(v.partsCost) || null)}${textF('r-client', 'Client <span class="opt-l">(facultatif)</span>', v.client || '', 'Prénom, pseudo…')}</div>
     <div class="row2">${textF('r-phone', 'Téléphone <span class="opt-l">(facultatif)</span>', v.phone || '', '06 …', 'inputmode="tel"')}${textF('r-city', 'Commune <span class="opt-l">(facultatif)</span>', v.city || '', 'ex. Meylan')}</div>
@@ -3228,7 +3256,7 @@ function openRep(id, copyOf) {
     ${textF('r-note', 'Note <span class="opt-l">(facultatif)</span>', v.note || '', 'ex. modules Hall, manette blanche…')}
     <p class="preview" id="r-prev"></p>`,
     foot: `<button class="btn" data-act="close">Annuler</button>${r ? `<button class="btn" data-act="rep-copy" data-id="${esc(id)}">Dupliquer</button>` : ''}<button class="btn primary grow" data-act="rep-save" ${id ? `data-id="${esc(id)}"` : ''}>${src ? 'Créer la copie' : 'Enregistrer'}</button>` });
-  if (r || src) $('#r-total').dataset.touched = '1';
+  if (r) $('#r-total').dataset.touched = '1';
   if (src) setTimeout(() => { const c = $('#r-client'); if (c) c.focus(); }, 60);
   repSections(); repPreview();
 }
@@ -3283,6 +3311,7 @@ const ACT = {
   'rep-copy': (a) => openRep(null, a.dataset.id),
   'rep-save': async (a) => {
     clearErrs();
+    if (!noFuture()) return;
     const id = a.dataset.id || null, old = id ? S.repairs.find((x) => x.id === id) : null;
     const picked = $('#r-picked').checked, done = picked && $('#r-done').checked, ret = done && $('#r-ret').checked, paid = $('#r-paid').checked;
     const r = { type: val('r-type').trim(), qty: Number(val('r-qty')) || 1, unitPrice: parseNum(val('r-price')), total: parseNum(val('r-total')), partsCost: parseNum(val('r-parts')) || 0, client: val('r-client').trim(), note: val('r-note').trim(),
@@ -3369,7 +3398,7 @@ const ACT = {
   },
   'buyer-recv': async (a) => {
     const i = byId(a.dataset.id); if (!i) return;
-    if (await upd(i.id, { buyerRecvDate: today() })) toast(`${i.ref} reçu par l’acheteur · paiement automatique le ${dShort(addDays(today(), payDelay()))}`);
+    if (await upd(i.id, { buyerRecvDate: today() })) toast(`${i.ref} reçu par l’acheteur · paiement attendu vers le ${dShort(addDays(today(), payDelay()))}, touche « Argent reçu » quand il arrive`);
   },
   'pay-ok': async (a) => {
     const i = byId(a.dataset.id); if (!i) return;
@@ -3406,6 +3435,7 @@ const ACT = {
   },
   'cash-save': async (a) => {
     clearErrs();
+    if (!noFuture()) return;
     const amount = parseNum(val('c-amount')), date = val('c-date');
     if (amount == null || amount <= 0) return fieldErr('c-amount', 'Indique un montant.');
     if (!isDate(date)) return fieldErr('c-date', 'Date requise.');
@@ -3538,6 +3568,8 @@ async function init() {
   }
 }
 
+// Accès réservé aux tests locaux (jamais actif sur le site en ligne)
+if (location.hostname === 'localhost') window.__app = { S, capital, monthStats, cashLedger, isPaid, paidOn, profit };
 init();
 })();
 </script>
