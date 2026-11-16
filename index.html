@@ -1056,7 +1056,7 @@ function renderAccueil() {
         ${cashCard()}
         ${salesCard(m, ms)}
         ${reparoStrip(m)}
-        ${(() => { const st = tourStops(today()); if (!st.length) return ''; const n = st[st.length - 1].n; return `<button class="strip tour" data-act="view" data-view="tournee"><span><b>Tournée ce soir</b></span><span><b>${n}</b> arrêt${n > 1 ? 's' : ''}</span><span>${st.filter((x) => x.kind === 'pick').length} à récupérer · ${st.filter((x) => x.kind === 'ret').length} à rendre</span>${ic('right')}</button>`; })()}
+        ${(() => { const st = tourStops(today()); if (!st.length) return ''; const n = st[st.length - 1].n; return `<button class="strip tour" data-act="view" data-view="tournee"><span><b>Tournée ${momentTxt(today(), tourSlot(today()))}</b></span><span><b>${n}</b> arrêt${n > 1 ? 's' : ''}</span><span>${st.filter((x) => x.kind === 'pick').length} à récupérer · ${st.filter((x) => x.kind === 'ret').length} à rendre</span>${ic('right')}</button>`; })()}
         <button class="strip" data-act="goto" data-view="articles" data-st="encours">
           <span>En ce moment</span><span><b>${open.length}</b> en cours</span><span><b>${eur(capital)}</b> immobilisés</span><span><b>${eurS(pot)}</b> au prix affiché</span>${ic('right')}
         </button>
@@ -2731,15 +2731,35 @@ function openAd(id, focus) {
 function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el.textContent = `(${t.value.length} caractères)`; }
 
 /* ---------- Tournée : demandes clients, ordre de passage (semaine : boucle Crolles → Crolles ; week-end : Saint-Égrève → Crolles), messages prêts ---------- */
-const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', wdFrom: 'Crolles', wdTo: 'Crolles', wdStart: '18:00', wdEnd: '21:00', stop: 12, formUrl: '', ntfy: '',
+const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', wdFrom: 'Crolles', wdTo: 'Crolles', wdStart: '18:00', wdEnd: '21:00', wd2: false, midStart: '12:00', midEnd: '14:00', stop: 12, formUrl: '', ntfy: '',
   services: 'Joystick drift (manette PS5) : 25 € (50 € les deux, 20 € la manette à partir de la 3e)\nJoystick drift (manette Xbox) : 25 € (mêmes tarifs que PS5)\nJoysticks à effet Hall (plus jamais de drift) : 45 € la manette\nManette PS5 : 25 € (bouton, gâchette, port de charge, batterie : à partir de 20 €)\nPS5 nettoyage simple : 40 € (poussière, ventilateur)\nPS5 nettoyage liquide métal : 80 € (surchauffe, bruit, nettoyage complet)\nHDMI PS5 : 75 € (port HDMI remplacé)\nTéléphone (batterie, écran, vitre arrière) : sur devis\nDiagnostic : gratuit si tu répares, 15 € sinon', p1: 25, p2: 50, delai: '24-48 h', garantie: '30 jours' };
 const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
 // Semaine (lun-ven) : boucle depuis Crolles. Week-end : trajet Amazon Saint-Égrève → Crolles. Renvoie les réglages du jour D.
 const isWeekend = (D) => { const g = weekday(D || today()); return g === 0 || g === 6; };
-function dayCfg(D) {
+function dayCfg(D, slot) {
   const c = tourCfg();
   if (isWeekend(D)) return { ...c, weekend: true };
-  return { ...c, weekend: false, from: c.wdFrom || 'Crolles', to: c.wdTo || 'Crolles', start: c.wdStart || TOUR_DEF.wdStart, end: c.wdEnd || TOUR_DEF.wdEnd };
+  const w = { ...c, weekend: false, from: c.wdFrom || 'Crolles', to: c.wdTo || 'Crolles', start: c.wdStart || TOUR_DEF.wdStart, end: c.wdEnd || TOUR_DEF.wdEnd };
+  if (slot === 'midi' && twoRounds(D)) return { ...w, midi: true, start: c.midStart || TOUR_DEF.midStart, end: c.midEnd || TOUR_DEF.midEnd };
+  return w;
+}
+// Deux tournées (midi + soir) : seulement en semaine, et seulement si activé dans les réglages
+const twoRounds = (D) => !!tourCfg().wd2 && !isWeekend(D);
+// Tournée affichée : midi ou soir (par défaut midi tant que la tournée de midi n'est pas finie)
+function tourSlot(D) {
+  D = D || tourDay();
+  if (!twoRounds(D)) return 'soir';
+  if (S.tourSlot) return S.tourSlot;
+  return D === today() && nowMin() >= toMin(dayCfg(D, 'midi').end) ? 'soir' : 'midi';
+}
+// Clé de rangement (ordre, retard, messages envoyés) : une par tournée
+const roundKey = (D, slot) => (slot === 'midi' && twoRounds(D) ? D + 'm' : D);
+// « ce soir », « demain midi », « le 21/11 au soir »…
+function momentTxt(D, slot) {
+  const m = slot === 'midi' && twoRounds(D) ? 'midi' : 'soir';
+  if (!isDate(D) || D === today()) return 'ce ' + m;
+  if (D === addDays(today(), 1)) return 'demain ' + m;
+  return 'le ' + dShort(D) + (m === 'midi' ? ' à midi' : ' au soir');
 }
 // Communes dans l'ordre où on les traverse en rentrant de Saint-Égrève à Crolles (A480, rocade sud, A41) : ordre du week-end
 const ROUTE_RANK = [
@@ -2808,7 +2828,7 @@ function parseDemande(txt) {
   const pr = g('prestation', 'reparation');
   if (pr) { const sv = services().find((s) => s.line === pr || norm(pr).startsWith(norm(s.name))); r.type = sv ? sv.name : pr; }
   const when = g('quand', 'passage');
-  if (when) r.when = /demain/i.test(when) ? 'demain' : 'soir';
+  if (when) r.when = /demain/i.test(when) ? (/midi/i.test(when) ? 'demain-midi' : 'demain') : (/midi/i.test(when) ? 'midi' : 'soir');
   if (g('probleme', 'panne', 'remarque')) r.note = g('probleme', 'panne', 'remarque');
   r.name = r.name ? r.name[0].toUpperCase() + r.name.slice(1) : '';
   return r;
@@ -2856,13 +2876,16 @@ const tourDay = () => (S.tourDay === 'demain' ? addDays(today(), 1) : today());
 function planDateNow() { return today(); }
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 // Plage large annoncée au client dès l'ajout : pas besoin de renvoyer une heure précise ensuite
-const plage = (D) => { const c = dayCfg(D || today()); return `entre ${hm(toMin(c.start))} et ${hm(toMin(c.end || '21:00'))}`; };
+const plage = (D, slot) => { const c = dayCfg(D || today(), slot); return `entre ${hm(toMin(c.start))} et ${hm(toMin(c.end || '21:00'))}`; };
 
-function tourStops(D) {
+function tourStops(D, slot) {
+  slot = slot || tourSlot(D);
+  const mid = slot === 'midi' && twoRounds(D);
   const due = (r) => !isDate(r.planDate) || r.planDate <= D;
-  const pick = S.repairs.filter((r) => r.picked === false && due(r)).map((r) => ({ r, kind: 'pick' }));
+  // Tournée de midi : seulement les récupérations prévues à midi. Le soir : toutes les autres, plus celles de midi pas encore faites.
+  const pick = S.repairs.filter((r) => r.picked === false && due(r) && (!mid || r.planSlot === 'midi')).map((r) => ({ r, kind: 'pick' }));
   const ret = S.repairs.filter((r) => r.picked !== false && repDone(r) && r.returned === false && due(r)).map((r) => ({ r, kind: 'ret' }));
-  const ord = LS.get('tourOrd', {})[D] || [];
+  const K = roundKey(D, slot), ord = LS.get('tourOrd', {})[K] || [];
   const all = [...pick, ...ret];
   all.sort((a, b) => {
     const ia = ord.indexOf(a.r.id), ib = ord.indexOf(b.r.id);
@@ -2870,7 +2893,7 @@ function tourStops(D) {
     return cityRank(a.r.city, D) - cityRank(b.r.city, D) || (a.r.address || '').localeCompare(b.r.address || '') || (a.kind === 'ret' ? -1 : 1);
   });
   // Même adresse (retour + nouvelle manette) : un seul arrêt, l'heure est la même
-  const c = dayCfg(D), delay = num((LS.get('tourDelay', {}) || {})[D]);
+  const c = dayCfg(D, slot), delay = num((LS.get('tourDelay', {}) || {})[K]);
   let t = toMin(c.start) + delay, prev = null, n = 0;
   all.forEach((s) => {
     const key = normC((s.r.address || '') + (s.r.city || '')) || s.r.id;
@@ -2885,26 +2908,33 @@ function svcPrice(re) { const sv = services().find((x) => re.test(norm(x.name)))
 const REPLY_KINDS = [['drift', 'Drift manette'], ['tel', 'Téléphone'], ['hdmi', 'Port HDMI'], ['clean', 'Nettoyage / métal liquide']];
 function replyMsg(k) {
   const c = tourCfg(), ask = c.formUrl ? `Remplis ce petit formulaire (30 secondes) et je te confirme le passage : ${c.formUrl}` : `Envoie-moi ton prénom, ton numéro et ton adresse complète (avec la ville), et je te cale un passage.`;
-  if (k === 'drift') { const p = svcPrice(/drift.*ps5|drift/); return `Salut ! Merci pour ton message 🙏\nLe drift, c'est ce que je répare le plus. Je ne fais pas un simple nettoyage : je remplace le module joystick en entier, donc le stick repart comme neuf.\nJe passe récupérer ta manette devant chez toi le soir, je la répare à l'atelier et je te la ramène le lendemain soir. Si tu ne veux pas rester sans manette, je peux t'en prêter une en attendant (selon dispo).\n${p ? `Tarif : ${p}. ` : ''}Garantie ${c.garantie}.\nDis-moi : c'est le stick gauche, le droit ou les deux ? Et tu as combien de manettes à faire ?\n${ask}`; }
+  if (k === 'drift') { const p = svcPrice(/drift.*ps5|drift/); return `Salut ! Merci pour ton message 🙏\nLe drift, c'est ce que je répare le plus. Je ne fais pas un simple nettoyage : je remplace le module joystick en entier, donc le stick repart comme neuf.\nJe passe récupérer ta manette devant chez toi${tourCfg().wd2 ? ' le midi ou le soir' : ' le soir'}, je la répare à l'atelier et je te la ramène le lendemain soir.${tourCfg().wd2 ? ` En semaine, si je la récupère le midi, je peux souvent te la ramener le soir même.` : ''} Si tu ne veux pas rester sans manette, je peux t'en prêter une en attendant (selon dispo).\n${p ? `Tarif : ${p}. ` : ''}Garantie ${c.garantie}.\nDis-moi : c'est le stick gauche, le droit ou les deux ? Et tu as combien de manettes à faire ?\n${ask}`; }
   if (k === 'tel') return `Salut ! Merci de m'avoir écrit 🙏\nPour te donner un prix juste, dis-moi :\n- le modèle exact (ex. iPhone 13, Galaxy S21)\n- ce qui se passe : écran cassé, tactile qui ne répond plus, batterie qui se vide vite, vitre arrière fissurée…\nSi tu peux, envoie-moi une photo. Je te donne le prix avant de toucher à quoi que ce soit, sans engagement.\nEnsuite je peux passer le récupérer devant chez toi et te le ramener réparé, garantie ${c.garantie}.`;
   if (k === 'hdmi') { const p = svcPrice(/hdmi/); return `Salut ! Merci pour ton message 🙏\nPlus d'image sur la télé, ou une image qui coupe ? Sur PS5, c'est souvent le port HDMI qui est abîmé (câble tiré, console tombée…).\nJe remplace le port à l'atelier, je soude le neuf, et je teste la console sur une télé avant de te la rendre.\n${p ? `Tarif : ${p}. ` : ''}Garantie ${c.garantie}.\nDis-moi ce qui se passe exactement et, si tu peux, envoie une photo du port HDMI.\n${ask}`; }
   if (k === 'clean') { const p1 = svcPrice(/nettoyage simple/), p2 = svcPrice(/liquide/); return `Salut ! Merci pour ton message 🙏\nTa PS5 chauffe, souffle fort ou s'éteint toute seule ? C'est souvent la poussière, ou le métal liquide (ce qui fait passer la chaleur de la puce au radiateur) qui ne fait plus bien son travail.\nJe propose deux options :\n- Nettoyage simple${p1 ? ` (${p1.replace(/\s*\(.*\)$/, '')})` : ''} : poussière et ventilateur.\n- Nettoyage complet avec remplacement du métal liquide${p2 ? ` (${p2.replace(/\s*\(.*\)$/, '')})` : ''} : si elle surchauffe ou fait beaucoup de bruit.\nDis-moi ce que tu remarques et depuis quand : je te conseille la bonne option, pas besoin de faire le complet si le simple suffit. Garantie ${c.garantie}.\n${ask}`; }
   return '';
+}
+// Prochaine tournée où un retour peut se faire (au moins 30 min avant la fin)
+function nextRound() {
+  const T = today(), n = nowMin();
+  if (twoRounds(T) && n < toMin(dayCfg(T, 'midi').end) - 30) return [T, 'midi'];
+  if (n < toMin(dayCfg(T).end || '21:00') - 30) return [T, 'soir'];
+  const T1 = addDays(T, 1); return [T1, twoRounds(T1) ? 'midi' : 'soir'];
 }
 const firstName = (r) => (r.client || '').split(/\s+/)[0] || '';
 function tourMsg(kind, r, s) {
   r = r || {};
   const c = tourCfg(), nm = firstName(r), hi = nm ? `Salut ${nm} ! ` : 'Salut ! ', amt = repTotal(r) > 0 ? eur(repTotal(r)) : 'sur devis';
   const when = s ? `entre ${hm(s.from)} et ${hm(s.to)}` : '';
-  const soir = s && tourDay() !== today() ? 'demain soir' : 'ce soir';
+  const soir = momentTxt(s ? tourDay() : today(), s ? tourSlot() : 'soir');
   if (/^reply/.test(kind)) return replyMsg(kind.slice(6) || 'drift');
   const w = objWord(r);
-  if (kind === 'confirm') return `${hi}C'est noté ! Je passe récupérer ${w.ta} devant chez toi ${r.planDate && r.planDate !== today() ? (r.planDate === addDays(today(), 1) ? 'demain soir' : 'le ' + dShort(r.planDate) + ' au soir') : 'ce soir'} ${plage(isDate(r.planDate) ? r.planDate : today())}. Je t'envoie un message 10 min avant d'arriver. Tarif : ${amt}, à payer au retour.`;
+  if (kind === 'confirm') return `${hi}C'est noté ! Je passe récupérer ${w.ta} devant chez toi ${momentTxt(isDate(r.planDate) ? r.planDate : today(), r.planSlot)} ${plage(isDate(r.planDate) ? r.planDate : today(), r.planSlot)}. Je t'envoie un message 10 min avant d'arriver. Tarif : ${amt}, à payer au retour.`;
   if (kind === 'pick') return `${hi}C'est bon pour ${soir} : je passe récupérer ${w.ta} devant chez toi ${when}. Je t'envoie un message 10 min avant. Tarif : ${amt}, à payer au retour.`;
   if (kind === 'ret') return `${hi}${w.Ta} ${w.sont} ${w.rep} ! Je te ${w.la} ramène ${soir} ${when}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`;
   if (kind === 'late') return `${hi}Petit retard ${soir}, désolé : je passe plutôt ${when}. Je t'envoie un message 10 min avant.`;
   if (kind === 'eta') return `J'arrive dans 10 min, tu peux descendre ?`;
-  if (kind === 'ready') return `${hi}${w.Ta} ${w.sont} ${w.pret} ! Je te ${w.la} ramène ${nowMin() < toMin(dayCfg(today()).end || '21:00') - 30 ? 'ce soir' : 'demain soir'} ${plage(nowMin() < toMin(dayCfg(today()).end || '21:00') - 30 ? today() : addDays(today(), 1))}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`;
+  if (kind === 'ready') { const [nD, nS] = nextRound(); return `${hi}${w.Ta} ${w.sont} ${w.pret} ! Je te ${w.la} ramène ${momentTxt(nD, nS)} ${plage(nD, nS)}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`; }
   if (kind === 'thanks') return `${hi}Merci pour ta confiance ! Ta réparation est garantie ${c.garantie}, si le moindre souci revient, écris-moi. Et si tu es content, un petit partage ou un avis sur TikTok m'aide énormément.`;
   return '';
 }
@@ -2917,14 +2947,14 @@ function sendMsg(text, phone) {
 function renderTournee() {
   const el = $('#v-tournee');
   if (S.status !== 'ok') { el.innerHTML = stateBlock(); return; }
-  const D = tourDay(), c = dayCfg(D), stops = tourStops(D), sent = LS.get('tourSent', {});
-  const delay = num((LS.get('tourDelay', {}) || {})[D]);
+  const D = tourDay(), slot = tourSlot(D), K = roundKey(D, slot), c = dayCfg(D, slot), stops = tourStops(D, slot), sent = LS.get('tourSent', {});
+  const delay = num((LS.get('tourDelay', {}) || {})[K]);
   const nStops = stops.length ? stops[stops.length - 1].n : 0;
   const atelier = S.repairs.filter((r) => r.picked !== false && !repDone(r));
   const pickN = sum(stops.filter((s) => s.kind === 'pick'), (s) => repQty(s.r)), retN = sum(stops.filter((s) => s.kind === 'ret'), (s) => repQty(s.r));
   const cash = sum(stops.filter((s) => s.kind === 'ret' && !repPaid(s.r)), (s) => repTotal(s.r));
   const card = (s) => {
-    const r = s.r, pick = s.kind === 'pick', k = `${D}:${r.id}:${s.kind}`, wasSent = sent[k];
+    const r = s.r, pick = s.kind === 'pick', k = `${K}:${r.id}:${s.kind}`, wasSent = sent[k];
     const adr = [r.address, r.city].filter(Boolean).join(', ');
     return `<div class="stop ${pick ? 'pk' : 'rt'}">
       <div class="stop-h"><span class="stop-n">${s.n}</span><b class="stop-t">${hm(s.from)} – ${hm(s.to)}</b><span class="pill ${pick ? 'st-attente' : 'st-vendu'}">${pick ? `Récupérer ×${repQty(r)}` : `Rendre ×${repQty(r)} · ${eur(repTotal(r))}`}</span></div>
@@ -2946,13 +2976,14 @@ function renderTournee() {
       <button class="btn primary grow" data-act="dem-add">${ic('plus')} Nouvelle demande</button>
     </div>
     <div class="tour-reply"><span class="muted" style="font-size:12.5px">Répondre à un nouveau client :</span> ${REPLY_KINDS.map(([k, l]) => `<button class="chip" data-act="tour-reply" data-k="${k}">${l}</button>`).join(' ')}</div>
-    <div class="stabs" role="tablist">${[['ce-soir', 'Ce soir'], ['demain', 'Demain']].map(([v, l]) => `<button role="tab" data-act="tour-day" data-v="${v}" aria-selected="${(S.tourDay || 'ce-soir') === v}">${l}</button>`).join('')}</div>
+    <div class="stabs" role="tablist">${[['ce-soir', "Aujourd'hui"], ['demain', 'Demain']].map(([v, l]) => `<button role="tab" data-act="tour-day" data-v="${v}" aria-selected="${(S.tourDay || 'ce-soir') === v}">${l}</button>`).join('')}</div>
+    ${twoRounds(D) ? `<div class="stabs" role="tablist">${[['midi', 'Tournée de midi'], ['soir', 'Tournée du soir']].map(([v, l]) => `<button role="tab" data-act="tour-slot" data-v="${v}" aria-selected="${slot === v}">${l}</button>`).join('')}</div>` : ''}
     <section class="card tour-sum">
-      ${stops.length ? `<div class="tour-line"><b>${c.weekend ? 'Week-end' : 'Semaine'} · ${plural(nStops, 'arrêt')}</b><span>${pickN} à récupérer · ${retN} à rendre${cash ? ` · ${eur(cash)} à encaisser` : ''}</span><span>départ ${esc(c.from)} ${hm(toMin(c.start) + delay)} → ${esc(c.to)} vers ${hm(stops[stops.length - 1].to + 15)}</span></div>
+      ${stops.length ? `<div class="tour-line"><b>${c.weekend ? 'Week-end' : 'Semaine'}${twoRounds(D) ? (c.midi ? ' · midi' : ' · soir') : ''} · ${plural(nStops, 'arrêt')}</b><span>${pickN} à récupérer · ${retN} à rendre${cash ? ` · ${eur(cash)} à encaisser` : ''}</span><span>départ ${esc(c.from)} ${hm(toMin(c.start) + delay)} → ${esc(c.to)} vers ${hm(stops[stops.length - 1].to + 15)}</span></div>
       <div class="btns"><button class="btn primary grow" data-act="tour-go">Lancer la tournée (Google Maps)</button></div>
-      <div class="tour-delay"><span>Retard ce soir :</span>${[0, 10, 20, 30, 45].map((m) => `<button class="chip" data-act="tour-delay" data-m="${m}" aria-pressed="${delay === m}">${m ? '+' + m + ' min' : 'aucun'}</button>`).join('')}</div>
+      <div class="tour-delay"><span>Retard :</span>${[0, 10, 20, 30, 45].map((m) => `<button class="chip" data-act="tour-delay" data-m="${m}" aria-pressed="${delay === m}">${m ? '+' + m + ' min' : 'aucun'}</button>`).join('')}</div>
       ${delay ? '<p class="hint" style="margin:0">Les heures ont été décalées : touche « Prévenir du retard » sur chaque arrêt déjà prévenu.</p>' : ''}`
-      : `<p style="margin:0">Aucun arrêt ${D === today() ? 'ce soir' : 'demain'}. Ajoute une demande dès qu'un client t'écrit : elle va dans la tournée de ce soir (ou de demain si tu le choisis), à la bonne place sur ton trajet.</p>`}
+      : `<p style="margin:0">Aucun arrêt ${momentTxt(D, slot)}. Ajoute une demande dès qu'un client t'écrit : elle va dans la tournée que tu choisis, à la bonne place sur ton trajet.</p>`}
     </section>
     ${stops.map(card).join('')}
     <section class="card"><div class="card-h"><h2 class="sec">Atelier</h2><span class="muted" style="font-size:12.5px">${sum(atelier, repQty)} à réparer</span></div>
@@ -2965,6 +2996,16 @@ function renderTournee() {
     </section>`;
 }
 
+// Choix de passage proposés dans une demande (midi seulement en semaine, si les deux tournées sont activées)
+function whenOpts() {
+  const T = today(), T1 = addDays(T, 1), o = [];
+  const [nD, nS] = nextRound();
+  if (twoRounds(T) && nD === T && nS === 'midi') o.push(['midi', 'Ce midi']);
+  o.push(['soir', 'Ce soir']);
+  if (twoRounds(T1)) o.push(['demain-midi', 'Demain midi']);
+  o.push(['demain', 'Demain soir']);
+  return o;
+}
 function openDemande() {
   const T = repTypes(), sv = services(), last = (sv[0] && sv[0].name) || [...T.keys()].find((t) => /drift/i.test(t)) || [...T.keys()].pop();
   openSheet({ kind: 'dem', title: 'Nouvelle demande', body: `
@@ -2976,9 +3017,9 @@ function openDemande() {
     <div class="row2"><div class="field"><label for="d-city">Commune</label><input id="d-city" class="inp" list="dl-city" autocomplete="off"><datalist id="dl-city">${CITIES.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
       <div class="field"><label for="d-qty">Nombre</label><span class="selw" style="display:block"><select id="d-qty" class="inp">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}">${n}</option>`).join('')}</select></span></div></div>
     <div class="row2"><div class="field"><label for="d-type">Prestation</label><input id="d-type" class="inp" list="dl-rep2" autocomplete="off" value="${esc(last)}"><datalist id="dl-rep2">${[...new Set([...sv.map((s) => s.name), ...T.keys()])].map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>${moneyF('d-total', 'Prix total', tourPrice(1))}</div>
-    <div class="field"><span class="lbl">Passage</span>${radios('d-when', [['soir', 'Ce soir'], ['demain', 'Demain soir']], 'soir', 'opts seg2')}</div>
+    <div class="field"><span class="lbl">Passage</span>${radios('d-when', whenOpts(), whenOpts()[0][0], 'opts seg2')}</div>
     ${textF('d-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. urgent, manette blanche, mineur : n° parent')}
-    <p class="hint">« Ajouter et envoyer » enregistre le client et ouvre le message de confirmation (passage ${plage()}) : un seul geste.</p>`,
+    <p class="hint">« Ajouter et envoyer » enregistre le client et ouvre le message de confirmation (passage annoncé avec la plage de la tournée choisie) : un seul geste.</p>`,
     foot: `<button class="btn" data-act="dem-save">Ajouter</button><button class="btn primary grow" data-act="dem-save" data-send="1">Ajouter et envoyer</button>` });
 }
 function demFill() {
@@ -2987,7 +3028,7 @@ function demFill() {
   // Client déjà venu : on reprend son adresse
   const known = p.phone && S.repairs.slice().reverse().find((r) => r.phone && r.phone.replace(/\s/g, '') === p.phone.replace(/\s/g, ''));
   if (known) { [['d-name', known.client], ['d-addr', known.address], ['d-city', known.city]].forEach(([id, v]) => { const x = $('#' + id); if (x && !x.value && v) x.value = v; }); toast(`Client connu : ${known.client || p.phone}`); }
-  if (p.when) { const w = $(`input[name="d-when"][value="${p.when}"]`); if (w) w.checked = true; }
+  if (p.when) { const w = $(`input[name="d-when"][value="${p.when}"]`) || $(`input[name="d-when"][value="${p.when.replace(/^midi$/, 'soir').replace('demain-midi', 'demain')}"]`); if (w) w.checked = true; }
   if (p.note) { const n = $('#d-note'); if (n && !n.value) n.value = p.note; }
   const gs = p.type ? { name: p.type } : guessService(val('d-paste')), ty = $('#d-type');
   if (gs && ty && !ty.dataset.touched) ty.value = gs.name;
@@ -2998,7 +3039,7 @@ async function demSave(a) {
   const qty = Number(val('d-qty')) || 1, T = repTypes(), type = val('d-type').trim() || 'Joystick drift (manette PS5)';
   const total = parseNum(val('d-total')) ?? tourPrice(qty, type);
   const r = { type, qty, unitPrice: num(T.get(type)) || num(tourCfg().p1), total, partsCost: 0, client: val('d-name').trim(), phone: val('d-phone').trim(), address: val('d-addr').trim(), city: val('d-city').trim(), note: val('d-note').trim(),
-    picked: false, gotDate: '', done: false, result: '', returned: false, returnDate: '', paid: false, paidDate: '', planDate: radioVal('d-when') === 'demain' ? addDays(today(), 1) : today() };
+    picked: false, gotDate: '', done: false, result: '', returned: false, returnDate: '', paid: false, paidDate: '', planDate: /^demain/.test(radioVal('d-when')) ? addDays(today(), 1) : today(), planSlot: /midi/.test(radioVal('d-when')) ? 'midi' : '' };
   r.date = r.planDate;
   if (!r.client && !r.phone) return fieldErr('d-name', 'Indique au moins le prénom ou le numéro.');
   if (!r.address) return fieldErr('d-addr', 'Adresse nécessaire pour passer chez le client.');
@@ -3007,13 +3048,13 @@ async function demSave(a) {
   const ok = await write(() => addRepair({ ...r, createdAt: new Date().toISOString() }));
   a.disabled = false;
   if (ok) {
-    closeSheet(); S.tourDay = r.planDate === today() ? 'ce-soir' : 'demain';
+    closeSheet(); S.tourDay = r.planDate === today() ? 'ce-soir' : 'demain'; S.tourSlot = r.planSlot === 'midi' ? 'midi' : (twoRounds(r.planDate) ? 'soir' : null);
     if (S.view !== 'tournee') setView('tournee'); else renderTournee();
-    if (a.dataset.send) { sendMsg(tourMsg('confirm', r), r.phone); } else toast(`${r.client || 'Client'} ajouté à la tournée de ${r.planDate === today() ? 'ce soir' : 'demain soir'}`);
+    if (a.dataset.send) { sendMsg(tourMsg('confirm', r), r.phone); } else toast(`${r.client || 'Client'} ajouté à la tournée de ${momentTxt(r.planDate, r.planSlot)}`);
   }
 }
 function tourMapsUrl(stops) {
-  const c = dayCfg(tourDay()), pts = [];
+  const c = dayCfg(tourDay(), tourSlot()), pts = [];
   stops.forEach((s) => { const a = [s.r.address, s.r.city].filter(Boolean).join(', '); if (a && !pts.includes(a)) pts.push(a); });
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(c.from)}&destination=${encodeURIComponent(c.to)}&travelmode=driving${pts.length ? '&waypoints=' + encodeURIComponent(pts.slice(0, 9).join('|')) : ''}`;
 }
@@ -3069,6 +3110,8 @@ function openTourCfg() {
     <div class="fs"><p class="fs-t">Semaine (lundi → vendredi)</p>
       <div class="row2">${textF('t-wd-from', 'Départ', c.wdFrom)}${textF('t-wd-to', 'Arrivée', c.wdTo)}</div>
       <div class="row2"><div class="field"><label for="t-wd-start">Heure de départ</label><input id="t-wd-start" class="inp" type="time" value="${esc(c.wdStart)}"></div><div class="field"><label for="t-wd-end">Fin de tournée</label><input id="t-wd-end" class="inp" type="time" value="${esc(c.wdEnd)}"></div></div>
+      <label class="sw"><span class="sw-t"><b>Deux tournées par jour</b><small>Une le midi, une le soir : une manette récupérée le midi peut être rendue le soir même</small></span><input type="checkbox" id="t-wd2" role="switch" ${c.wd2 ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
+      <div class="row2"><div class="field"><label for="t-mid-start">Midi : départ</label><input id="t-mid-start" class="inp" type="time" value="${esc(c.midStart || TOUR_DEF.midStart)}"></div><div class="field"><label for="t-mid-end">Midi : fin</label><input id="t-mid-end" class="inp" type="time" value="${esc(c.midEnd || TOUR_DEF.midEnd)}"></div></div>
     </div>
     <div class="fs"><p class="fs-t">Week-end (après Amazon)</p>
       <div class="row2">${textF('t-from', 'Départ', c.from)}${textF('t-to', 'Arrivée (domicile)', c.to)}</div>
@@ -3093,7 +3136,8 @@ const TOUR_ACT = {
   'dem-save': (a) => demSave(a),
   'dem-pastebtn': async () => { try { const t = await navigator.clipboard.readText(); $('#d-paste').value = t; demFill(); } catch (e) { toast('Appuie longuement dans la case puis « Coller »'); } },
   'tour-reply': (a) => copyText(replyMsg(a.dataset.k || 'drift'), 'Réponse copiée : ajoute un mot perso et envoie-la'),
-  'tour-day': (a) => { S.tourDay = a.dataset.v; renderTournee(); },
+  'tour-day': (a) => { S.tourDay = a.dataset.v; S.tourSlot = null; renderTournee(); },
+  'tour-slot': (a) => { S.tourSlot = a.dataset.v; renderTournee(); },
   'tour-msg': (a) => {
     const r = S.repairs.find((x) => x.id === a.dataset.id), k = a.dataset.k;
     if (k === 'thanks' && !r) { copyText(tourMsg('thanks', {}), 'Message copié'); return; }
@@ -3102,19 +3146,20 @@ const TOUR_ACT = {
     sendMsg(tourMsg(k, r, s), r.phone);
     if (a.dataset.sk) { const m = LS.get('tourSent', {}); m[a.dataset.sk] = 1; LS.set('tourSent', m); setTimeout(renderTournee, 400); }
   },
-  'tour-later': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { planDate: addDays(tourDay(), 1) }))) toast(`${r.client || 'Client'} reporté au ${dShort(addDays(tourDay(), 1))}`); },
+  'tour-later': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { planDate: addDays(tourDay(), 1), planSlot: twoRounds(addDays(tourDay(), 1)) && tourSlot() === 'midi' ? 'midi' : '' }))) toast(`${r.client || 'Client'} reporté au ${dShort(addDays(tourDay(), 1))}`); },
   'tour-mv': (a) => {
-    const D = tourDay(), ids = tourStops(D).map((s) => s.r.id).filter((v, i, arr) => arr.indexOf(v) === i), i = ids.indexOf(a.dataset.id), j = i + Number(a.dataset.d);
+    const D = tourDay(), K = roundKey(D, tourSlot(D)), ids = tourStops(D).map((s) => s.r.id).filter((v, i, arr) => arr.indexOf(v) === i), i = ids.indexOf(a.dataset.id), j = i + Number(a.dataset.d);
     if (i < 0 || j < 0 || j >= ids.length) return;
     [ids[i], ids[j]] = [ids[j], ids[i]];
-    const o = LS.get('tourOrd', {}); o[D] = ids; LS.set('tourOrd', o); renderTournee();
+    const o = LS.get('tourOrd', {}); o[K] = ids; LS.set('tourOrd', o); renderTournee();
   },
-  'tour-delay': (a) => { const o = LS.get('tourDelay', {}); o[tourDay()] = Number(a.dataset.m); LS.set('tourDelay', o); renderTournee(); },
+  'tour-delay': (a) => { const o = LS.get('tourDelay', {}); o[roundKey(tourDay(), tourSlot())] = Number(a.dataset.m); LS.set('tourDelay', o); renderTournee(); },
   'tour-go': () => { const stops = tourStops(tourDay()); if (stops.length > 9) toast('Google Maps prend 9 arrêts max : les suivants seront à ajouter'); window.open(tourMapsUrl(stops), '_blank'); },
   'tour-cfg': () => openTourCfg(),
   'tour-cfg-save': async (a) => {
     const t = { ...tourCfg(), formUrl: val('t-form').trim(), from: val('t-from').trim() || TOUR_DEF.from, to: val('t-to').trim() || TOUR_DEF.to, start: val('t-start') || TOUR_DEF.start, stop: Math.max(3, parseInt(val('t-stop'), 10) || 12), end: val('t-end') || TOUR_DEF.end,
       wdFrom: val('t-wd-from').trim() || TOUR_DEF.wdFrom, wdTo: val('t-wd-to').trim() || TOUR_DEF.wdTo, wdStart: val('t-wd-start') || TOUR_DEF.wdStart, wdEnd: val('t-wd-end') || TOUR_DEF.wdEnd,
+      wd2: !!($('#t-wd2') || {}).checked, midStart: val('t-mid-start') || TOUR_DEF.midStart, midEnd: val('t-mid-end') || TOUR_DEF.midEnd,
       p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie, services: $('#t-serv').value.trim() || TOUR_DEF.services };
     a.disabled = true; const ok = await write(() => saveSettingsData({ ...S.settings, tour: t })); a.disabled = false;
     if (ok) { closeSheet(); toast('Réglages de la tournée enregistrés'); }
