@@ -240,6 +240,10 @@ textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-
 .pill.rp-pick{background:var(--warn-soft);color:var(--warn)} .strip.tour{background:var(--warn-soft)}
 .opts.seg2{display:grid;grid-template-columns:1fr 1fr}
 .opts.seg3{display:grid;grid-template-columns:1fr 1fr 1fr}
+.placebox{border:1px dashed var(--line);border-radius:12px;padding:10px;margin:2px 0 12px}
+.geo-list{display:grid;gap:6px;margin:8px 0}
+.geo-it{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font:inherit;color:var(--ink);cursor:pointer}
+.geo-it small{color:var(--ink-2);font-size:12px}
 .ship-info{margin:6px 0 0;font-size:13.5px;font-weight:700;color:var(--accent)}
 .st-livraison{background:var(--surface);color:var(--ink-2);box-shadow:inset 0 0 0 1px var(--axis)}
 .sw{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;background:var(--bg);border:1px solid var(--line);cursor:pointer}
@@ -2732,7 +2736,7 @@ function openAd(id, focus) {
 function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el.textContent = `(${t.value.length} caractères)`; }
 
 /* ---------- Tournée : demandes clients, ordre de passage (semaine : boucle Crolles → Crolles ; week-end : Saint-Égrève → Crolles), messages prêts ---------- */
-const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', wdFrom: 'Crolles', wdTo: 'Crolles', wdStart: '18:00', wdEnd: '21:00', wd2: true, midStart: '12:00', midEnd: '14:00', apStart: '15:00', apEnd: '17:00', stop: 12, formUrl: '', ntfy: '',
+const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', wdFrom: 'Crolles', wdTo: 'Crolles', wdStart: '18:00', wdEnd: '21:00', wd2: true, midStart: '12:00', midEnd: '14:00', apStart: '15:00', apEnd: '17:00', send: 'sms', ocrLeft: true, msgs: {}, stop: 12, formUrl: '', ntfy: '',
   services: 'Joystick drift (manette PS5) : 25 € (50 € les deux, 20 € la manette à partir de la 3e)\nJoystick drift (manette Xbox) : 25 € (mêmes tarifs que PS5)\nJoysticks à effet Hall (plus jamais de drift) : 45 € la manette\nManette PS5 : 25 € (bouton, gâchette, port de charge, batterie : à partir de 20 €)\nPS5 nettoyage simple : 40 € (poussière, ventilateur)\nPS5 nettoyage liquide métal : 80 € (surchauffe, bruit, nettoyage complet)\nHDMI PS5 : 75 € (port HDMI remplacé)\nTéléphone (batterie, écran, vitre arrière) : sur devis\nDiagnostic : gratuit si tu répares, 15 € sinon', p1: 25, p2: 50, delai: '24-48 h', garantie: '30 jours' };
 const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
 // Semaine (lun-ven) : boucle depuis Crolles. Week-end : trajet Amazon Saint-Égrève → Crolles. Renvoie les réglages du jour D.
@@ -2812,6 +2816,13 @@ function parseDemande(txt) {
     a = a.replace(/\s+(ma|mes|une|deux|trois)\s+manettes?.*$/i, '').replace(/\s+manettes?.*$/i, '');
     r.address = a.replace(/\s{2,}/g, ' ').replace(/[,\s.]+$/, '').trim();
   } else { const al = lines.find((l) => /\b38\d{3}\b/.test(l)); if (al) r.address = al.replace(ph ? ph[0] : '', '').replace(/[,\s]+$/, '').trim(); }
+  // Pas d'adresse mais un lieu (« devant la mosquée de SMH », « arrêt de tram… ») : c'est un rendez-vous
+  if (!r.address) {
+    const PL = /(mosqu[ée]e|gare\b|tram|arr[êe]t|lyc[ée]e|coll[èe]ge|[ée]cole|\bfac\b|universit|campus|centre commercial|carrefour|auchan|leclerc|intermarch|lidl|casino|parking|[ée]glise|mairie|stade|piscine|mcdo|mcdonald|burger king|kfc|grand.?place|h[ôo]pital|\bchu\b|pharmacie|boulangerie|station|caserne|parc\b|place\s+[A-ZÀ-Ý]|résidence|residence|bâtiment|batiment)/i;
+    const pl = lines.find((l) => PL.test(l) && !MINE.test(l));
+    const strip = (t) => t.trim().replace(/^(je suis|on se voit|on se retrouve|rdv|rendez-vous|rejoins-moi|c'est)\s*:?\s*/i, '').replace(/^(devant|à côté de|a cote de|en face de)\s+/i, '').replace(/^(à|a|au|aux|la|le|les)\s+/i, '').replace(/^l['’]\s*/i, '').replace(/[,.!?\s]+$/, '');
+    if (pl) { let a = pl.replace(ph ? ph[0] : '', ''), b; do { b = a; a = strip(a); } while (a !== b); r.address = a; r.meet = true; }
+  }
   const pc = String(txt).match(/\b(38\d{3})\s+([A-Za-zÀ-ÿ’' -]{3,40})/);
   r.city = findCity(pc ? pc[2] : '') || findCity(txt) || (pc ? pc[2].trim() : '');
   if (r.city === 'Grenoble' && pc && pc[1] === '38100') r.city = 'Grenoble';
@@ -2930,9 +2941,173 @@ function nextRound() {
   if (s) return [T, s];
   const T1 = addDays(T, 1); return [T1, slotsOf(T1)[0]];
 }
+/* ---------- Lieux : trouver l'endroit exact (adresse ou lieu comme « mosquée SMH ») ---------- */
+// Abréviations courantes écrites par les clients
+const ALIAS = [[/\bsmh\b/gi, "Saint-Martin-d'Hères"], [/\bst[ -]?eg(reve)?\b/gi, 'Saint-Égrève'], [/\bsmd?v\b/gi, 'Saint-Martin-le-Vinoux'], [/\bst[ -]ismier\b/gi, 'Saint-Ismier'], [/\bgre\b/gi, 'Grenoble'], [/\bgrenob\b/gi, 'Grenoble'], [/\bfac\b/gi, 'campus universitaire'], [/\bmacdo\b|\bmcdo\b/gi, "McDonald's"], [/\bst\b/gi, 'Saint']];
+const unAlias = (s) => ALIAS.reduce((t, [re, v]) => t.replace(re, v), String(s || ''));
+const GEO_BIAS = 'lat=45.19&lon=5.76';
+// Distance à vol d'oiseau (km)
+function kmBetween(a, b) { const R = 6371, r = Math.PI / 180, dl = (b.lat - a.lat) * r, dn = (b.lon - a.lon) * r; const x = Math.sin(dl / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dn / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); }
+async function geoSearch(q) {
+  q = unAlias(q).replace(/\s+/g, ' ').trim();
+  if (q.length < 3) return [];
+  const hasNum = /^\s*\d+|\b\d+\s*(bis|ter)?\s*,?\s*(rue|av|avenue|bd|boulevard|chemin|allée|allee|place|impasse|route|cours|quai)/i.test(q);
+  const get = (u) => fetch(u).then((x) => (x.ok ? x.json() : { features: [] })).catch(() => ({ features: [] }));
+  const [ban, pho] = await Promise.all([
+    get(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&${GEO_BIAS}&limit=5`),
+    get(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&${GEO_BIAS}&limit=7&lang=fr&bbox=5.3,44.95,6.3,45.6`)]);
+  const A = (ban.features || []).filter((f) => /^(38|73)/.test(f.properties.postcode || '') && f.properties.score > 0.35).map((f) => ({
+    lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], name: '', label: f.properties.label, city: f.properties.city || '',
+    kind: f.properties.type === 'housenumber' ? 'home' : 'street', score: f.properties.score }));
+  const P = (pho.features || []).map((f) => { const p = f.properties;
+    const street = [p.housenumber, p.street].filter(Boolean).join(' ');
+    const isPlace = p.name && !['place', 'highway', 'boundary'].includes(p.osm_key);
+    return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], name: isPlace ? p.name : '', city: p.city || p.locality || '',
+      label: [isPlace ? p.name : '', street || (!isPlace ? p.name : ''), [p.postcode, p.city].filter(Boolean).join(' ')].filter(Boolean).join(', '), kind: isPlace ? 'place' : p.housenumber ? 'home' : 'street' }; });
+  const out = [];
+  (hasNum ? [...A, ...P] : [...P.filter((x) => x.kind === 'place'), ...A, ...P]).forEach((x) => { if (!out.some((y) => kmBetween(x, y) < ((y.name || '') === (x.name || '') ? 0.2 : 0.03))) out.push(x); });
+  return out.slice(0, 6);
+}
+// Le lieu tel que Google Maps le comprend : coordonnées si le lieu est vérifié, sinon l'adresse écrite
+const mapsPt = (r) => (r.geo && r.geo.lat ? `${r.geo.lat.toFixed(6)},${r.geo.lon.toFixed(6)}` : [r.address, r.city].filter(Boolean).join(', '));
+// Comment on dit l'endroit au client : « devant chez toi » ou le lieu de rendez-vous
+const lieuTxt = (r) => (r && r.meet ? (r.meetTxt || `au point de rendez-vous (${(r.geo && r.geo.name) || r.address})`) : 'devant chez toi');
+
+// Bloc « Lieu » des formulaires (demande et fiche) : recherche, choix, domicile ou rendez-vous
+const PLACE = {};
+function placeBox(px, r) {
+  PLACE[px] = r && r.geo ? { geo: r.geo, meet: !!r.meet, meetTxt: r.meetTxt || '' } : { geo: null, meet: !!(r && r.meet), meetTxt: (r && r.meetTxt) || '' };
+  return `<div class="placebox" id="${px}-pb">
+    <div class="btns"><button class="btn sm primary" data-act="geo-find" data-px="${px}">🔎 Trouver le lieu</button><span class="muted" id="${px}-gst" style="font-size:12.5px"></span></div>
+    <div id="${px}-glist"></div>
+    <div class="field"><span class="lbl">C'est…</span>${radios(px + '-meet', [['home', 'Son domicile'], ['meet', 'Un lieu de rendez-vous']], PLACE[px].meet ? 'meet' : 'home', 'opts seg2')}</div>
+    <div id="${px}-mt" ${PLACE[px].meet ? '' : 'hidden'}>${textF(px + '-meettxt', 'Comment le dire au client', PLACE[px].meetTxt, 'ex. devant la mosquée de Saint-Martin-d’Hères')}</div>
+  </div>`;
+}
+function placeShow(px) {
+  const P = PLACE[px], st = $('#' + px + '-gst'); if (!st) return;
+  st.innerHTML = P.geo ? `<span class="pos">📍 ${esc(P.geo.label)}</span> · <a href="https://maps.google.com/?q=${P.geo.lat},${P.geo.lon}" target="_blank" rel="noopener">voir</a>` : '<span class="neg">Lieu pas encore vérifié</span>';
+  const mt = $('#' + px + '-mt'); if (mt) mt.hidden = !P.meet;
+}
+async function placeFind(px, auto) {
+  const a = $('#' + px + '-addr'), c = $('#' + px + '-city'), q = [a && a.value, c && c.value].filter((x) => x && x.trim()).join(' ');
+  const st = $('#' + px + '-gst'), L = $('#' + px + '-glist');
+  if (!q.trim()) { if (!auto) toast('Écris d’abord une adresse ou un lieu'); return; }
+  if (st) st.textContent = 'Recherche…';
+  const res = await geoSearch(q);
+  PLACE[px].cands = res;
+  if (!L) return;
+  if (!res.length) { L.innerHTML = '<p class="hint neg" style="margin:4px 0">Rien trouvé : ajoute la ville ou un mot de plus (ex. « mosquée rue Edmond Rostand »).</p>'; placeShow(px); return; }
+  L.innerHTML = `${auto ? '<p class="hint" style="margin:6px 0 0">Pas le bon endroit ? Choisis :</p>' : ''}<div class="geo-list">${res.map((x, i) => `<button class="geo-it" data-act="geo-pick" data-px="${px}" data-i="${i}"><b>${esc(x.name || x.label.split(',')[0])}</b><small>${esc(x.name ? x.label.split(', ').slice(1).join(', ') : x.label.split(', ').slice(1).join(', ') || x.label)}${x.kind === 'place' ? ' · lieu' : x.kind === 'street' ? ' · rue sans numéro' : ''}</small></button>`).join('')}</div>`;
+  // Un seul résultat clair (adresse exacte, ou un seul lieu) : on le prend directement
+  // Recherche automatique : on prend le meilleur résultat, les autres restent proposés juste en dessous
+  if (auto) placePick(px, 0, true); else placeShow(px);
+}
+function placePick(px, i, keepList) {
+  const x = (PLACE[px].cands || [])[i]; if (!x) return;
+  PLACE[px].geo = { lat: x.lat, lon: x.lon, label: x.label, name: x.name || '' };
+  const c = $('#' + px + '-city'); if (c && x.city && (!c.value.trim() || !c.dataset.touched)) c.value = findCity(x.city) || x.city;
+  if (x.kind === 'place') {
+    PLACE[px].meet = true; const m = $(`input[name="${px}-meet"][value="meet"]`); if (m) m.checked = true;
+    const t = $('#' + px + '-meettxt'); if (t && !t.value.trim()) { t.value = 'devant ' + x.name; PLACE[px].meetTxt = t.value; }
+  }
+  const L = $('#' + px + '-glist'); if (L && !keepList) L.innerHTML = '';
+  placeShow(px);
+}
+// Ce que le bloc ajoute à la fiche enregistrée
+function placeVal(px) {
+  const P = PLACE[px] || {}, meet = radioVal(px + '-meet') === 'meet';
+  return { geo: P.geo || null, meet, meetTxt: meet ? val(px + '-meettxt') : '' };
+}
+
+/* ---------- Trajet le plus court entre les arrêts ---------- */
+async function geoOne(q) { const k = 'geo:' + normC(q), C = LS.get('geoCache', {}); if (C[k]) return C[k]; const r = (await geoSearch(q))[0]; if (r) { C[k] = { lat: r.lat, lon: r.lon }; LS.set('geoCache', C); } return r ? { lat: r.lat, lon: r.lon } : null; }
+async function travelMatrix(pts) {
+  // Temps de route réels (OSRM) ; à défaut, distance à vol d'oiseau
+  try {
+    const u = `https://router.project-osrm.org/table/v1/driving/${pts.map((p) => `${p.lon.toFixed(5)},${p.lat.toFixed(5)}`).join(';')}?annotations=duration`;
+    const j = await fetch(u).then((x) => x.json());
+    if (j.code === 'Ok' && j.durations) return { m: j.durations, real: true };
+  } catch (e) {}
+  return { m: pts.map((a) => pts.map((b) => kmBetween(a, b) * 90)), real: false };
+}
+function bestOrder(m, n) {
+  // 0 = départ, n+1 = arrivée, 1..n = arrêts. Exact jusqu'à 8 arrêts, sinon plus proche voisin + 2-opt.
+  const cost = (o) => { let s = m[0][o[0]]; for (let i = 1; i < o.length; i++) s += m[o[i - 1]][o[i]]; return s + m[o[o.length - 1]][n + 1]; };
+  const ids = Array.from({ length: n }, (_, i) => i + 1);
+  if (n <= 1) return ids;
+  if (n <= 8) {
+    let best = null, bc = Infinity;
+    const perm = (a, k) => { if (k === a.length) { const c = cost(a); if (c < bc) { bc = c; best = a.slice(); } return; } for (let i = k; i < a.length; i++) { [a[k], a[i]] = [a[i], a[k]]; perm(a, k + 1); [a[k], a[i]] = [a[i], a[k]]; } };
+    perm(ids.slice(), 0); return best;
+  }
+  const left = new Set(ids), o = []; let cur = 0;
+  while (left.size) { let b = null; left.forEach((j) => { if (b === null || m[cur][j] < m[cur][b]) b = j; }); o.push(b); left.delete(b); cur = b; }
+  let imp = true;
+  while (imp) { imp = false; for (let i = 0; i < o.length - 1; i++) for (let k = i + 1; k < o.length; k++) { const t = o.slice(0, i).concat(o.slice(i, k + 1).reverse(), o.slice(k + 1)); if (cost(t) < cost(o) - 1e-6) { o.splice(0, o.length, ...t); imp = true; } } }
+  return o;
+}
+async function optimizeRound() {
+  const D = tourDay(), slot = tourSlot(D), K = roundKey(D, slot), c = dayCfg(D, slot);
+  const stops = tourStops(D, slot), seen = new Set(), groups = [];
+  stops.forEach((s) => { const k = mapsPt(s.r); if (!seen.has(k)) { seen.add(k); groups.push({ k, r: s.r, ids: [] }); } groups.find((g) => g.k === k).ids.push(s.r.id); });
+  const withGeo = groups.filter((g) => g.r.geo && g.r.geo.lat), noGeo = groups.filter((g) => !(g.r.geo && g.r.geo.lat));
+  if (withGeo.length < 2) { toast('Vérifie le lieu d’au moins 2 clients (bouton « Trouver le lieu ») pour optimiser'); return; }
+  toast('Calcul du meilleur trajet…');
+  const [A, B] = await Promise.all([geoOne(c.from), geoOne(c.to)]);
+  if (!A || !B) { toast('Départ ou arrivée introuvable : vérifie-les dans les réglages'); return; }
+  const pts = [A, ...withGeo.map((g) => g.r.geo), B];
+  const { m, real } = await travelMatrix(pts);
+  const o = bestOrder(m, withGeo.length);
+  const ids = [...o.map((i) => withGeo[i - 1]), ...noGeo].flatMap((g) => g.ids);
+  const total = (() => { let s = m[0][o[0]]; for (let i = 1; i < o.length; i++) s += m[o[i - 1]][o[i]]; return s + m[o[o.length - 1]][o.length + 1]; })();
+  const OR = LS.get('tourOrd', {}); OR[K] = ids; LS.set('tourOrd', OR);
+  const OT = LS.get('tourOpt', {}); OT[K] = { min: Math.round(total / 60), real }; LS.set('tourOpt', OT);
+  renderTournee();
+  toast(`Trajet optimisé : environ ${Math.round(total / 60)} min de route${real ? '' : ' (estimation)'}${noGeo.length ? ` · ${noGeo.length} lieu(x) non vérifié(s) mis à la fin` : ''}`);
+}
+
+/* ---------- Lire une capture d'écran de conversation ---------- */
+let OCR_LIB = null;
+function loadOcr() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  if (!OCR_LIB) OCR_LIB = new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; s.onload = () => ok(window.Tesseract); s.onerror = () => { OCR_LIB = null; ko(new Error('ocr')); }; document.head.appendChild(s); });
+  return OCR_LIB;
+}
+// Phrases de tes propres messages : on les retire pour ne garder que ce que dit le client
+const MINE = /merci pour ton message|merci de m'avoir|tarif|garantie|envoie-moi|je passe récupérer|je te la ramène|c'est noté|je t'envoie un message|remplis ce petit formulaire|voici mes réparations|paiement à la livraison/i;
+async function ocrImages(files, onProg) {
+  const T = await loadOcr(), out = [];
+  for (let i = 0; i < files.length; i++) {
+    const res = await T.recognize(files[i], 'fra', { logger: (m) => { if (m.status === 'recognizing text') onProg(Math.round(((i + m.progress) / files.length) * 100)); } });
+    const W = (res.data && res.data.lines) || [], width = Math.max(...W.map((l) => l.bbox.x1), 1);
+    const keepLeft = tourCfg().ocrLeft !== false;
+    W.forEach((l) => {
+      const t = l.text.replace(/\s+/g, ' ').trim();
+      if (!t || /^\d{1,2}[:h]\d{2}$/.test(t) || /^(lu|vu|envoyé|distribué|aujourd'hui|hier|delivered|seen|read)\b/i.test(t)) return;
+      if (MINE.test(t)) return;
+      // Bulles de droite = tes messages (iMessage, WhatsApp, TikTok, Insta) : on les écarte
+      if (keepLeft && l.bbox.x0 > width * 0.3) return;
+      out.push(t);
+    });
+  }
+  return out.join('\n');
+}
+
 // Une manette réparée part dans la prochaine tournée, celle annoncée au client dans le message « prête »
 function readyPlan() { const [D, sl] = nextRound(); return { planDate: D, planSlot: sl === 'soir' ? '' : sl }; }
 const firstName = (r) => (r.client || '').split(/\s+/)[0] || '';
+// Textes des messages : modifiables dans les réglages. Les mots entre accolades sont remplacés pour chaque client.
+const MSG_DEF = {
+  confirm: "{salut}C'est noté ! Je passe récupérer {objet} {lieu} {quand} {plage}. Je t'envoie un message 10 min avant d'arriver. Tarif : {prix}, à payer au retour.",
+  pick: "{salut}C'est bon pour {quand} : je passe récupérer {objet} {lieu} {creneau}. Je t'envoie un message 10 min avant. Tarif : {prix}, à payer au retour.",
+  ret: "{salut}{Objet} {est} {reparee} ! Je te {la} ramène {lieu} {quand} {creneau}. Paiement à la livraison : {prix} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.",
+  late: "{salut}Petit retard {quand}, désolé : je passe plutôt {creneau}. Je t'envoie un message 10 min avant.",
+  eta: "J'arrive dans 10 min {lieu}, à tout de suite !",
+  ready: "{salut}{Objet} {est} {prete} ! Je te {la} ramène {lieu} {quand} {plage}. Paiement à la livraison : {prix} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.",
+  thanks: "{salut}Merci pour ta confiance ! Ta réparation est garantie {garantie}, si le moindre souci revient, écris-moi. Et si tu es content, un petit partage ou un avis sur TikTok m'aide énormément."
+};
+const MSG_NAMES = { confirm: 'Confirmation de la demande', pick: 'Heure précise (récupération)', ret: 'Heure précise (retour)', late: 'Retard', eta: "J'arrive (10 min)", ready: 'Réparée, prête à rendre', thanks: 'Remerciement + avis' };
 function tourMsg(kind, r, s) {
   r = r || {};
   const c = tourCfg(), nm = firstName(r), hi = nm ? `Salut ${nm} ! ` : 'Salut ! ', amt = repTotal(r) > 0 ? eur(repTotal(r)) : 'sur devis';
@@ -2940,19 +3115,17 @@ function tourMsg(kind, r, s) {
   const soir = momentTxt(s ? tourDay() : today(), s ? tourSlot() : 'soir');
   if (/^reply/.test(kind)) return replyMsg(kind.slice(6) || 'drift');
   const w = objWord(r);
-  if (kind === 'confirm') return `${hi}C'est noté ! Je passe récupérer ${w.ta} devant chez toi ${momentTxt(isDate(r.planDate) ? r.planDate : today(), r.planSlot)} ${plage(isDate(r.planDate) ? r.planDate : today(), r.planSlot)}. Je t'envoie un message 10 min avant d'arriver. Tarif : ${amt}, à payer au retour.`;
-  if (kind === 'pick') return `${hi}C'est bon pour ${soir} : je passe récupérer ${w.ta} devant chez toi ${when}. Je t'envoie un message 10 min avant. Tarif : ${amt}, à payer au retour.`;
-  if (kind === 'ret') return `${hi}${w.Ta} ${w.sont} ${w.rep} ! Je te ${w.la} ramène ${soir} ${when}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`;
-  if (kind === 'late') return `${hi}Petit retard ${soir}, désolé : je passe plutôt ${when}. Je t'envoie un message 10 min avant.`;
-  if (kind === 'eta') return `J'arrive dans 10 min, tu peux descendre ?`;
-  if (kind === 'ready') { const [nD, nS] = nextRound(); return `${hi}${w.Ta} ${w.sont} ${w.pret} ! Je te ${w.la} ramène ${momentTxt(nD, nS)} ${plage(nD, nS)}. Paiement à la livraison : ${amt} (espèces, Wero ou Lydia). Je t'envoie un message 10 min avant.`; }
-  if (kind === 'thanks') return `${hi}Merci pour ta confiance ! Ta réparation est garantie ${c.garantie}, si le moindre souci revient, écris-moi. Et si tu es content, un petit partage ou un avis sur TikTok m'aide énormément.`;
+  const fill = (t, quand, plage2, cren) => String(t).replace(/\{(\w+)\}/g, (m, k) => ({ salut: hi, prenom: nm, objet: w.ta, Objet: w.Ta, la: w.la, est: w.sont, reparee: w.rep, prete: w.pret, lieu: lieuTxt(r), quand, plage: plage2, creneau: cren, prix: amt, garantie: c.garantie }[k] ?? m)).replace(/ {2,}/g, ' ').replace(/ ([.,])/g, '$1');
+  const tpl = (k) => ((c.msgs || {})[k] || '').trim() || MSG_DEF[k];
+  if (kind === 'confirm') { const D = isDate(r.planDate) ? r.planDate : today(); return fill(tpl('confirm'), momentTxt(D, r.planSlot), plage(D, r.planSlot), plage(D, r.planSlot)); }
+  if (kind === 'ready') { const [nD, nS] = nextRound(); return fill(tpl('ready'), momentTxt(nD, nS), plage(nD, nS), plage(nD, nS)); }
+  if (MSG_DEF[kind]) return fill(tpl(kind), soir, s ? plage(tourDay(), tourSlot()) : '', when);
   return '';
 }
 function sendMsg(text, phone) {
-  copyText(text, 'Message copié');
+  copyText(text, tourCfg().send === 'copy' ? 'Message copié : colle-le dans la conversation' : 'Message copié');
   const p = String(phone || '').replace(/\s/g, '');
-  if (p) setTimeout(() => { location.href = `sms:${p}${/iPhone|iPad|Mac/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(text)}`; }, 250);
+  if (p && tourCfg().send !== 'copy') setTimeout(() => { location.href = `sms:${p}${/iPhone|iPad|Mac/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(text)}`; }, 250);
 }
 
 function renderTournee() {
@@ -2970,7 +3143,7 @@ function renderTournee() {
     return `<div class="stop ${pick ? 'pk' : 'rt'}">
       <div class="stop-h"><span class="stop-n">${s.n}</span><b class="stop-t">${hm(s.from)} – ${hm(s.to)}</b><span class="pill ${pick ? 'st-attente' : 'st-vendu'}">${pick ? `Récupérer ×${repQty(r)}` : `Rendre ×${repQty(r)} · ${eur(repTotal(r))}`}</span></div>
       <div class="stop-m"><b>${esc(r.client || 'Client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<br>
-        ${adr ? `<a href="https://maps.google.com/?q=${encodeURIComponent(adr)}" target="_blank" rel="noopener">${esc(adr)}</a>` : '<span class="neg">Adresse manquante : touche Modifier</span>'}${cityRank(r.city) === 50 && r.city ? ' <small class="muted">(commune hors trajet : placée à la fin)</small>' : ''}
+        ${adr ? `<a href="https://maps.google.com/?q=${encodeURIComponent(mapsPt(r))}" target="_blank" rel="noopener">${r.geo ? '📍 ' : ''}${esc(adr)}</a>${r.meet ? ` <small class="muted">· RDV : ${esc(lieuTxt(r))}</small>` : ''}${r.geo ? '' : ' <small class="neg">· lieu non vérifié : touche Modifier puis « Trouver le lieu »</small>'}` : '<span class="neg">Adresse manquante : touche Modifier</span>'}${cityRank(r.city) === 50 && r.city ? ' <small class="muted">(commune hors trajet : placée à la fin)</small>' : ''}
         <small class="muted"> · ${esc(r.type)}${r.note ? ' · ' + esc(r.note) : ''}</small></div>
       <div class="stop-a">
         <button class="btn sm primary" data-act="tour-msg" data-k="eta" data-id="${esc(r.id)}">J'arrive (10 min)</button>
@@ -2992,7 +3165,8 @@ function renderTournee() {
     ${twoRounds(D) ? `<div class="stabs" role="tablist" style="grid-template-columns:repeat(3,1fr)">${slotsOf(D).map((v) => { const st = tourStops(D, v), n = st.length ? st[st.length - 1].n : 0; return `<button role="tab" data-act="tour-slot" data-v="${v}" aria-selected="${slot === v}">${SLOT_NAMES[v]}${n ? ` · ${n}` : ''}</button>`; }).join('')}</div>` : ''}
     <section class="card tour-sum">
       ${stops.length ? `<div class="tour-line"><b>${c.weekend ? 'Week-end' : 'Semaine'}${twoRounds(D) ? ' · ' + SLOT_NAMES[slot].toLowerCase() : ''} · ${plural(nStops, 'arrêt')}</b><span>${pickN} à récupérer · ${retN} à rendre${cash ? ` · ${eur(cash)} à encaisser` : ''}</span><span>départ ${esc(c.from)} ${hm(toMin(c.start) + delay)} → ${esc(c.to)} vers ${hm(stops[stops.length - 1].to + 15)}</span></div>
-      <div class="btns"><button class="btn primary grow" data-act="tour-go">Lancer la tournée (Google Maps)</button></div>
+      <div class="btns"><button class="btn grow" data-act="tour-opt">Optimiser le trajet</button><button class="btn primary grow" data-act="tour-go">Lancer la tournée (Google Maps)</button></div>
+      ${(() => { const o = (LS.get('tourOpt', {}) || {})[K]; return o ? `<p class="hint" style="margin:0">Trajet optimisé : environ ${o.min} min de route${o.real ? '' : ' (estimation)'}. Un nouveau client ? Touche à nouveau « Optimiser ».</p>` : ''; })()}
       <div class="tour-delay"><span>Retard :</span>${[0, 10, 20, 30, 45].map((m) => `<button class="chip" data-act="tour-delay" data-m="${m}" aria-pressed="${delay === m}">${m ? '+' + m + ' min' : 'aucun'}</button>`).join('')}</div>
       ${delay ? '<p class="hint" style="margin:0">Les heures ont été décalées : touche « Prévenir du retard » sur chaque arrêt déjà prévenu.</p>' : ''}`
       : `<p style="margin:0">Aucun arrêt ${momentTxt(D, slot)}. Ajoute une demande dès qu'un client t'écrit : elle va dans la tournée que tu choisis, à la bonne place sur ton trajet.</p>`}
@@ -3020,20 +3194,34 @@ function openDemande() {
   const T = repTypes(), sv = services(), last = (sv[0] && sv[0].name) || [...T.keys()].find((t) => /drift/i.test(t)) || [...T.keys()].pop();
   openSheet({ kind: 'dem', title: 'Nouvelle demande', body: `
     <div class="field"><label for="d-paste">Colle ici le message du client</label><textarea id="d-paste" class="inp" rows="4" placeholder="Ex. : Yanis, 06 12 34 56 78, 12 rue des Alpes 38400 Saint-Martin-d’Hères, 2 manettes qui driftent"></textarea>
-      <div class="btns" style="margin-top:6px"><button class="btn sm" data-act="dem-pastebtn">${ic('copy')} Coller depuis le presse-papiers</button></div>
-      <small class="hint">Les champs ci-dessous se remplissent tout seuls. Vérifie et corrige si besoin.</small></div>
+      <div class="btns" style="margin-top:6px"><button class="btn sm" data-act="dem-pastebtn">${ic('copy')} Coller depuis le presse-papiers</button><label class="btn sm primary" for="d-shot">${ic('cam')} Lire une capture d'écran</label><input id="d-shot" type="file" accept="image/*" multiple hidden></div>
+      <p class="hint" id="d-shot-st" style="margin:4px 0 0" hidden></p>
+      <small class="hint">Colle le message, ou envoie une ou plusieurs captures de la conversation : les champs ci-dessous se remplissent tout seuls et le lieu est cherché sur la carte. Vérifie et corrige si besoin.</small></div>
     <div class="row2">${textF('d-name', 'Prénom', '', 'Prénom ou pseudo')}${textF('d-phone', 'Téléphone', '', '06 …', 'inputmode="tel"')}</div>
-    ${textF('d-addr', 'Adresse', '', 'n° et rue')}
+    ${textF('d-addr', 'Adresse ou lieu', '', 'n° et rue, ou un lieu (ex. mosquée SMH)')}
     <div class="row2"><div class="field"><label for="d-city">Commune</label><input id="d-city" class="inp" list="dl-city" autocomplete="off"><datalist id="dl-city">${CITIES.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
       <div class="field"><label for="d-qty">Nombre</label><span class="selw" style="display:block"><select id="d-qty" class="inp">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}">${n}</option>`).join('')}</select></span></div></div>
+    ${placeBox('d')}
     <div class="row2"><div class="field"><label for="d-type">Prestation</label><input id="d-type" class="inp" list="dl-rep2" autocomplete="off" value="${esc(last)}"><datalist id="dl-rep2">${[...new Set([...sv.map((s) => s.name), ...T.keys()])].map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>${moneyF('d-total', 'Prix total', tourPrice(1))}</div>
     <div class="field"><span class="lbl">Passage</span>${radios('d-when', whenOpts(), whenOpts()[0][0], whenOpts().length > 4 ? 'opts seg3' : 'opts seg2')}</div>
     ${textF('d-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. urgent, manette blanche, mineur : n° parent')}
     <p class="hint">« Ajouter et envoyer » enregistre le client et ouvre le message de confirmation (passage annoncé avec la plage de la tournée choisie) : un seul geste.</p>`,
     foot: `<button class="btn" data-act="dem-save">Ajouter</button><button class="btn primary grow" data-act="dem-save" data-send="1">Ajouter et envoyer</button>` });
+  placeShow('d');
+}
+async function demShot(inp) {
+  const st = $('#d-shot-st'), files = [...inp.files]; inp.value = '';
+  st.hidden = false; st.textContent = 'Lecture de la capture… (la première fois, quelques secondes de chargement)';
+  try {
+    const txt = await ocrImages(files, (p) => { st.textContent = `Lecture de la capture… ${p} %`; });
+    if (!txt.trim()) { st.textContent = 'Je n’ai rien pu lire : essaie une capture plus nette, ou colle le texte.'; return; }
+    const ta = $('#d-paste'); ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + txt; demFill();
+    st.textContent = 'Capture lue : vérifie les champs ci-dessous (et le texte lu, dans la case du haut).';
+  } catch (e) { st.textContent = 'Lecture impossible (connexion ?) : réessaie, ou colle le texte.'; }
 }
 function demFill() {
   const p = parseDemande(val('d-paste'));
+  const before = val('d-addr') + '|' + val('d-city');
   [['d-name', p.name], ['d-phone', p.phone], ['d-addr', p.address], ['d-city', p.city]].forEach(([id, v]) => { const x = $('#' + id); if (x && v && !x.dataset.touched) x.value = v; });
   // Client déjà venu : on reprend son adresse
   const known = p.phone && S.repairs.slice().reverse().find((r) => r.phone && r.phone.replace(/\s/g, '') === p.phone.replace(/\s/g, ''));
@@ -3043,6 +3231,7 @@ function demFill() {
   const gs = p.type ? { name: p.type } : guessService(val('d-paste')), ty = $('#d-type');
   if (gs && ty && !ty.dataset.touched) ty.value = gs.name;
   const q = $('#d-qty'); if (q && !q.dataset.touched) { q.value = String(p.qty); const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(p.qty, val('d-type'))); }
+  if (val('d-addr') && val('d-addr') + '|' + val('d-city') !== before) { if (PLACE.d) PLACE.d.geo = null; if (p.meet && PLACE.d) { PLACE.d.meet = true; const m = $('input[name="d-meet"][value="meet"]'); if (m) m.checked = true; } clearTimeout(demFill.t); demFill.t = setTimeout(() => placeFind('d', true), 700); }
 }
 async function demSave(a) {
   clearErrs();
@@ -3050,9 +3239,11 @@ async function demSave(a) {
   const total = parseNum(val('d-total')) ?? tourPrice(qty, type);
   const r = { type, qty, unitPrice: num(T.get(type)) || num(tourCfg().p1), total, partsCost: 0, client: val('d-name').trim(), phone: val('d-phone').trim(), address: val('d-addr').trim(), city: val('d-city').trim(), note: val('d-note').trim(),
     picked: false, gotDate: '', done: false, result: '', returned: false, returnDate: '', paid: false, paidDate: '', planDate: /^demain/.test(radioVal('d-when')) ? addDays(today(), 1) : today(), planSlot: (radioVal('d-when').match(/midi|aprem/) || [''])[0] };
+  Object.assign(r, placeVal('d'));
   r.date = r.planDate;
   if (!r.client && !r.phone) return fieldErr('d-name', 'Indique au moins le prénom ou le numéro.');
-  if (!r.address) return fieldErr('d-addr', 'Adresse nécessaire pour passer chez le client.');
+  if (!r.address) return fieldErr('d-addr', 'Adresse ou lieu nécessaire pour passer chez le client.');
+  if (!r.geo && !a.dataset.force) { a.dataset.force = '1'; $('#d-gst').innerHTML = '<span class="neg">Lieu pas vérifié : touche « Trouver le lieu », ou touche encore le bouton pour enregistrer quand même.</span>'; return; }
   if (total < 0) return fieldErr('d-total', 'Montant négatif impossible.');
   a.disabled = true;
   const ok = await write(() => addRepair({ ...r, createdAt: new Date().toISOString() }));
@@ -3065,7 +3256,7 @@ async function demSave(a) {
 }
 function tourMapsUrl(stops) {
   const c = dayCfg(tourDay(), tourSlot()), pts = [];
-  stops.forEach((s) => { const a = [s.r.address, s.r.city].filter(Boolean).join(', '); if (a && !pts.includes(a)) pts.push(a); });
+  stops.forEach((s) => { const a = mapsPt(s.r); if (a && !pts.includes(a)) pts.push(a); });
   return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(c.from)}&destination=${encodeURIComponent(c.to)}&travelmode=driving${pts.length ? '&waypoints=' + encodeURIComponent(pts.slice(0, 9).join('|')) : ''}`;
 }
 function formScript(topic) {
@@ -3114,8 +3305,9 @@ function aChaqueDemande(e) {
 }
 `;
 }
+let MSG_DRAFT = {};
 function openTourCfg() {
-  const c = tourCfg();
+  const c = tourCfg(); MSG_DRAFT = { ...(c.msgs || {}) };
   openSheet({ kind: 'tourcfg', title: 'Réglages de la tournée', body: `
     <div class="fs"><p class="fs-t">Semaine (lundi → vendredi)</p>
       <div class="row2">${textF('t-wd-from', 'Départ', c.wdFrom)}${textF('t-wd-to', 'Arrivée', c.wdTo)}</div>
@@ -3132,6 +3324,14 @@ function openTourCfg() {
     <div class="row2">${moneyF('t-p1', 'Drift : 1 manette', c.p1)}${moneyF('t-p2', 'Drift : 2 manettes', c.p2)}</div>
     ${textF('t-gar', 'Garantie', c.garantie)}
     <div class="field"><label for="t-serv">Tes prestations et prix (une par ligne, « Nom : prix »)</label><textarea id="t-serv" class="inp" rows="5">${esc(c.services || '')}</textarea><small class="hint">Leurs prix sont repris dans les réponses aux nouveaux clients et dans la liste « Prestation » des demandes.</small></div>
+    <div class="fs"><p class="fs-t">Messages aux clients</p>
+      <div class="field"><span class="lbl">Quand tu touches un bouton de message</span>${radios('t-send', [['sms', 'Copier + ouvrir les SMS'], ['copy', 'Copier seulement']], c.send === 'copy' ? 'copy' : 'sms', 'opts seg2')}</div>
+      <label class="sw"><span class="sw-t"><b>Captures : garder seulement le client</b><small>Ignore les bulles de droite (tes propres messages) quand une capture est lue</small></span><input type="checkbox" id="t-ocrleft" role="switch" ${c.ocrLeft !== false ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
+      <div class="field"><label for="t-msgk">Modifier un message</label><span class="selw" style="display:block"><select id="t-msgk" class="inp">${Object.keys(MSG_DEF).map((k) => `<option value="${k}">${esc(MSG_NAMES[k])}</option>`).join('')}</select></span></div>
+      <div class="field"><textarea id="t-msg" class="inp" rows="5" data-k="confirm">${esc(((c.msgs || {}).confirm || '').trim() || MSG_DEF.confirm)}</textarea>
+        <small class="hint">Les mots entre accolades se remplissent seuls : {salut} {prenom} {objet} {Objet} {la} {est} {reparee} {prete} {lieu} (« devant chez toi » ou le lieu de RDV) {quand} (« ce soir »…) {plage} {creneau} (heure précise) {prix} {garantie}. Change de message dans la liste : celui que tu viens de modifier est gardé.</small>
+        <div class="btns"><button class="btn sm" data-act="msg-reset">Remettre le texte d'origine</button></div></div>
+    </div>
     <div class="fs"><p class="fs-t">Formulaire de réservation</p>
       ${textF('t-form', 'Lien de ton formulaire', c.formUrl || '', 'https://docs.google.com/forms/…')}
       <p class="hint" style="margin:0">Une fois rempli, ce lien est ajouté à tes réponses aux nouveaux clients. Les demandes arrivent sur ton téléphone sans que ton numéro soit visible.</p>
@@ -3174,10 +3374,15 @@ const TOUR_ACT = {
   'tour-delay': (a) => { const o = LS.get('tourDelay', {}); o[roundKey(tourDay(), tourSlot())] = Number(a.dataset.m); LS.set('tourDelay', o); renderTournee(); },
   'tour-go': () => { const stops = tourStops(tourDay()); if (stops.length > 9) toast('Google Maps prend 9 arrêts max : les suivants seront à ajouter'); window.open(tourMapsUrl(stops), '_blank'); },
   'tour-cfg': () => openTourCfg(),
+  'tour-opt': () => optimizeRound(),
+  'geo-find': (a) => placeFind(a.dataset.px, false),
+  'geo-pick': (a) => placePick(a.dataset.px, Number(a.dataset.i)),
+  'msg-reset': () => { const k = val('t-msgk'); $('#t-msg').value = MSG_DEF[k]; MSG_DRAFT[k] = ''; toast('Texte d’origine remis : touche Enregistrer'); },
   'tour-cfg-save': async (a) => {
     const t = { ...tourCfg(), formUrl: val('t-form').trim(), from: val('t-from').trim() || TOUR_DEF.from, to: val('t-to').trim() || TOUR_DEF.to, start: val('t-start') || TOUR_DEF.start, stop: Math.max(3, parseInt(val('t-stop'), 10) || 12), end: val('t-end') || TOUR_DEF.end,
       wdFrom: val('t-wd-from').trim() || TOUR_DEF.wdFrom, wdTo: val('t-wd-to').trim() || TOUR_DEF.wdTo, wdStart: val('t-wd-start') || TOUR_DEF.wdStart, wdEnd: val('t-wd-end') || TOUR_DEF.wdEnd,
       wd2: !!($('#t-wd2') || {}).checked, midStart: val('t-mid-start') || TOUR_DEF.midStart, midEnd: val('t-mid-end') || TOUR_DEF.midEnd, apStart: val('t-ap-start') || TOUR_DEF.apStart, apEnd: val('t-ap-end') || TOUR_DEF.apEnd,
+      send: radioVal('t-send') || 'sms', ocrLeft: !!($('#t-ocrleft') || {}).checked, msgs: (() => { const ta = $('#t-msg'); if (ta) MSG_DRAFT[ta.dataset.k] = ta.value; const o = {}; Object.keys(MSG_DEF).forEach((k) => { const v = (MSG_DRAFT[k] || '').trim(); if (v && v !== MSG_DEF[k]) o[k] = v; }); return o; })(),
       p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie, services: $('#t-serv').value.trim() || TOUR_DEF.services };
     a.disabled = true; const ok = await write(() => saveSettingsData({ ...S.settings, tour: t })); a.disabled = false;
     if (ok) { closeSheet(); toast('Réglages de la tournée enregistrés'); }
@@ -3344,13 +3549,14 @@ function openRep(id, copyOf) {
     </div>
     <div class="row2">${moneyF('r-parts', 'Pièces achetées <span class="opt-l">(facultatif)</span>', num(v.partsCost) || null)}${textF('r-client', 'Client <span class="opt-l">(facultatif)</span>', v.client || '', 'Prénom, pseudo…')}</div>
     <div class="row2">${textF('r-phone', 'Téléphone <span class="opt-l">(facultatif)</span>', v.phone || '', '06 …', 'inputmode="tel"')}${textF('r-city', 'Commune <span class="opt-l">(facultatif)</span>', v.city || '', 'ex. Meylan')}</div>
-    ${textF('r-addr', 'Adresse <span class="opt-l">(pour la tournée)</span>', v.address || '', 'n° et rue')}
+    ${textF('r-addr', 'Adresse ou lieu <span class="opt-l">(pour la tournée)</span>', v.address || '', 'n° et rue, ou un lieu')}
+    ${placeBox('r', v)}
     ${textF('r-note', 'Note <span class="opt-l">(facultatif)</span>', v.note || '', 'ex. modules Hall, manette blanche…')}
     <p class="preview" id="r-prev"></p>`,
     foot: `<button class="btn" data-act="close">Annuler</button>${r ? `<button class="btn" data-act="rep-copy" data-id="${esc(id)}">Dupliquer</button>` : ''}<button class="btn primary grow" data-act="rep-save" ${id ? `data-id="${esc(id)}"` : ''}>${src ? 'Créer la copie' : 'Enregistrer'}</button>` });
   if (r) $('#r-total').dataset.touched = '1';
   if (src) setTimeout(() => { const c = $('#r-client'); if (c) c.focus(); }, 60);
-  repSections(); repPreview();
+  repSections(); repPreview(); placeShow('r');
 }
 function repSections() {
   const d = $('#r-done'); if (!d) return;
@@ -3407,7 +3613,7 @@ const ACT = {
     const id = a.dataset.id || null, old = id ? S.repairs.find((x) => x.id === id) : null;
     const picked = $('#r-picked').checked, done = picked && $('#r-done').checked, ret = done && $('#r-ret').checked, paid = $('#r-paid').checked;
     const r = { type: val('r-type').trim(), qty: Number(val('r-qty')) || 1, unitPrice: parseNum(val('r-price')), total: parseNum(val('r-total')), partsCost: parseNum(val('r-parts')) || 0, client: val('r-client').trim(), note: val('r-note').trim(),
-      phone: val('r-phone').trim(), address: val('r-addr').trim(), city: val('r-city').trim(), picked,
+      phone: val('r-phone').trim(), address: val('r-addr').trim(), city: val('r-city').trim(), picked, ...placeVal('r'),
       gotDate: picked ? val('r-got') : '', done, result: done ? radioVal('r-res') || 'ok' : '', returned: ret, returnDate: ret ? val('r-retDate') : '', paid, paidDate: paid ? val('r-paidDate') : '' };
     r.date = done ? val('r-date') : picked ? r.gotDate : (old && isDate(old.planDate) ? old.planDate : today());
     if (!picked && !(old && isDate(old.planDate))) r.planDate = planDateNow();
@@ -3603,9 +3809,14 @@ function bind() {
   });
   document.addEventListener('input', (e) => {
     if (e.target.id === 'd-paste') demFill();
+    { const m = e.target.id.match(/^(d|r)-(addr|city)$/); if (m && PLACE[m[1]]) { PLACE[m[1]].geo = null; placeShow(m[1]); if (m[2] === 'city') e.target.dataset.touched = '1'; clearTimeout(placeFind.t); placeFind.t = setTimeout(() => placeFind(m[1], true), 900); } }
+    { const m = e.target.id.match(/^(d|r)-meettxt$/); if (m && PLACE[m[1]]) PLACE[m[1]].meetTxt = e.target.value; }
     if (/^d-(name|phone|addr|city|total)$/.test(e.target.id)) e.target.dataset.touched = '1';
     if (e.target.id === 'r-total') e.target.dataset.touched = '1'; if (/^r-(qty|price|parts|total)$/.test(e.target.id)) repPreview(); if (e.target.id === 'ad-title') adCount(); });
   document.addEventListener('change', (e) => {
+    { const m = (e.target.name || '').match(/^(d|r)-meet$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meet = e.target.value === 'meet'; placeShow(m[1]); } }
+    if (e.target.id === 'd-shot' && e.target.files && e.target.files.length) demShot(e.target);
+    if (e.target.id === 't-msgk') { const ta = $('#t-msg'), k = e.target.value; MSG_DRAFT[ta.dataset.k] = ta.value; ta.dataset.k = k; ta.value = (MSG_DRAFT[k] || '').trim() || MSG_DEF[k]; }
     if (e.target.id === 'r-type') { const p = repTypes().get(e.target.value.trim()); if (p != null) { $('#r-price').value = numIn(p); } repPreview(); }
     if (e.target.id === 'r-qty') repPreview();
     if (e.target.id === 'd-qty') { e.target.dataset.touched = '1'; const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(e.target.value) || 1, val('d-type'))); }
