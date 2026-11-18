@@ -236,10 +236,15 @@ textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-
 .stop.pk{border-left:5px solid var(--warn)} .stop.rt{border-left:5px solid var(--good)}
 .stop-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .stop-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--surface);font-weight:800;font-size:13px}
 .stop-t{font-size:16px;font-variant-numeric:tabular-nums} .stop-m{font-size:14px;line-height:1.45} .stop-m a{color:var(--accent);text-decoration:none}
-.stop-a{display:flex;flex-wrap:wrap;gap:6px} .iconbtn.sm{width:34px;height:34px;font-weight:800}
+.stop-a{display:flex;flex-wrap:wrap;gap:6px} .stop-a .grow{flex:1 1 auto}
+.chip.warn{height:26px;padding:0 9px;font-size:12px;border-color:var(--bad);color:var(--bad);vertical-align:middle}
+.stop-mv{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12.5px} .stop-mv .chip{height:30px;padding:0 11px;font-size:12.5px}
+.stop-more summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--ink-2);list-style:none;padding:2px 0} .stop-more summary::-webkit-details-marker{display:none} .stop-more summary::after{content:' ▾'} .stop-more[open] summary::after{content:' ▴'} .stop-more .stop-a{margin-top:6px} .iconbtn.sm{width:34px;height:34px;font-weight:800}
 .pill.rp-pick{background:var(--warn-soft);color:var(--warn)} .strip.tour{background:var(--warn-soft)}
-.opts.seg2{display:grid;grid-template-columns:1fr 1fr}
-.opts.seg3{display:grid;grid-template-columns:1fr 1fr 1fr}
+.opts.seg2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.opts.seg3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.opts.seg2 .opt,.opts.seg3 .opt{display:flex}
+.opts.seg2 .opt span,.opts.seg3 .opt span{width:100%;justify-content:center;text-align:center;white-space:normal;line-height:1.15;min-height:38px;height:auto;padding:4px 6px}
 .placebox{border:1px dashed var(--line);border-radius:12px;padding:10px;margin:2px 0 12px}
 .geo-list{display:grid;gap:6px;margin:8px 0}
 .geo-it{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font:inherit;color:var(--ink);cursor:pointer}
@@ -1061,7 +1066,7 @@ function renderAccueil() {
         ${cashCard()}
         ${salesCard(m, ms)}
         ${reparoStrip(m)}
-        ${(() => { const st = tourStops(today()); if (!st.length) return ''; const n = st[st.length - 1].n; return `<button class="strip tour" data-act="view" data-view="tournee"><span><b>Tournée ${momentTxt(today(), tourSlot(today()))}</b></span><span><b>${n}</b> arrêt${n > 1 ? 's' : ''}</span><span>${st.filter((x) => x.kind === 'pick').length} à récupérer · ${st.filter((x) => x.kind === 'ret').length} à rendre</span>${ic('right')}</button>`; })()}
+        ${(() => { const sl = autoSlot(today()), st = tourStops(today(), sl); if (!st.length) return ''; const n = st[st.length - 1].n; return `<button class="strip tour" data-act="tour-open" data-v="${sl}"><span><b>Tournée ${momentTxt(today(), sl)}</b></span><span><b>${n}</b> arrêt${n > 1 ? 's' : ''}</span><span>${st.filter((x) => x.kind === 'pick').length} à récupérer · ${st.filter((x) => x.kind === 'ret').length} à rendre</span>${ic('right')}</button>`; })()}
         <button class="strip" data-act="goto" data-view="articles" data-st="encours">
           <span>En ce moment</span><span><b>${open.length}</b> en cours</span><span><b>${eur(capital)}</b> immobilisés</span><span><b>${eurS(pot)}</b> au prix affiché</span>${ic('right')}
         </button>
@@ -2760,8 +2765,20 @@ function tourSlot(D) {
   D = D || tourDay();
   const L = slotsOf(D);
   if (S.tourSlot && L.includes(S.tourSlot)) return S.tourSlot;
-  if (D !== today()) return L[0];
-  return L.find((x) => nowMin() < toMin(dayCfg(D, x).end)) || L[L.length - 1];
+  return autoSlot(D);
+}
+// Par défaut : la prochaine tournée qui a des clients (sinon la prochaine tout court)
+function autoSlot(D) {
+  const L = slotsOf(D);
+  const open = D !== today() ? L : L.filter((x) => nowMin() < toMin(dayCfg(D, x).end));
+  if (!open.length) return L[L.length - 1];
+  return open.find((x) => tourStops(D, x).length) || open[0];
+}
+// Où on peut déplacer un client depuis la tournée affichée : les autres tournées pas encore finies, et demain
+function moveTargets(D, slot) {
+  const n = nowMin(), o = slotsOf(D).filter((x) => x !== slot && (D !== today() || n < toMin(dayCfg(D, x).end))).map((x) => [x, SLOT_NAMES[x]]);
+  o.push(['demain', D === today() ? 'Demain' : 'Le lendemain']);
+  return o;
 }
 // Clé de rangement (ordre, retard, messages envoyés) : une par tournée
 const roundKey = (D, slot) => (twoRounds(D) && slot && slot !== 'soir' ? D + (slot === 'midi' ? 'm' : 'a') : D);
@@ -2897,29 +2914,45 @@ const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMin
 // Plage large annoncée au client dès l'ajout : pas besoin de renvoyer une heure précise ensuite
 const plage = (D, slot) => { const c = dayCfg(D || today(), slot); return `entre ${hm(toMin(c.start))} et ${hm(toMin(c.end || '21:00'))}`; };
 
+// La tournée où passe un client le jour D : une seule, jamais deux.
+// Celle prévue ; si elle est déjà finie (ou si le passage était prévu un jour d'avant), la suivante qui n'est pas finie.
+function effSlot(r, D) {
+  const L = slotsOf(D), P = isDate(r.planDate) ? r.planDate : today();
+  if (P > D) return null;
+  let i = P < D ? 0 : L.indexOf(L.includes(r.planSlot) ? r.planSlot : 'soir');
+  if (i < 0) i = L.length - 1;
+  if (D === today()) { const n = nowMin(); while (i < L.length - 1 && n >= toMin(dayCfg(D, L[i]).end)) i++; }
+  return L[i];
+}
+const grpKey = (r) => normC(mapsPt(r)) || r.id;
 function tourStops(D, slot) {
-  slot = slot || tourSlot(D);
-  const multi = twoRounds(D), si = slotIdx(slot);
-  const due = (r) => !isDate(r.planDate) || r.planDate <= D;
-  // Chaque tournée prend ses récupérations, plus celles des tournées précédentes pas encore faites (et les jours passés).
-  const inSlot = (r) => !multi || !isDate(r.planDate) || r.planDate < D || slotIdx(r.planSlot) <= si;
-  const pick = S.repairs.filter((r) => r.picked === false && due(r) && inSlot(r)).map((r) => ({ r, kind: 'pick' }));
-  const ret = S.repairs.filter((r) => r.picked !== false && repDone(r) && r.returned === false && due(r) && inSlot(r)).map((r) => ({ r, kind: 'ret' }));
+  if (!slot || !slotsOf(D).includes(slot)) slot = tourSlot(D);
+  const pick = S.repairs.filter((r) => r.picked === false && effSlot(r, D) === slot).map((r) => ({ r, kind: 'pick' }));
+  const ret = S.repairs.filter((r) => r.picked !== false && repDone(r) && r.returned === false && effSlot(r, D) === slot).map((r) => ({ r, kind: 'ret' }));
   const K = roundKey(D, slot), ord = LS.get('tourOrd', {})[K] || [];
   const all = [...pick, ...ret];
   all.sort((a, b) => {
     const ia = ord.indexOf(a.r.id), ib = ord.indexOf(b.r.id);
     if (ia >= 0 && ib >= 0) return ia - ib;
+    if (ia >= 0 || ib >= 0) return ia >= 0 ? -1 : 1;
     return cityRank(a.r.city, D) - cityRank(b.r.city, D) || (a.r.address || '').localeCompare(b.r.address || '') || (a.kind === 'ret' ? -1 : 1);
   });
-  // Même adresse (retour + nouvelle manette) : un seul arrêt, l'heure est la même
-  const c = dayCfg(D, slot), delay = num((LS.get('tourDelay', {}) || {})[K]);
-  let t = toMin(c.start) + delay, prev = null, n = 0;
+  // Même lieu (retour + nouvelle manette) : un seul arrêt, l'heure est la même.
+  // Trajet optimisé et inchangé depuis : heures calculées avec les vrais temps de route ; sinon un temps fixe par arrêt.
+  const c = dayCfg(D, slot), delay = num((LS.get('tourDelay', {}) || {})[K]), stopMin = num(c.stop) || 12;
+  const opt = (LS.get('tourOpt', {}) || {})[K], useOpt = !!(opt && opt.arr && opt.sig === all.map((s) => s.r.id).join(','));
+  const t0 = toMin(c.start) + delay;
+  let t = t0, prev = null, n = 0;
   all.forEach((s) => {
-    const key = normC((s.r.address || '') + (s.r.city || '')) || s.r.id;
-    if (key !== prev) { n += 1; if (n > 1) t += num(c.stop) || 12; prev = key; }
+    const key = grpKey(s.r);
+    if (key !== prev) {
+      n += 1;
+      if (useOpt && opt.arr[key] != null) t = t0 + Math.round(opt.arr[key]); else if (n > 1) t += stopMin;
+      prev = key;
+    }
     s.n = n; s.from = t; s.to = t + 20;
   });
+  all.optOk = useOpt;
   return all;
 }
 
@@ -2943,16 +2976,18 @@ function nextRound() {
 }
 /* ---------- Lieux : trouver l'endroit exact (adresse ou lieu comme « mosquée SMH ») ---------- */
 // Abréviations courantes écrites par les clients
-const ALIAS = [[/\bsmh\b/gi, "Saint-Martin-d'Hères"], [/\bst[ -]?eg(reve)?\b/gi, 'Saint-Égrève'], [/\bsmd?v\b/gi, 'Saint-Martin-le-Vinoux'], [/\bst[ -]ismier\b/gi, 'Saint-Ismier'], [/\bgre\b/gi, 'Grenoble'], [/\bgrenob\b/gi, 'Grenoble'], [/\bfac\b/gi, 'campus universitaire'], [/\bmacdo\b|\bmcdo\b/gi, "McDonald's"], [/\bst\b/gi, 'Saint']];
+const ALIAS = [[/(^|[^\wà-ÿ])(moqu[ée]e?|mosqu[ée]e?|mosque)s?(?![\wà-ÿ])/gi, '$1mosquée'], [/\bd\s?['’]?\s?h[eè]res\b/gi, "d'Hères"], [/\bechi\b/gi, 'Échirolles'], [/\bgd\b/gi, 'Grand'], [/\bsmh\b/gi, "Saint-Martin-d'Hères"], [/\bst[ -]?eg(reve)?\b/gi, 'Saint-Égrève'], [/\bsmd?v\b/gi, 'Saint-Martin-le-Vinoux'], [/\bst[ -]ismier\b/gi, 'Saint-Ismier'], [/\bgre\b/gi, 'Grenoble'], [/\bgrenob\b/gi, 'Grenoble'], [/\bfac\b/gi, 'campus universitaire'], [/\bmacdo\b|\bmcdo\b/gi, "McDonald's"], [/\bst\b/gi, 'Saint']];
 const unAlias = (s) => ALIAS.reduce((t, [re, v]) => t.replace(re, v), String(s || ''));
 const GEO_BIAS = 'lat=45.19&lon=5.76';
 // Distance à vol d'oiseau (km)
 function kmBetween(a, b) { const R = 6371, r = Math.PI / 180, dl = (b.lat - a.lat) * r, dn = (b.lon - a.lon) * r; const x = Math.sin(dl / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dn / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); }
 async function geoSearch(q) {
-  q = unAlias(q).replace(/\s+/g, ' ').trim();
+  q = unAlias(q).replace(/\s+/g, ' ').trim().replace(/^(je suis |on se voit |rdv |rendez-vous )?(devant|à côté de|a cote de|en face de|vers)\s+(le |la |les |l['’]\s?)?/i, '');
   if (q.length < 3) return [];
   const hasNum = /^\s*\d+|\b\d+\s*(bis|ter)?\s*,?\s*(rue|av|avenue|bd|boulevard|chemin|allée|allee|place|impasse|route|cours|quai)/i.test(q);
-  const get = (u) => fetch(u).then((x) => (x.ok ? x.json() : { features: [] })).catch(() => ({ features: [] }));
+  // Les services de carte refusent parfois une demande (trop rapprochées) : on réessaie une fois
+  const get1 = (u) => fetch(u).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  const get = async (u) => (await get1(u)) || (await new Promise((ok) => setTimeout(ok, 700)).then(() => get1(u))) || { features: [] };
   const [ban, pho] = await Promise.all([
     get(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&${GEO_BIAS}&limit=5`),
     get(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&${GEO_BIAS}&limit=7&lang=fr&bbox=5.3,44.95,6.3,45.6`)]);
@@ -2964,8 +2999,27 @@ async function geoSearch(q) {
     const isPlace = p.name && !['place', 'highway', 'boundary'].includes(p.osm_key);
     return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], name: isPlace ? p.name : '', city: p.city || p.locality || '',
       label: [isPlace ? p.name : '', street || (!isPlace ? p.name : ''), [p.postcode, p.city].filter(Boolean).join(' ')].filter(Boolean).join(', '), kind: isPlace ? 'place' : p.housenumber ? 'home' : 'street' }; });
+  // Fiabilité : un lieu doit porter un des mots importants de la recherche (« mosquée », « barber »…),
+  // une adresse doit être bien reconnue, et une simple commune n'est jamais un lieu précis
+  const STOP = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'l', 'd', 'a', 'au', 'aux', 'en', 'et', 'devant', 'pres', 'cote', 'face', 'vers', 'rue', 'avenue', 'av', 'bd', 'boulevard', 'chemin', 'allee', 'place', 'impasse', 'route', 'cours', 'quai', 'saint', 'sainte', 'st', 'bis', 'ter']);
+  const cityW = new Set(CITIES.flatMap((c) => normC(c).split(' ')));
+  const keys = normC(q).split(' ').filter((w) => w.length >= 2 && !STOP.has(w) && !cityW.has(w) && !/^\d+$/.test(w) && !/^38\d{3}$/.test(w));
+  const isTown = (x) => { const n = normC(x.name || x.label.split(',')[0]); return cityW.has(n) || CITIES.some((c) => normC(c) === n) || n === normC(x.city); };
+  [...A, ...P].forEach((x) => {
+    const nm = normC((x.name || '') + ' ' + x.label);
+    if (x.kind === 'place') x.conf = !isTown(x) && keys.length > 0 && keys.filter((k) => normC(x.name).includes(k)).length >= Math.ceil(keys.length * 0.6);
+    else if (!keys.length) x.conf = false; // seulement une commune : pas assez précis
+    else if (x.kind === 'home') x.conf = (x.score == null || x.score > 0.55) && keys.filter((k) => nm.includes(k)).length >= keys.length / 2;
+    else x.conf = x.score != null && x.score > 0.7 && !isTown(x) && keys.filter((k) => nm.includes(k)).length >= keys.length / 2;
+  });
   const out = [];
   (hasNum ? [...A, ...P] : [...P.filter((x) => x.kind === 'place'), ...A, ...P]).forEach((x) => { if (!out.some((y) => kmBetween(x, y) < ((y.name || '') === (x.name || '') ? 0.2 : 0.03))) out.push(x); });
+  // Les plus sûrs d'abord ; à égalité, le nom qui colle le mieux à la recherche (« Gare de Grenoble » avant « Gare de Grenoble Universités Gières »)
+  const qn = normC(q), extra = (x) => normC(x.name || x.label.split(',')[0]).split(' ').filter((w) => !qn.includes(w)).length;
+  out.sort((a, b) => (b.conf ? 1 : 0) - (a.conf ? 1 : 0) || extra(a) - extra(b));
+  // Deux lieux aussi plausibles à plus de 500 m (ex. deux mosquées à Saint-Martin-d'Hères) : on ne choisit pas à ta place
+  // (sauf si le nom correspond exactement à ce qui est écrit, comme « gare de Grenoble »)
+  if (out[0] && out[0].conf && out[0].kind === 'place' && extra(out[0]) > 0) { const twin = out.slice(1).find((y) => y.conf && y.kind === 'place' && kmBetween(out[0], y) > 0.5 && normC(y.name) !== normC(out[0].name)); if (twin) out[0].amb = true; }
   return out.slice(0, 6);
 }
 // Le lieu tel que Google Maps le comprend : coordonnées si le lieu est vérifié, sinon l'adresse écrite
@@ -2994,22 +3048,31 @@ async function placeFind(px, auto) {
   const st = $('#' + px + '-gst'), L = $('#' + px + '-glist');
   if (!q.trim()) { if (!auto) toast('Écris d’abord une adresse ou un lieu'); return; }
   if (st) st.textContent = 'Recherche…';
+  const seq = (PLACE[px].seq = (PLACE[px].seq || 0) + 1);
   const res = await geoSearch(q);
+  // Une recherche plus récente a été lancée entre-temps (adresse modifiée) : on ignore celle-ci
+  if (!PLACE[px] || PLACE[px].seq !== seq) return;
   PLACE[px].cands = res;
   if (!L) return;
   if (!res.length) { L.innerHTML = '<p class="hint neg" style="margin:4px 0">Rien trouvé : ajoute la ville ou un mot de plus (ex. « mosquée rue Edmond Rostand »).</p>'; placeShow(px); return; }
-  L.innerHTML = `${auto ? '<p class="hint" style="margin:6px 0 0">Pas le bon endroit ? Choisis :</p>' : ''}<div class="geo-list">${res.map((x, i) => `<button class="geo-it" data-act="geo-pick" data-px="${px}" data-i="${i}"><b>${esc(x.name || x.label.split(',')[0])}</b><small>${esc(x.name ? x.label.split(', ').slice(1).join(', ') : x.label.split(', ').slice(1).join(', ') || x.label)}${x.kind === 'place' ? ' · lieu' : x.kind === 'street' ? ' · rue sans numéro' : ''}</small></button>`).join('')}</div>`;
+  const sure = res[0].conf && !res[0].amb;
+  L.innerHTML = `<p class="hint" style="margin:6px 0 0">${auto && sure ? 'Pas le bon endroit ? Choisis :' : 'Choisis le bon endroit :'}</p><div class="geo-list">${res.map((x, i) => `<button class="geo-it" data-act="geo-pick" data-px="${px}" data-i="${i}"><b>${esc(x.name || x.label.split(',')[0])}</b><small>${esc(x.name ? x.label.split(', ').slice(1).join(', ') : x.label.split(', ').slice(1).join(', ') || x.label)}${x.kind === 'place' ? ' · lieu' : x.kind === 'street' ? ' · rue sans numéro' : ''}</small></button>`).join('')}</div>`;
   // Un seul résultat clair (adresse exacte, ou un seul lieu) : on le prend directement
   // Recherche automatique : on prend le meilleur résultat, les autres restent proposés juste en dessous
-  if (auto) placePick(px, 0, true); else placeShow(px);
+  if (auto && sure) placePick(px, 0, true); else { placeShow(px); if (st && !PLACE[px].geo) st.innerHTML = '<span class="neg">Plusieurs possibilités : choisis le bon lieu ci-dessous</span>'; }
 }
 function placePick(px, i, keepList) {
   const x = (PLACE[px].cands || [])[i]; if (!x) return;
   PLACE[px].geo = { lat: x.lat, lon: x.lon, label: x.label, name: x.name || '' };
   const c = $('#' + px + '-city'); if (c && x.city && (!c.value.trim() || !c.dataset.touched)) c.value = findCity(x.city) || x.city;
+  const t = $('#' + px + '-meettxt'), auto = t && (!t.value.trim() || t.dataset.auto === '1');
   if (x.kind === 'place') {
-    PLACE[px].meet = true; const m = $(`input[name="${px}-meet"][value="meet"]`); if (m) m.checked = true;
-    const t = $('#' + px + '-meettxt'); if (t && !t.value.trim()) { t.value = 'devant ' + x.name; PLACE[px].meetTxt = t.value; }
+    PLACE[px].meet = true; PLACE[px].autoMeet = true; const m = $(`input[name="${px}-meet"][value="meet"]`); if (m) m.checked = true;
+    if (auto) { t.value = 'devant ' + x.name; t.dataset.auto = '1'; PLACE[px].meetTxt = t.value; }
+  } else if (PLACE[px].autoMeet && x.kind === 'home') {
+    // Adresse précise choisie après un lieu proposé automatiquement : c'est un domicile
+    PLACE[px].meet = false; PLACE[px].autoMeet = false; const m = $(`input[name="${px}-meet"][value="home"]`); if (m) m.checked = true;
+    if (auto) { t.value = ''; delete t.dataset.auto; PLACE[px].meetTxt = ''; }
   }
   const L = $('#' + px + '-glist'); if (L && !keepList) L.innerHTML = '';
   placeShow(px);
@@ -3021,13 +3084,22 @@ function placeVal(px) {
 }
 
 /* ---------- Trajet le plus court entre les arrêts ---------- */
+// Départ / arrivée : une commune (ex. « Crolles »), cherchée comme commune et gardée en mémoire
+async function townPt(q) {
+  const k = 'town:' + normC(q), C = LS.get('geoCache', {}); if (C[k]) return C[k];
+  let p = null;
+  try { const j = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&type=municipality&${GEO_BIAS}&limit=1`).then((x) => x.json()); const f = (j.features || [])[0]; if (f) p = { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] }; } catch (e) {}
+  if (!p) p = await geoOne(q);
+  if (p) { C[k] = p; LS.set('geoCache', C); }
+  return p;
+}
 async function geoOne(q) { const k = 'geo:' + normC(q), C = LS.get('geoCache', {}); if (C[k]) return C[k]; const r = (await geoSearch(q))[0]; if (r) { C[k] = { lat: r.lat, lon: r.lon }; LS.set('geoCache', C); } return r ? { lat: r.lat, lon: r.lon } : null; }
 async function travelMatrix(pts) {
   // Temps de route réels (OSRM) ; à défaut, distance à vol d'oiseau
   try {
     const u = `https://router.project-osrm.org/table/v1/driving/${pts.map((p) => `${p.lon.toFixed(5)},${p.lat.toFixed(5)}`).join(';')}?annotations=duration`;
     const j = await fetch(u).then((x) => x.json());
-    if (j.code === 'Ok' && j.durations) return { m: j.durations, real: true };
+    if (j.code === 'Ok' && j.durations) return { m: j.durations.map((row, a) => row.map((v, b) => (v == null ? kmBetween(pts[a], pts[b]) * 90 : v))), real: true };
   } catch (e) {}
   return { m: pts.map((a) => pts.map((b) => kmBetween(a, b) * 90)), real: false };
 }
@@ -3047,22 +3119,51 @@ function bestOrder(m, n) {
   while (imp) { imp = false; for (let i = 0; i < o.length - 1; i++) for (let k = i + 1; k < o.length; k++) { const t = o.slice(0, i).concat(o.slice(i, k + 1).reverse(), o.slice(k + 1)); if (cost(t) < cost(o) - 1e-6) { o.splice(0, o.length, ...t); imp = true; } } }
   return o;
 }
+// Cherche le lieu des clients qui n'en ont pas (meilleur résultat), et enregistre tout en une fois
+async function geoFixRepairs(ids) {
+  const patches = {};
+  for (const id of ids) await (async () => {
+    const r = S.repairs.find((x) => x.id === id); if (!r || !(r.address || r.city)) return;
+    const x = (await geoSearch([r.address, r.city].filter(Boolean).join(' ')))[0]; if (!x || !x.conf || x.amb) return;
+    const pl = x.kind === 'place';
+    patches[id] = { geo: { lat: x.lat, lon: x.lon, label: x.label, name: x.name || '' }, ...(pl && !r.meet ? { meet: true, meetTxt: r.meetTxt || 'devant ' + x.name } : {}), ...(!r.city && x.city ? { city: findCity(x.city) || x.city } : {}) };
+  })();
+  const found = Object.keys(patches);
+  if (found.length) {
+    S.repairs.forEach((r) => { if (patches[r.id]) Object.assign(r, patches[r.id]); }); render();
+    await write(() => commit((d) => { d.repairs.forEach((r) => { if (patches[r.id]) Object.assign(r, patches[r.id]); }); }, `Réparo · ${found.length} lieu${found.length > 1 ? 'x' : ''} trouvé${found.length > 1 ? 's' : ''}`));
+  }
+  return { found, missing: ids.filter((id) => !patches[id]), patches };
+}
 async function optimizeRound() {
   const D = tourDay(), slot = tourSlot(D), K = roundKey(D, slot), c = dayCfg(D, slot);
   const stops = tourStops(D, slot), seen = new Set(), groups = [];
-  stops.forEach((s) => { const k = mapsPt(s.r); if (!seen.has(k)) { seen.add(k); groups.push({ k, r: s.r, ids: [] }); } groups.find((g) => g.k === k).ids.push(s.r.id); });
-  const withGeo = groups.filter((g) => g.r.geo && g.r.geo.lat), noGeo = groups.filter((g) => !(g.r.geo && g.r.geo.lat));
+  stops.forEach((s) => { const k = grpKey(s.r); if (!seen.has(k)) { seen.add(k); groups.push({ k, r: s.r, ids: [] }); } groups.find((g) => g.k === k).ids.push(s.r.id); });
+  let withGeo = groups.filter((g) => g.r.geo && g.r.geo.lat), noGeo = groups.filter((g) => !(g.r.geo && g.r.geo.lat));
+  if (noGeo.length) {
+    // Lieux pas encore vérifiés : on les cherche d'abord, tout seuls
+    toast(`Recherche de ${plural(noGeo.length, 'lieu', 'lieux')} sur la carte…`);
+    const fx = await geoFixRepairs(noGeo.map((g) => g.r.id));
+    if (fx.found.length) return optimizeRound();
+  }
   if (withGeo.length < 2) { toast('Vérifie le lieu d’au moins 2 clients (bouton « Trouver le lieu ») pour optimiser'); return; }
   toast('Calcul du meilleur trajet…');
-  const [A, B] = await Promise.all([geoOne(c.from), geoOne(c.to)]);
+  const [A, B] = await Promise.all([townPt(c.from), townPt(c.to)]);
   if (!A || !B) { toast('Départ ou arrivée introuvable : vérifie-les dans les réglages'); return; }
   const pts = [A, ...withGeo.map((g) => g.r.geo), B];
   const { m, real } = await travelMatrix(pts);
   const o = bestOrder(m, withGeo.length);
   const ids = [...o.map((i) => withGeo[i - 1]), ...noGeo].flatMap((g) => g.ids);
-  const total = (() => { let s = m[0][o[0]]; for (let i = 1; i < o.length; i++) s += m[o[i - 1]][o[i]]; return s + m[o[o.length - 1]][o.length + 1]; })();
+  // Heure d'arrivée de chaque arrêt (minutes après le départ) : route + temps passé à chaque arrêt
+  const stopMin = num(c.stop) || 12, arr = {};
+  let t = 0, prevI = 0;
+  o.forEach((i, k) => { t += m[prevI][i] / 60; if (k > 0) t += stopMin; arr[withGeo[i - 1].k] = t; prevI = i; });
+  const drive = (() => { let x = m[0][o[0]]; for (let i = 1; i < o.length; i++) x += m[o[i - 1]][o[i]]; return x + m[o[o.length - 1]][o.length + 1]; })();
   const OR = LS.get('tourOrd', {}); OR[K] = ids; LS.set('tourOrd', OR);
-  const OT = LS.get('tourOpt', {}); OT[K] = { min: Math.round(total / 60), real }; LS.set('tourOpt', OT);
+  const OT = LS.get('tourOpt', {}); OT[K] = { min: Math.round(drive / 60), real, arr, sig: '' }; LS.set('tourOpt', OT);
+  // Signature = l'ordre exact des arrêts : si un client est ajouté, déplacé ou fini, les heures repassent au calcul simple
+  OT[K].sig = tourStops(D, slot).map((s) => s.r.id).join(','); LS.set('tourOpt', OT);
+  const total = drive;
   renderTournee();
   toast(`Trajet optimisé : environ ${Math.round(total / 60)} min de route${real ? '' : ' (estimation)'}${noGeo.length ? ` · ${noGeo.length} lieu(x) non vérifié(s) mis à la fin` : ''}`);
 }
@@ -3080,7 +3181,8 @@ async function ocrImages(files, onProg) {
   const T = await loadOcr(), out = [];
   for (let i = 0; i < files.length; i++) {
     const res = await T.recognize(files[i], 'fra', { logger: (m) => { if (m.status === 'recognizing text') onProg(Math.round(((i + m.progress) / files.length) * 100)); } });
-    const W = (res.data && res.data.lines) || [], width = Math.max(...W.map((l) => l.bbox.x1), 1);
+    let width = 0; try { const bm = await createImageBitmap(files[i]); width = bm.width; bm.close && bm.close(); } catch (e) {}
+    const W = (res.data && res.data.lines) || []; if (!width) width = Math.max(...W.map((l) => l.bbox.x1), 1);
     const keepLeft = tourCfg().ocrLeft !== false;
     W.forEach((l) => {
       const t = l.text.replace(/\s+/g, ' ').trim();
@@ -3143,17 +3245,20 @@ function renderTournee() {
     return `<div class="stop ${pick ? 'pk' : 'rt'}">
       <div class="stop-h"><span class="stop-n">${s.n}</span><b class="stop-t">${hm(s.from)} – ${hm(s.to)}</b><span class="pill ${pick ? 'st-attente' : 'st-vendu'}">${pick ? `Récupérer ×${repQty(r)}` : `Rendre ×${repQty(r)} · ${eur(repTotal(r))}`}</span></div>
       <div class="stop-m"><b>${esc(r.client || 'Client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<br>
-        ${adr ? `<a href="https://maps.google.com/?q=${encodeURIComponent(mapsPt(r))}" target="_blank" rel="noopener">${r.geo ? '📍 ' : ''}${esc(adr)}</a>${r.meet ? ` <small class="muted">· RDV : ${esc(lieuTxt(r))}</small>` : ''}${r.geo ? '' : ' <small class="neg">· lieu non vérifié : touche Modifier puis « Trouver le lieu »</small>'}` : '<span class="neg">Adresse manquante : touche Modifier</span>'}${cityRank(r.city) === 50 && r.city ? ' <small class="muted">(commune hors trajet : placée à la fin)</small>' : ''}
+        ${adr ? `<a href="https://maps.google.com/?q=${encodeURIComponent(mapsPt(r))}" target="_blank" rel="noopener">${r.geo ? '📍 ' : ''}${esc(adr)}</a>${r.meet ? ` <small class="muted">· RDV : ${esc(lieuTxt(r))}</small>` : ''}${r.geo ? '' : ` <button class="chip warn" data-act="geo-fix" data-id="${esc(r.id)}">📍 Trouver ce lieu</button>`}` : '<span class="neg">Adresse manquante : touche Modifier</span>'}${cityRank(r.city) === 50 && r.city ? ' <small class="muted">(commune hors trajet : placée à la fin)</small>' : ''}
         <small class="muted"> · ${esc(r.type)}${r.note ? ' · ' + esc(r.note) : ''}</small></div>
       <div class="stop-a">
-        <button class="btn sm primary" data-act="tour-msg" data-k="eta" data-id="${esc(r.id)}">J'arrive (10 min)</button>
-        ${delay ? `<button class="btn sm" data-act="tour-msg" data-k="late" data-id="${esc(r.id)}" data-sk="${esc(k)}">${wasSent ? 'Retard prévenu ✓' : 'Prévenir du retard'}</button>` : `<button class="btn sm" data-act="tour-msg" data-k="${s.kind}" data-id="${esc(r.id)}" data-sk="${esc(k)}">${wasSent ? 'Heure précise envoyée ✓' : 'Heure précise'}</button>`}
-        ${pick ? `<button class="btn sm primary" data-act="rep-pick" data-id="${esc(r.id)}">Récupéré</button>` : `<button class="btn sm primary" data-act="rep-retpay" data-id="${esc(r.id)}">Rendu + payé</button><button class="btn sm" data-act="rep-ret" data-id="${esc(r.id)}">Rendu, pas payé</button>`}
-        ${pick && twoRounds(D) ? slotsOf(D).filter((x) => x !== slot).map((x) => `<button class="btn sm" data-act="tour-move" data-s="${x}" data-id="${esc(r.id)}">→ ${SLOT_NAMES[x]}</button>`).join('') : ''}
-        <button class="btn sm" data-act="tour-later" data-id="${esc(r.id)}">Demain</button>
-        <button class="iconbtn sm" data-act="tour-mv" data-d="-1" data-id="${esc(r.id)}" aria-label="Monter">↑</button><button class="iconbtn sm" data-act="tour-mv" data-d="1" data-id="${esc(r.id)}" aria-label="Descendre">↓</button>
+        ${delay ? `<button class="btn sm" data-act="tour-msg" data-k="late" data-id="${esc(r.id)}" data-sk="${esc(k)}">${wasSent ? 'Retard prévenu ✓' : 'Prévenir du retard'}</button>` : `<button class="btn sm" data-act="tour-msg" data-k="${s.kind}" data-id="${esc(r.id)}" data-sk="${esc(k)}">${wasSent ? 'Heure envoyée ✓' : 'Envoyer l’heure'}</button>`}
+        <button class="btn sm" data-act="tour-msg" data-k="eta" data-id="${esc(r.id)}">J'arrive</button>
+        ${pick ? `<button class="btn sm primary grow" data-act="rep-pick" data-id="${esc(r.id)}">Récupéré</button>` : `<button class="btn sm primary grow" data-act="rep-retpay" data-id="${esc(r.id)}">Rendu + payé</button>`}
+      </div>
+      <div class="stop-mv"><span class="muted">Passer à :</span>${moveTargets(D, slot).map(([v, l]) => `<button class="chip" data-act="${v === 'demain' ? 'tour-later' : 'tour-move'}" data-s="${v}" data-id="${esc(r.id)}">${l}</button>`).join('')}</div>
+      <details class="stop-more"><summary>Plus</summary><div class="stop-a">
+        ${pick ? '' : `<button class="btn sm" data-act="rep-ret" data-id="${esc(r.id)}">Rendu, pas encore payé</button>`}
+        <button class="btn sm" data-act="tour-mv" data-d="-1" data-id="${esc(r.id)}">↑ Monter</button><button class="btn sm" data-act="tour-mv" data-d="1" data-id="${esc(r.id)}">↓ Descendre</button>
         <button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button><button class="btn sm" data-act="rep-copy" data-id="${esc(r.id)}">Dupliquer</button>
-      </div></div>`;
+      </div></details>
+    </div>`;
   };
   el.innerHTML = `
     <div class="ttl-row"><div><div class="eyebrow">Réparo · récupérations et retours</div><h1 class="h1">Tournée</h1></div><button class="btn sm" data-act="tour-cfg">Réglages</button></div>
@@ -3166,10 +3271,10 @@ function renderTournee() {
     <section class="card tour-sum">
       ${stops.length ? `<div class="tour-line"><b>${c.weekend ? 'Week-end' : 'Semaine'}${twoRounds(D) ? ' · ' + SLOT_NAMES[slot].toLowerCase() : ''} · ${plural(nStops, 'arrêt')}</b><span>${pickN} à récupérer · ${retN} à rendre${cash ? ` · ${eur(cash)} à encaisser` : ''}</span><span>départ ${esc(c.from)} ${hm(toMin(c.start) + delay)} → ${esc(c.to)} vers ${hm(stops[stops.length - 1].to + 15)}</span></div>
       <div class="btns"><button class="btn grow" data-act="tour-opt">Optimiser le trajet</button><button class="btn primary grow" data-act="tour-go">Lancer la tournée (Google Maps)</button></div>
-      ${(() => { const o = (LS.get('tourOpt', {}) || {})[K]; return o ? `<p class="hint" style="margin:0">Trajet optimisé : environ ${o.min} min de route${o.real ? '' : ' (estimation)'}. Un nouveau client ? Touche à nouveau « Optimiser ».</p>` : ''; })()}
+      ${(() => { const o = (LS.get('tourOpt', {}) || {})[K]; if (!o) return ''; return stops.optOk ? `<p class="hint pos" style="margin:0">Trajet optimisé : environ ${o.min} min de route${o.real ? '' : ' (estimation)'}, heures calculées avec les vrais temps de trajet.</p>` : '<p class="hint" style="margin:0">La tournée a changé depuis la dernière optimisation : touche « Optimiser le trajet » pour recalculer l’ordre et les heures.</p>'; })()}
       <div class="tour-delay"><span>Retard :</span>${[0, 10, 20, 30, 45].map((m) => `<button class="chip" data-act="tour-delay" data-m="${m}" aria-pressed="${delay === m}">${m ? '+' + m + ' min' : 'aucun'}</button>`).join('')}</div>
       ${delay ? '<p class="hint" style="margin:0">Les heures ont été décalées : touche « Prévenir du retard » sur chaque arrêt déjà prévenu.</p>' : ''}`
-      : `<p style="margin:0">Aucun arrêt ${momentTxt(D, slot)}. Ajoute une demande dès qu'un client t'écrit : elle va dans la tournée que tu choisis, à la bonne place sur ton trajet.</p>`}
+      : (() => { const other = slotsOf(D).filter((x) => x !== slot && tourStops(D, x).length); return `<p style="margin:0">Aucun arrêt ${momentTxt(D, slot)}.${other.length ? '' : ' Ajoute une demande dès qu’un client t’écrit : elle va dans la tournée que tu choisis, à la bonne place sur ton trajet.'}</p>${other.length ? `<div class="btns">${other.map((x) => `<button class="btn sm primary" data-act="tour-slot" data-v="${x}">Voir la tournée ${SLOT_NAMES[x] === 'Soir' ? 'du soir' : SLOT_NAMES[x] === 'Midi' ? 'de midi' : 'de l’après-midi'} (${tourStops(D, x).slice(-1)[0].n})</button>`).join('')}</div>` : ''}`; })()}
     </section>
     ${stops.map(card).join('')}
     <section class="card"><div class="card-h"><h2 class="sec">Atelier</h2><span class="muted" style="font-size:12.5px">${sum(atelier, repQty)} à réparer</span></div>
@@ -3178,7 +3283,7 @@ function renderTournee() {
     </section>
     <section class="card"><div class="card-h"><h2 class="sec">Messages utiles</h2></div>
       <div class="btns"><button class="btn sm" data-act="tour-msg" data-k="thanks">Remerciement + avis</button></div>
-      <p class="hint" style="margin:6px 0 0">« Envoyer » copie le message et ouvre tes SMS avec le numéro du client. Pour TikTok, colle simplement le message dans la conversation.</p>
+      <p class="hint" style="margin:6px 0 0">${tourCfg().send === 'copy' ? 'Chaque bouton de message copie le texte : colle-le dans la conversation (SMS, TikTok, Insta…).' : 'Chaque bouton de message copie le texte et ouvre tes SMS avec le numéro du client. Pour TikTok, colle simplement le message dans la conversation.'} Les textes se modifient dans Réglages.</p>
     </section>`;
 }
 
@@ -3342,6 +3447,16 @@ function openTourCfg() {
     foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="tour-cfg-save">Enregistrer</button>` });
 }
 
+// Changement instantané à l'écran, puis enregistrement ; en cas d'échec, on remet comme avant
+async function repFast(id, patch, msg) {
+  const r = S.repairs.find((x) => x.id === id); if (!r) return false;
+  const old = {}; Object.keys(patch).forEach((k) => { old[k] = r[k]; });
+  Object.assign(r, patch); render();
+  if (msg) toast(typeof msg === 'function' ? msg(r) : msg);
+  const ok = await write(() => updRepair(id, patch));
+  if (!ok) { const r2 = S.repairs.find((x) => x.id === id); if (r2) Object.assign(r2, old); render(); }
+  return ok;
+}
 const TOUR_ACT = {
   'dem-add': () => openDemande(),
   'dem-save': (a) => demSave(a),
@@ -3349,12 +3464,10 @@ const TOUR_ACT = {
   'tour-reply': (a) => copyText(replyMsg(a.dataset.k || 'drift'), 'Réponse copiée : ajoute un mot perso et envoie-la'),
   'tour-day': (a) => { S.tourDay = a.dataset.v; S.tourSlot = null; renderTournee(); },
   'tour-slot': (a) => { S.tourSlot = a.dataset.v; renderTournee(); },
+  'tour-open': (a) => { S.tourDay = 'ce-soir'; S.tourSlot = a.dataset.v; setView('tournee'); },
   'tour-move': async (a) => {
-    const r = S.repairs.find((x) => x.id === a.dataset.id), sl = a.dataset.s, D = tourDay();
-    if (r && await write(() => updRepair(r.id, { planDate: D, planSlot: sl === 'soir' ? '' : sl }))) {
-      toast(`${r.client || 'Client'} passe à la tournée de ${momentTxt(D, sl)} : envoie-lui « Heure précise » depuis cette tournée`);
-      S.tourSlot = sl; renderTournee();
-    }
+    const id = a.dataset.id, sl = a.dataset.s, D = tourDay(), r = S.repairs.find((x) => x.id === id); if (!r) return;
+    await repFast(id, { planDate: D, planSlot: sl === 'soir' ? '' : sl }, `${r.client || 'Client'} passe à la tournée de ${momentTxt(D, sl)} : pense à lui envoyer l’heure`);
   },
   'tour-msg': (a) => {
     const r = S.repairs.find((x) => x.id === a.dataset.id), k = a.dataset.k;
@@ -3364,7 +3477,7 @@ const TOUR_ACT = {
     sendMsg(tourMsg(k, r, s), r.phone);
     if (a.dataset.sk) { const m = LS.get('tourSent', {}); m[a.dataset.sk] = 1; LS.set('tourSent', m); setTimeout(renderTournee, 400); }
   },
-  'tour-later': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id), D1 = addDays(tourDay(), 1), sl = tourSlot(); if (r && await write(() => updRepair(r.id, { planDate: D1, planSlot: twoRounds(D1) && sl !== 'soir' ? sl : '' }))) toast(`${r.client || 'Client'} reporté à ${momentTxt(D1, sl)}`); },
+  'tour-later': async (a) => { const id = a.dataset.id, r = S.repairs.find((x) => x.id === id), D1 = addDays(tourDay(), 1), sl = tourSlot(); if (!r) return; const ps = twoRounds(D1) && sl !== 'soir' ? sl : ''; await repFast(id, { planDate: D1, planSlot: ps }, `${r.client || 'Client'} reporté à ${momentTxt(D1, ps || 'soir')}`); },
   'tour-mv': (a) => {
     const D = tourDay(), K = roundKey(D, tourSlot(D)), ids = tourStops(D).map((s) => s.r.id).filter((v, i, arr) => arr.indexOf(v) === i), i = ids.indexOf(a.dataset.id), j = i + Number(a.dataset.d);
     if (i < 0 || j < 0 || j >= ids.length) return;
@@ -3376,6 +3489,12 @@ const TOUR_ACT = {
   'tour-cfg': () => openTourCfg(),
   'tour-opt': () => optimizeRound(),
   'geo-find': (a) => placeFind(a.dataset.px, false),
+  'geo-fix': async (a) => {
+    a.disabled = true; a.textContent = 'Recherche…';
+    const fx = await geoFixRepairs([a.dataset.id]);
+    if (fx.found.length) toast(`📍 ${fx.patches[a.dataset.id].geo.label} · pas le bon ? Plus → Modifier`);
+    else { toast('Pas sûr du lieu : choisis-le dans la fiche', 'bad'); openRep(a.dataset.id); setTimeout(() => placeFind('r', false), 300); }
+  },
   'geo-pick': (a) => placePick(a.dataset.px, Number(a.dataset.i)),
   'msg-reset': () => { const k = val('t-msgk'); $('#t-msg').value = MSG_DEF[k]; MSG_DRAFT[k] = ''; toast('Texte d’origine remis : touche Enregistrer'); },
   'tour-cfg-save': async (a) => {
@@ -3384,6 +3503,10 @@ const TOUR_ACT = {
       wd2: !!($('#t-wd2') || {}).checked, midStart: val('t-mid-start') || TOUR_DEF.midStart, midEnd: val('t-mid-end') || TOUR_DEF.midEnd, apStart: val('t-ap-start') || TOUR_DEF.apStart, apEnd: val('t-ap-end') || TOUR_DEF.apEnd,
       send: radioVal('t-send') || 'sms', ocrLeft: !!($('#t-ocrleft') || {}).checked, msgs: (() => { const ta = $('#t-msg'); if (ta) MSG_DRAFT[ta.dataset.k] = ta.value; const o = {}; Object.keys(MSG_DEF).forEach((k) => { const v = (MSG_DRAFT[k] || '').trim(); if (v && v !== MSG_DEF[k]) o[k] = v; }); return o; })(),
       p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie, services: $('#t-serv').value.trim() || TOUR_DEF.services };
+    // Horaires cohérents : chaque tournée finit après son départ, et midi → après-midi → soir ne se chevauchent pas
+    const bad = [['Semaine, soir', t.wdStart, t.wdEnd], ['Week-end', t.start, t.end], ...(t.wd2 ? [['Midi', t.midStart, t.midEnd], ['Après-midi', t.apStart, t.apEnd]] : [])].find(([, x, y]) => toMin(y) <= toMin(x));
+    if (bad) { toast(`${bad[0]} : l’heure de fin doit être après l’heure de départ`, 'bad'); return; }
+    if (t.wd2 && (toMin(t.midEnd) > toMin(t.apStart) || toMin(t.apEnd) > toMin(t.wdStart))) { toast('Les tournées se chevauchent : midi doit finir avant l’après-midi, et l’après-midi avant le soir', 'bad'); return; }
     a.disabled = true; const ok = await write(() => saveSettingsData({ ...S.settings, tour: t })); a.disabled = false;
     if (ok) { closeSheet(); toast('Réglages de la tournée enregistrés'); }
   },
@@ -3397,17 +3520,21 @@ const TOUR_ACT = {
     copyText(formScript(c.ntfy), `Script copié · ton sujet ntfy : ${c.ntfy}`);
   },
   'tour-topic': () => copyText(tourCfg().ntfy, 'Sujet ntfy copié'),
-  'rep-pick': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { picked: true, gotDate: today(), date: today(), planDate: '' }))) toast(`${r.client || 'Manette'} récupérée : direction l’atelier`); },
+  'rep-pick': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r) await repFast(r.id, { picked: true, gotDate: today(), date: today(), planDate: '', planSlot: '' }, `${r.client || 'Manette'} récupérée : direction l’atelier`); },
   'rep-ready': async (a) => {
-    const r = S.repairs.find((x) => x.id === a.dataset.id);
-    if (r && await write(() => updRepair(r.id, { done: true, result: 'ok', date: today(), returned: false, ...readyPlan() }))) { toast('Réparé : ajouté aux retours de la prochaine tournée'); if (r.phone || r.client) setTimeout(() => sendMsg(tourMsg('ready', r), r.phone), 300); }
+    const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return;
+    const plan = readyPlan();
+    if (await repFast(r.id, { done: true, result: 'ok', date: today(), returned: false, ...plan }, `Réparé : retour prévu ${momentTxt(plan.planDate, plan.planSlot || 'soir')}`) && (r.phone || r.client)) setTimeout(() => sendMsg(tourMsg('ready', r), r.phone), 300);
   },
   'rep-ready-all': async () => {
-    const ids = S.repairs.filter((r) => r.picked !== false && !repDone(r)).map((r) => r.id);
-    for (const id of ids) { if (!(await write(() => updRepair(id, { done: true, result: 'ok', date: today(), returned: false, ...readyPlan() })))) return; }
+    const ids = S.repairs.filter((r) => r.picked !== false && !repDone(r)).map((r) => r.id); if (!ids.length) return;
+    const patch = { done: true, result: 'ok', date: today(), returned: false, ...readyPlan() };
+    S.repairs.forEach((r) => { if (ids.includes(r.id)) Object.assign(r, patch); }); render();
     toast(`${plural(ids.length, 'prestation')} réparée${ids.length > 1 ? 's' : ''} : ajoutées aux retours`);
+    // Un seul enregistrement pour tout le lot
+    if (!(await write(() => commit((d) => { d.repairs.forEach((r) => { if (ids.includes(r.id)) Object.assign(r, patch); }); }, `Réparo · ${ids.length} réparées`)))) { await pull().catch(() => {}); render(); }
   },
-  'rep-retpay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { returned: true, returnDate: today(), paid: true, paidDate: today() }))) toast(`Rendu et payé : +${eur(repNet(r))}${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); },
+  'rep-retpay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r) await repFast(r.id, { returned: true, returnDate: today(), paid: true, paidDate: today() }, (x) => `Rendu et payé : +${eur(repNet(x))}${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); },
 };
 
 /* ---------- Réglages et export ---------- */
@@ -3632,9 +3759,9 @@ const ACT = {
     a.disabled = false;
     if (ok) { closeSheet(); toast(`Réparo : ${repStage(r).t}${paid && repInCash() ? ` · +${eur(repNet(r))} · caisse ${eur(capital().dispo)}` : ''}`); }
   },
-  'rep-done': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { done: true, result: 'ok', date: today(), returned: false, ...readyPlan() }))) toast('Réparé : le gain sera compté quand tu toucheras « Payé »'); },
-  'rep-ret': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { returned: true, returnDate: today() }))) toast(repPaid(r) ? 'Rendu au client' : 'Rendu : touche « Payé » quand tu as l’argent'); },
-  'rep-pay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && await write(() => updRepair(r.id, { paid: true, paidDate: today() }))) toast(`Payé : +${eur(repNet(r))} de bénéfice${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); },
+  'rep-done': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r) await repFast(r.id, { done: true, result: 'ok', date: today(), returned: false, ...readyPlan() }, 'Réparé : le gain sera compté quand tu toucheras « Payé »'); },
+  'rep-ret': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r) await repFast(r.id, { returned: true, returnDate: today() }, (x) => (repPaid(x) ? 'Rendu au client' : 'Rendu : touche « Payé » quand tu as l’argent')); },
+  'rep-pay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r) await repFast(r.id, { paid: true, paidDate: today() }, (x) => `Payé : +${eur(repNet(x))} de bénéfice${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); },
   'rep-del': async (a) => {
     const id = a.dataset.id;
     if (S.confirmRep !== id) { S.confirmRep = id; render(); setTimeout(() => { if (S.confirmRep === id) { S.confirmRep = null; render(); } }, 5000); return; }
@@ -3810,11 +3937,11 @@ function bind() {
   document.addEventListener('input', (e) => {
     if (e.target.id === 'd-paste') demFill();
     { const m = e.target.id.match(/^(d|r)-(addr|city)$/); if (m && PLACE[m[1]]) { PLACE[m[1]].geo = null; placeShow(m[1]); if (m[2] === 'city') e.target.dataset.touched = '1'; clearTimeout(placeFind.t); placeFind.t = setTimeout(() => placeFind(m[1], true), 900); } }
-    { const m = e.target.id.match(/^(d|r)-meettxt$/); if (m && PLACE[m[1]]) PLACE[m[1]].meetTxt = e.target.value; }
+    { const m = e.target.id.match(/^(d|r)-meettxt$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meetTxt = e.target.value; delete e.target.dataset.auto; } }
     if (/^d-(name|phone|addr|city|total)$/.test(e.target.id)) e.target.dataset.touched = '1';
     if (e.target.id === 'r-total') e.target.dataset.touched = '1'; if (/^r-(qty|price|parts|total)$/.test(e.target.id)) repPreview(); if (e.target.id === 'ad-title') adCount(); });
   document.addEventListener('change', (e) => {
-    { const m = (e.target.name || '').match(/^(d|r)-meet$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meet = e.target.value === 'meet'; placeShow(m[1]); } }
+    { const m = (e.target.name || '').match(/^(d|r)-meet$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meet = e.target.value === 'meet'; PLACE[m[1]].autoMeet = false; placeShow(m[1]); } }
     if (e.target.id === 'd-shot' && e.target.files && e.target.files.length) demShot(e.target);
     if (e.target.id === 't-msgk') { const ta = $('#t-msg'), k = e.target.value; MSG_DRAFT[ta.dataset.k] = ta.value; ta.dataset.k = k; ta.value = (MSG_DRAFT[k] || '').trim() || MSG_DEF[k]; }
     if (e.target.id === 'r-type') { const p = repTypes().get(e.target.value.trim()); if (p != null) { $('#r-price').value = numIn(p); } repPreview(); }
