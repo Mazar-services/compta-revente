@@ -639,7 +639,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '4474f57ded4b';
+const APP_VERSION = 'c718b1026f38';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -3350,6 +3350,8 @@ async function optimizeRound1(auto, tried, quiet) {
   const st = tourStops(D, slot), lateG = st.groups.filter((g) => g.fix != null && g.late > 0), nFix = st.groups.filter((g) => g.fix != null).length;
   const who = (g) => g.items.map((x) => x.r.client || 'client').join(', ');
   toast(`Trajet optimisé${live ? ` depuis ${live.label || 'ton dernier arrêt'}` : ''} : environ ${Math.round(plan.drive)} min de route${real ? '' : ' (estimation)'}${fixed && !live ? ` · départ ${hm(st.dep)}` : ''}${nFix ? (lateG.length ? ` · ⚠ impossible d’être pile à l’heure chez ${lateG.map(who).join(', ')}` : ` · ${nFix > 1 ? 'RDV tenus' : 'RDV tenu'}`) : ''}${freeNoGeo.length ? ` · ${plural(freeNoGeo.length, 'lieu', 'lieux')} non vérifié(s) mis à la fin` : ''}`, lateG.length ? 'bad' : undefined);
+  // Tournée commencée (ou départ dans moins de 30 min) : un client qui va attendre plus que l'heure annoncée est prévenu tout de suite
+  if (D === today() && nowMin() >= st.dep - 30) setTimeout(() => lateCheck(D, slot, true), 400);
 }
 // Arrêt fait (« Récupéré », « Rendu ») depuis la tournée d'aujourd'hui : tu repars de là, maintenant.
 // Le meilleur trajet vers les clients restants se recalcule depuis ce point (pas depuis Crolles).
@@ -3383,10 +3385,11 @@ function lateList(D, slot) {
   return out;
 }
 // Case « Prévenir du retard automatiquement » : dès qu'un retard apparaît, les messages s'ouvrent tout prêts
-function lateCheck(D, slot) {
+// onlyAuto : seulement si la case est cochée (sinon l'alerte sur la fiche suffit)
+function lateCheck(D, slot, onlyAuto) {
   if (D !== today()) return;
   const L = lateList(D, slot); if (!L.length) return;
-  if (tourCfg().autoLate === false) { toast(`⚠ Retard : ${plural(L.length, 'client')} à prévenir (bouton « Prévenir du retard »)`, 'bad'); return; }
+  if (tourCfg().autoLate === false) { if (onlyAuto) return; toast(`⚠ Retard : ${plural(L.length, 'client')} à prévenir (bouton « Prévenir du retard »)`, 'bad'); return; }
   openLate(D, slot, L);
 }
 function openLate(D, slot, L) {
@@ -3456,12 +3459,14 @@ function tourMsg(kind, r, s, list) {
   const soir = fx ? dayWord(tourDay()) : momentTxt(s ? tourDay() : today(), s ? tourSlot() : 'soir');
   if (/^reply/.test(kind)) return replyMsg(kind.slice(6) || 'drift');
   const w = objWords(list);
-  if (kind === 'ret' && list.every((x) => x.result === 'ko')) kind = 'retko';
+  // Retour sans réparation possible : jamais « réparée ». Mélange réparé / pas réparé : texte neutre, avec le prix à payer.
+  const ko = kind === 'ret' && list.some((x) => x.result === 'ko'), mixed = ko && !list.every((x) => x.result === 'ko');
+  if (ko) kind = 'retko';
   const fill = (t, quand, plage2, cren) => String(t).replace(/\{(\w+)\}/g, (m, k) => ({ salut: hi, prenom: nm, objet: w.ta, Objet: w.Ta, la: w.la, est: w.sont, reparee: w.rep, prete: w.pret, lieu: lieuTxt(r), quand, plage: plage2, creneau: cren, prix: amt, garantie: c.garantie }[k] ?? m)).replace(/ {2,}/g, ' ').replace(/ ([.,])/g, '$1');
   const tpl = (k) => ((c.msgs || {})[k] || '').trim() || MSG_DEF[k];
   if (kind === 'confirm') { const D = isDate(r.planDate) ? r.planDate : today(), f = fixOf(r, D); if (f != null) return fill(tpl('confirm'), dayWord(D), `à ${hm(f)}`, `à ${hm(f)}`); return fill(tpl('confirm'), momentTxt(D, r.planSlot), plage(D, r.planSlot), plage(D, r.planSlot)); }
   if (kind === 'ready') { const [nD, nS] = nextRound(); return fill(tpl('ready'), momentTxt(nD, nS), plage(nD, nS), plage(nD, nS)); }
-  if (MSG_DEF[kind]) return fill(tpl(kind), soir, s ? (fx ? when : plage(tourDay(), tourSlot())) : '', when);
+  if (MSG_DEF[kind]) return fill(tpl(kind), soir, s ? (fx ? when : plage(tourDay(), tourSlot())) : '', when) + (mixed && tot > 0 ? ` À payer sur place : ${amt} (espèces, Wero ou Lydia).` : '');
   return '';
 }
 function sendMsg(text, phone) {
