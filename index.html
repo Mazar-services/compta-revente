@@ -640,7 +640,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '86a262114420';
+const APP_VERSION = 'cd1c6ae31826';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2913,6 +2913,18 @@ function objWords(list) {
   const ta = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} et ${parts[parts.length - 1]}` : parts[0], f = W.every((x) => x.f), pl = n > 1;
   return { ta, Ta: cap1(ta), la: pl ? 'les' : f ? 'la' : 'le', pret: (f ? 'prête' : 'prêt') + (pl ? 's' : ''), rep: (f ? 'réparée' : 'réparé') + (pl ? 's' : ''), sont: pl ? 'sont' : 'est' };
 }
+// Ce qui a été réparé, dit précisément d'après la prestation : « Le port HDMI de ta PS5 est réparé ✅ »
+function repPhrase(list) {
+  const w = objWords(list), pl = sum(list, repQty) > 1, T = list.map((x) => norm(x.type || '')), all = (re) => T.length && T.every((t) => re.test(t));
+  const ps = T.every((t) => /ps5/.test(t)) ? 'PS5' : 'console';
+  if (all(/hdmi/)) return pl ? `Les ports HDMI de tes ${ps === 'PS5' ? 'PS5' : 'consoles'} sont réparés ✅` : `Le port HDMI de ta ${ps} est réparé ✅`;
+  if (all(/liquide/)) return pl ? `Tes ${ps === 'PS5' ? 'PS5' : 'consoles'} sont prêtes ✅ Métal liquide changé et nettoyage complet faits.` : `Ta ${ps} est prête ✅ Métal liquide changé et nettoyage complet fait.`;
+  if (all(/nettoy/)) { const n = T.some((t) => /simple/.test(t)) ? 'Nettoyage fait.' : 'Nettoyage complet fait.'; return pl ? `Tes ${ps === 'PS5' ? 'PS5' : 'consoles'} sont prêtes ✅ ${n}` : `Ta ${ps} est prête ✅ ${n}`; }
+  if (all(/hall/)) return pl ? 'Tes manettes sont prêtes ✅ Joysticks à effet Hall posés : plus jamais de drift.' : 'Ta manette est prête ✅ Joysticks à effet Hall posés : plus jamais de drift.';
+  if (all(/drift|joystick/)) return pl ? 'Tes manettes sont réparées ✅ Joysticks changés, plus de drift.' : 'Ta manette est réparée ✅ Joystick changé, plus de drift.';
+  const extra = list.length === 1 && list[0].type && !/[()]/.test(list[0].type) && !/^(diagnostic|manette|telephone|console)/.test(T[0]) ? ` (${list[0].type.trim()})` : '';
+  return `${w.Ta} ${w.sont} ${w.rep} ✅${extra}`;
+}
 // Même client au même arrêt (une fiche par objet, ou plusieurs fiches) : un seul message pour tout
 const telKey = (p) => String(p || '').replace(/\D/g, '').replace(/^33/, '0');
 const sameCli = (a, b) => a.id === b.id || (!!telKey(a.phone) && telKey(a.phone) === telKey(b.phone)) || (!!norm(a.client) && norm(a.client) === norm(b.client));
@@ -2987,6 +2999,17 @@ function setGo(K, v) {
   Object.keys(o).forEach((k) => { if (k.slice(0, 10) < old) delete o[k]; });
   LS.set('tourGo', o);
 }
+// Lieu de départ choisi pour une seule tournée (« Je pars de … », ex. un détour à Fontaine) : les réglages ne changent pas
+const fromOf = (K) => { const v = (LS.get('tourFrom', {}) || {})[K]; return v && v.lat != null ? v : null; };
+function setFrom(K, v) {
+  const o = LS.get('tourFrom', {}) || {}, old = addDays(today(), -3);
+  if (v) o[K] = v; else delete o[K];
+  Object.keys(o).forEach((k) => { if (k.slice(0, 10) < old) delete o[k]; });
+  LS.set('tourFrom', o);
+}
+// Le point de départ utilisé pour calculer le trajet (pour savoir si le dernier calcul est encore bon)
+const fromKey = (K, c) => { const f = fromOf(K); return f ? `p:${f.lat.toFixed(4)},${f.lon.toFixed(4)}` : 'c:' + normC(c.from); };
+const fromLabel = (K, c) => (fromOf(K) || {}).label || c.from;
 const hhmm = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
 function setLive(K, v) {
   const o = LS.get('tourLive', {}) || {}, old = addDays(today(), -3);
@@ -3062,7 +3085,8 @@ function tourStops(D, slot) {
   // Temps de route : ceux du dernier calcul « Optimiser » (un lieu inconnu compte comme un arrêt de plus) ; sans calcul, un temps fixe par arrêt.
   // Tournée en cours : on part du dernier arrêt fait, à l'heure où tu l'as fait.
   const c = dayCfg(D, slot), stopMin = stopOf(c), lv = D === today() ? liveOf(K) : null;
-  const opt = (LS.get('tourOpt', {}) || {})[K], known = !!(opt && opt.mat && opt.keys), fromOk = !lv || (known && opt.live && opt.live.t === lv.t);
+  const opt = (LS.get('tourOpt', {}) || {})[K], known = !!(opt && opt.mat && opt.keys);
+  const fromOk = lv ? known && !!opt.live && opt.live.t === lv.t : !(known && (opt.live || (opt.from && opt.from !== fromKey(K, c))));
   const ix = {}; if (known) opt.keys.forEach((k, i) => { ix[k] = i + 1; });
   const drive = (a, b) => {
     if (a == null && b != null && !fromOk) return EST_DRIVE;
@@ -3070,7 +3094,8 @@ function tourStops(D, slot) {
     const i = a == null ? 0 : ix[a], j = b == null ? opt.keys.length + 1 : ix[b]; return i == null || j == null ? EST_DRIVE : opt.mat[i][j];
   };
   const go = lv ? null : goOf(K);
-  const P = { t0: go ?? toMin(c.start), t1: toMin(c.end), stop: stopMin, drive, hard: !!c.weekend, dep0: lv ? lv.t : go, now: D === today() && !lv ? nowMin() : null };
+  // Tournée en cours : les clients peuvent être vus dès que tu es parti, même avant l'heure prévue de la tournée
+  const P = { t0: lv ? Math.min(toMin(c.start), lv.t) : go ?? toMin(c.start), t1: toMin(c.end), stop: stopMin, drive, hard: !!c.weekend, dep0: lv ? lv.t : go, now: D === today() && !lv ? nowMin() : null };
   // RDV pas encore placé (nouveau, ou heure changée) : mis à l'endroit où il tient le mieux, en attendant « Optimiser »
   const placed = (g) => g.items.some((s) => ord.includes(s.r.id));
   const loose = groups.filter((g) => g.fix != null && !placed(g)).sort((a, b) => a.fix - b.fix);
@@ -3337,7 +3362,8 @@ async function optimizeRound1(auto, tried, quiet) {
   if (!geoG.length) { if (!auto) toast('Vérifie le lieu des clients (bouton « Trouver ce lieu ») pour optimiser', 'bad'); return; }
   if (!auto) toast('Calcul du meilleur trajet…');
   // Départ : le dernier arrêt fait (ou ta position) si la tournée est en cours, sinon le point de départ des réglages
-  const [A, B] = await Promise.all([live && live.lat != null ? { lat: live.lat, lon: live.lon } : townPt(c.from), townPt(c.to)]);
+  const fr = live ? null : fromOf(K);
+  const [A, B] = await Promise.all([live && live.lat != null ? { lat: live.lat, lon: live.lon } : fr ? { lat: fr.lat, lon: fr.lon } : townPt(c.from), townPt(c.to)]);
   if (!A || !B) { toast('Départ ou arrivée introuvable : vérifie-les dans les réglages', 'bad'); return; }
   const { m, real } = await travelMatrix([A, ...geoG.map((g) => g.geo), B]);
   // Temps de route en minutes entre tous les arrêts (lieu non vérifié : un arrêt de plus, estimé)
@@ -3346,7 +3372,7 @@ async function optimizeRound1(auto, tried, quiet) {
   const mat = Array.from({ length: N + 2 }, (_, i) => Array.from({ length: N + 2 }, (_, j) => { if (i === j) return 0; const a = pm(i), b = pm(j); return a < 0 || b < 0 ? EST_DRIVE : Math.round(m[a][b] / 6) / 10; }));
   const keys = L.map((g) => g.k), ix = {}; keys.forEach((k, i) => { ix[k] = i + 1; });
   const go = live ? null : goOf(K);
-  const P = { t0: go ?? toMin(c.start), t1: toMin(c.end), stop: stopMin, drive: (a, b) => mat[a == null ? 0 : ix[a]][b == null ? N + 1 : ix[b]], hard: !!c.weekend, dep0: live ? live.t : go, now: D === today() && !live ? nowMin() : null };
+  const P = { t0: live ? Math.min(toMin(c.start), live.t) : go ?? toMin(c.start), t1: toMin(c.end), stop: stopMin, drive: (a, b) => mat[a == null ? 0 : ix[a]][b == null ? N + 1 : ix[b]], hard: !!c.weekend, dep0: live ? live.t : go, now: D === today() && !live ? nowMin() : null };
   // Sans heure fixe : le moins de route possible. Avec : les RDV tenus, puis le moins de route et d'attente.
   const order = fixed ? bestOrderTW(ng + fixNoGeo.length, (o) => planRound([...o.map((i) => L[i]), ...freeNoGeo], P).cost) : bestOrder(m, ng).map((i) => i - 1);
   const seqG = [...order.map((i) => L[i]), ...freeNoGeo];
@@ -3354,7 +3380,7 @@ async function optimizeRound1(auto, tried, quiet) {
   const OR = LS.get('tourOrd', {}), OT = LS.get('tourOpt', {});
   OR[K] = seqG.flatMap((g) => g.items.map((x) => x.r.id));
   const fixK = {}, idsK = {}; G.forEach((g) => { if (g.fix != null) fixK[g.k] = g.fix; idsK[g.k] = g.items.map((x) => [x.r.id, x.kind]); });
-  OT[K] = { keys, mat, seq: seqG.map((g) => g.k), fix: fixK, ids: idsK, min: Math.round(plan.drive), real, live: live ? { t: live.t } : null };
+  OT[K] = { keys, mat, seq: seqG.map((g) => g.k), fix: fixK, ids: idsK, min: Math.round(plan.drive), real, live: live ? { t: live.t } : null, from: live ? null : fromKey(K, c) };
   // On ne garde que les tournées récentes
   const old = addDays(today(), -3); [OR, OT].forEach((o) => Object.keys(o).forEach((k) => { if (k.slice(0, 10) < old) delete o[k]; }));
   LS.set('tourOrd', OR); LS.set('tourOpt', OT);
@@ -3377,7 +3403,7 @@ async function stopDone(id, run) {
   const left = tourStops(D, slot);
   if (!left.length) { setLive(K, null); renderTournee(); toast(`Tournée ${slotName(D, slot)} terminée 👏`); return ok; }
   if (left.groups.some((x) => x.k === g.k)) return ok; // un autre client au même endroit : tu y es encore
-  const r0 = g.items[0].r, pos = g.geo ? { lat: g.geo.lat, lon: g.geo.lon } : (await gpsPos()) || liveOf(K) || (await townPt(dayCfg(D, slot).from));
+  const r0 = g.items[0].r, pos = g.geo ? { lat: g.geo.lat, lon: g.geo.lon } : (await gpsPos()) || liveOf(K) || fromOf(K) || (await townPt(dayCfg(D, slot).from));
   const label = r0.meet && g.geo && g.geo.name ? g.geo.name : r0.client ? `chez ${r0.client}` : 'ton dernier arrêt';
   setLive(K, { lat: pos ? pos.lat : null, lon: pos ? pos.lon : null, t: nowMin(), label });
   renderTournee();
@@ -3391,6 +3417,8 @@ function nextToast(D, slot) {
   const o = (LS.get('tourOpt', {}) || {})[roundKey(D, slot)], i = o && o.keys && o.live ? o.keys.indexOf(g.k) : -1, dr = i >= 0 ? Math.round(o.mat[0][i + 1]) : null;
   toast(`Prochain : ${[...new Set(g.items.map((s) => s.r.client || (s.r.address || 'client').slice(0, 28)))].join(', ')} ${g.fix != null && g.late <= 0 ? 'à' : 'vers'} ${hm(g.fix != null && g.late <= 0 ? g.fix : g.arr)}${dr != null ? ` · ${dr} min de route` : ''} · touche « Waze »`);
 }
+// Clients déjà prévenus que c'est réparé (bouton « Réparé prévenu ✓ »)
+function markReady(ids) { const m = LS.get('readySent', {}) || {}; ids.forEach((id) => { m[id] = today(); }); const old = addDays(today(), -30); Object.keys(m).forEach((k) => { if (m[k] < old) delete m[k]; }); LS.set('readySent', m); }
 // Clients qui vont attendre plus que l'heure annoncée : un seul message par client et par arrêt
 function lateList(D, slot) {
   const out = [];
@@ -3410,6 +3438,36 @@ function openLate(D, slot, L) {
   openSheet({ kind: 'late', title: 'Tu as du retard', body: `<p class="hint" style="margin-top:0">${L.length > 1 ? 'Ces clients vont' : 'Ce client va'} t’attendre plus longtemps que prévu. Le message est prêt : touche « Envoyer ».</p>
     ${L.map((s) => `<div class="late-it"><b>${esc(s.r.client || 'Client')} · arrivée vers ${hm(s.from)}</b><small class="muted">Annoncé : ${esc(s.ann)}</small><p>${esc(tourMsg('late', s.r, s, cliItems(st, s, 'late').map((x) => x.r)))}</p><button class="btn primary" data-act="tour-msg" data-k="late" data-id="${esc(s.r.id)}">Envoyer</button></div>`).join('')}`,
     foot: '<button class="btn grow" data-act="close">Fermer</button>' });
+}
+// Choisir d'où on part, pour cette tournée seulement
+function openFrom() {
+  const D = tourDay(), slot = tourSlot(D), K = roundKey(D, slot), c = dayCfg(D, slot), f = fromOf(K);
+  const picks = [...new Set([c.from, 'Saint-Égrève', 'Crolles', 'Fontaine', 'Grenoble', 'Saint-Martin-d’Hères', 'Échirolles'])];
+  openSheet({ kind: 'from', title: 'D’où pars-tu ?', body: `
+    <p class="hint" style="margin-top:0">Seulement pour la tournée ${esc(slotName(D, slot))} ${esc(dayWord(D))}. Tes réglages ne changent pas : la prochaine fois, tu repars de ${esc(c.from)}.</p>
+    <div class="btns" style="margin-bottom:10px">${picks.map((x) => `<button class="chip" data-act="fr-pick" data-v="${esc(x)}">${esc(x)}</button>`).join('')}${D === today() ? '<button class="chip" data-act="fr-gps">📍 Ma position</button>' : ''}</div>
+    ${textF('fr-q', 'Ou écris une ville, une adresse ou un lieu', f ? f.label : '', 'ex. Fontaine, ou 12 rue des Alpes Fontaine')}
+    <p class="hint" id="fr-st" style="margin:0"></p>`,
+    foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="fr-save">Valider</button>` });
+}
+async function saveFrom(q, pt) {
+  const D = tourDay(), slot = tourSlot(D), K = roundKey(D, slot), c = dayCfg(D, slot), st = $('#fr-st');
+  q = String(q || '').trim(); if (!q) { fieldErr('fr-q', 'Écris d’où tu pars.'); return; }
+  if (!pt && normC(q) === normC(c.from)) { closeSheet(); setFrom(K, null); await startChanged(D, slot, `Départ de ${c.from}, comme d’habitude`); return; }
+  if (!pt) {
+    if (st) st.textContent = 'Recherche du lieu…';
+    const sp = /\d/.test(q) || q.split(/\s+/).length > 3;
+    pt = sp ? (await geoOne(q)) || (await townPt(q)) : (await townPt(q)) || (await geoOne(q));
+  }
+  if (!pt) { if (st) st.innerHTML = '<span class="neg">Lieu introuvable : essaie avec la ville, ou une adresse complète.</span>'; return; }
+  closeSheet(); setFrom(K, { label: q, lat: pt.lat, lon: pt.lon });
+  await startChanged(D, slot, `Départ de ${q} pour cette tournée seulement : trajet recalculé`);
+}
+// Point de départ changé : le trajet est recalculé depuis ce point
+async function startChanged(D, slot, msg) {
+  if (tourStops(D, slot).groups.some((g) => g.geo)) { await optIdle(); await optimizeRound(true, true); }
+  renderTournee(); toast(msg);
+  if (D === today()) setTimeout(() => lateCheck(D, slot, true), 300);
 }
 // Heure de départ changée : heures recalculées (l'ordre aussi s'il y a un RDV à heure fixe), et retards repérés
 async function goChanged(D, slot, msg) {
@@ -3434,7 +3492,7 @@ function loadOcr() {
   return OCR_LIB;
 }
 // Phrases de tes propres messages : on les retire pour ne garder que ce que dit le client
-const MINE = /merci pour ton message|merci de m'avoir|tarif|garantie|envoie-moi|je passe récupérer|je passe la récupérer|je te (la|le|les) ramène|c'est noté|je t'envoie un message|je te préviens|à payer sur place|petit retard|j'arrive dans 10 min|remplis ce petit formulaire|voici mes réparations|paiement à la livraison/i;
+const MINE = /merci pour ton message|à l'atelier, à crolles|dès que je sais quand|merci de m'avoir|tarif|garantie|envoie-moi|je passe récupérer|je passe la récupérer|je te (la|le|les) ramène|c'est noté|je t'envoie un message|je te préviens|à payer sur place|petit retard|j'arrive dans 10 min|remplis ce petit formulaire|voici mes réparations|paiement à la livraison/i;
 async function ocrImages(files, onProg) {
   const T = await loadOcr(), out = [];
   for (let i = 0; i < files.length; i++) {
@@ -3465,10 +3523,10 @@ const MSG_DEF = {
   retko: "{salut}Je te ramène {objet} {lieu} {quand} {creneau}. Je te préviens 10 min avant.",
   late: "{salut}Petit retard, désolé 🙏 Je serai là {creneau}.",
   eta: "J'arrive dans 10 min {lieu} 🚗 Tu peux te préparer, à tout de suite !",
-  ready: "{salut}{Objet} {est} {prete} ✅ Je te {la} ramène {lieu} {quand} {plage}. À payer sur place : {prix} (espèces, Wero ou Lydia).",
+  ready: "{salut}{repare} Je t'envoie un message dès que je sais quand je peux passer, selon ma tournée. Si tu préfères, tu peux aussi venir {la} récupérer à l'atelier, à Crolles. À payer : {prix} (espèces, Wero ou Lydia).",
   thanks: "{salut}Merci pour ta confiance ! Est-ce que tout fonctionne bien, le résultat te plaît ? Pour n'importe quel autre besoin, je suis là, écris-moi quand tu veux 🤝"
 };
-const MSG_NAMES = { confirm: 'Confirmation de la demande', pick: 'Heure précise (récupération)', ret: 'Heure précise (retour)', retko: 'Retour sans réparation possible', late: 'Retard', eta: "J'arrive (10 min)", ready: 'Réparée, prête à rendre', thanks: 'Remerciement' };
+const MSG_NAMES = { confirm: 'Confirmation de la demande', pick: 'Heure précise (récupération)', ret: 'Heure précise (retour)', retko: 'Retour sans réparation possible', late: 'Retard', eta: "J'arrive (10 min)", ready: 'C’est réparé (prévenir le client)', thanks: 'Remerciement' };
 // list : tout ce que ce client donne ou récupère à cet arrêt (« tes manettes », un seul prix total)
 function tourMsg(kind, r, s, list) {
   r = r || {}; list = list && list.length ? list : [r];
@@ -3482,15 +3540,16 @@ function tourMsg(kind, r, s, list) {
   // Retour sans réparation possible : jamais « réparée ». Mélange réparé / pas réparé : texte neutre, avec le prix à payer.
   const ko = kind === 'ret' && list.some((x) => x.result === 'ko'), mixed = ko && !list.every((x) => x.result === 'ko');
   if (ko) kind = 'retko';
-  const fill = (t, quand, plage2, cren) => String(t).replace(/\{(\w+)\}/g, (m, k) => ({ salut: hi, prenom: nm, objet: w.ta, Objet: w.Ta, la: w.la, est: w.sont, reparee: w.rep, prete: w.pret, lieu: lieuTxt(r), quand, plage: plage2, creneau: cren, prix: amt, garantie: c.garantie }[k] ?? m)).replace(/ {2,}/g, ' ').replace(/ ([.,])/g, '$1');
+  const fill = (t, quand, plage2, cren) => String(t).replace(/\{(\w+)\}/g, (m, k) => ({ salut: hi, prenom: nm, objet: w.ta, Objet: w.Ta, la: w.la, est: w.sont, reparee: w.rep, prete: w.pret, lieu: lieuTxt(r), quand, plage: plage2, creneau: cren, prix: amt, garantie: c.garantie, repare: repPhrase(list) }[k] ?? m)).replace(/ {2,}/g, ' ').replace(/ ([.,])/g, '$1');
   const tpl = (k) => ((c.msgs || {})[k] || '').trim() || MSG_DEF[k];
   if (kind === 'confirm') { const D = isDate(r.planDate) ? r.planDate : today(), f = fixOf(r, D); if (f != null) return fill(tpl('confirm'), dayWord(D), `à ${hm(f)}`, `à ${hm(f)}`); return fill(tpl('confirm'), momentTxt(D, r.planSlot), plage(D, r.planSlot), plage(D, r.planSlot)); }
   if (kind === 'ready') { const [nD, nS] = nextRound(); return fill(tpl('ready'), momentTxt(nD, nS), plage(nD, nS), plage(nD, nS)); }
   if (MSG_DEF[kind]) return fill(tpl(kind), soir, s ? (fx ? when : plage(tourDay(), tourSlot())) : '', when) + (mixed && tot > 0 ? ` À payer sur place : ${amt} (espèces, Wero ou Lydia).` : '');
   return '';
 }
-function sendMsg(text, phone) {
-  copyText(text, tourCfg().send === 'copy' ? 'Message copié : colle-le dans la conversation' : 'Message copié');
+function sendMsg(text, phone, pre) {
+  const m = tourCfg().send === 'copy' ? 'message copié : colle-le dans la conversation' : 'message copié';
+  copyText(text, pre ? `${pre} · ${m}` : m[0].toUpperCase() + m.slice(1));
   const p = String(phone || '').replace(/\s/g, '');
   if (p && tourCfg().send !== 'copy') setTimeout(() => { location.href = `sms:${p}${/iPhone|iPad|Mac/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(text)}`; }, 250);
 }
@@ -3522,6 +3581,7 @@ function renderTournee() {
         ${s.lateBy > 0 ? `<button class="btn sm danger" data-act="tour-msg" data-k="late" data-id="${esc(r.id)}">Prévenir du retard</button>` : `<button class="btn sm" data-act="tour-msg" data-k="${s.kind}" data-id="${esc(r.id)}">${s.sent ? 'Heure envoyée ✓' : 'Envoyer l’heure'}</button>`}
         <a class="btn sm" href="${esc(wazeUrl(r))}" target="_blank" rel="noopener">🚗 Waze</a>
         <button class="btn sm" data-act="tour-msg" data-k="eta" data-id="${esc(r.id)}">J'arrive</button>
+        ${!pick && r.result !== 'ko' ? `<button class="btn sm" data-act="tour-msg" data-k="ready" data-id="${esc(r.id)}">${(LS.get('readySent', {}) || {})[r.id] ? 'Réparé prévenu ✓' : '📩 C’est réparé'}</button>` : ''}
         ${pick ? `<button class="btn sm primary grow" data-act="rep-pick" data-id="${esc(r.id)}">Récupéré</button>` : `<button class="btn sm primary grow" data-act="rep-retpay" data-id="${esc(r.id)}">Rendu + payé</button>`}
       </div>
       <div class="stop-mv"><span class="muted">Passer à :</span>${moveTargets(D, slot).map(([v, l]) => `<button class="chip" data-act="${v === 'demain' ? 'tour-later' : 'tour-move'}" data-s="${v}" data-id="${esc(r.id)}">${l}</button>`).join('')}<button class="chip" data-act="fix-open" data-id="${esc(r.id)}" aria-pressed="${s.own != null}">⏰ ${s.own != null ? hm(s.own) : 'Heure fixe'}</button></div>
@@ -3541,9 +3601,10 @@ function renderTournee() {
     <div class="stabs" role="tablist">${[['ce-soir', "Aujourd'hui"], ['demain', 'Demain']].map(([v, l]) => `<button role="tab" data-act="tour-day" data-v="${v}" aria-selected="${(S.tourDay || 'ce-soir') === v}">${l}</button>`).join('')}</div>
     ${twoRounds(D) ? `<div class="stabs" role="tablist" style="grid-template-columns:repeat(3,1fr)">${slotsOf(D).map((v) => { const st = tourStops(D, v), n = st.length ? st[st.length - 1].n : 0; return `<button role="tab" data-act="tour-slot" data-v="${v}" aria-selected="${slot === v}">${SLOT_NAMES[v]}${n ? ` · ${n}` : ''}</button>`; }).join('')}</div>` : ''}
     <section class="card tour-sum">
-      ${stops.length ? `<div class="tour-line"><b>${c.weekend ? 'Week-end' : 'Semaine'}${twoRounds(D) ? ' · ' + SLOT_NAMES[slot].toLowerCase() : ''} · ${plural(nStops, 'arrêt')}</b><span>${pickN} à récupérer · ${retN} à rendre${cash ? ` · ${eur(cash)} à encaisser` : ''}</span><span>${lv ? `📍 parti de ${esc(lv.label || 'ton dernier arrêt')} à ${hm(lv.t)}` : `départ ${esc(c.from)} ${hm(stops.dep)}`} → ${esc(c.to)} vers ${hm(stops.end)}</span></div>
+      ${stops.length ? `<div class="tour-line"><b>${c.weekend ? 'Week-end' : 'Semaine'}${twoRounds(D) ? ' · ' + SLOT_NAMES[slot].toLowerCase() : ''} · ${plural(nStops, 'arrêt')}</b><span>${pickN} à récupérer · ${retN} à rendre${cash ? ` · ${eur(cash)} à encaisser` : ''}</span><span>${lv ? `📍 parti de ${esc(lv.label || 'ton dernier arrêt')} à ${hm(lv.t)}` : `départ ${esc(fromLabel(K, c))} ${hm(stops.dep)}`} → ${esc(c.to)} vers ${hm(stops.end)}</span></div>
       ${lv ? '' : `<div class="tour-dep"><label for="t-dep">🕒 Je pars à</label><input id="t-dep" class="inp" type="time" step="300" value="${hhmm(stops.dep)}">${(() => { const f0 = stops.groups.find((g) => g.fix != null);
-        return stops.byNow ? '<small>au plus tôt : il est déjà cette heure-là</small>' : stops.go != null ? '<small>ton heure</small>' : f0 && stops.dep !== toMin(c.start) ? `<small>calé sur le RDV de ${hm(f0.fix)}</small>` : '<small>heure prévue</small>'; })()}${stops.go != null ? '<button class="chip" data-act="tour-go-reset">Remettre l’heure prévue</button>' : ''}</div>`}
+        return stops.byNow ? '<small>au plus tôt : il est déjà cette heure-là</small>' : stops.go != null ? '<small>ton heure</small>' : f0 && stops.dep !== toMin(c.start) ? `<small>calé sur le RDV de ${hm(f0.fix)}</small>` : '<small>heure prévue</small>'; })()}${stops.go != null ? '<button class="chip" data-act="tour-go-reset">Remettre l’heure prévue</button>' : ''}</div>
+      <div class="tour-dep"><span>📍 Je pars de</span><button class="chip" data-act="tour-from">${esc(fromLabel(K, c))} ✎</button>${fromOf(K) ? `<small>pour cette tournée seulement</small><button class="chip" data-act="tour-from-reset">Remettre ${esc(c.from)}</button>` : ''}</div>`}
       ${isT ? (() => { const g = stops.groups[0], r = g.items[0].r, adr = [r.address, r.city].filter(Boolean).join(', ');
         return `<div class="tour-next"><div class="nx"><small>Prochain arrêt</small><b>${esc([...new Set(g.items.map((x) => x.r.client || 'Client'))].join(', '))}</b> · ${g.fix != null && g.late <= 0 ? `⏰ ${hm(g.fix)}` : `vers ${hm(g.arr)}`}${adr ? `<small>${esc(adr)}</small>` : ''}</div><a class="btn primary" href="${esc(wazeUrl(r))}" target="_blank" rel="noopener">🚗 Y aller avec Waze</a></div>`; })() : ''}
       <div class="btns"><button class="btn grow" data-act="tour-opt">Optimiser le trajet</button>${isT ? (lv ? '<button class="btn grow" data-act="tour-here">📍 Recalculer d’ici</button>' : '<button class="btn grow" data-act="tour-go-now">🚗 Je pars maintenant</button>') : ''}</div>
@@ -3739,7 +3800,7 @@ function openTourCfg() {
       <label class="sw"><span class="sw-t"><b>Captures : garder seulement le client</b><small>Ignore les bulles de droite (tes propres messages) quand une capture est lue</small></span><input type="checkbox" id="t-ocrleft" role="switch" ${c.ocrLeft !== false ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
       <div class="field"><label for="t-msgk">Modifier un message</label><span class="selw" style="display:block"><select id="t-msgk" class="inp">${Object.keys(MSG_DEF).map((k) => `<option value="${k}">${esc(MSG_NAMES[k])}</option>`).join('')}</select></span></div>
       <div class="field"><textarea id="t-msg" class="inp" rows="5" data-k="confirm">${esc(((c.msgs || {}).confirm || '').trim() || MSG_DEF.confirm)}</textarea>
-        <small class="hint">Les mots entre accolades se remplissent seuls : {salut} {prenom} {objet} {Objet} {la} {est} {reparee} {prete} {lieu} (« devant chez toi » ou le lieu de RDV) {quand} (« ce soir »…) {plage} {creneau} (heure précise) {prix} {garantie}. Change de message dans la liste : celui que tu viens de modifier est gardé.</small>
+        <small class="hint">Les mots entre accolades se remplissent seuls : {salut} {prenom} {objet} {Objet} {la} {est} {reparee} {prete} {lieu} (« devant chez toi » ou le lieu de RDV) {quand} (« ce soir »…) {plage} {creneau} (heure précise) {prix} {garantie} {repare} (« Le port HDMI de ta PS5 est réparé ✅ »…). Change de message dans la liste : celui que tu viens de modifier est gardé.</small>
         <div class="btns"><button class="btn sm" data-act="msg-reset">Remettre le texte d'origine</button></div></div>
     </div>
     <div class="fs"><p class="fs-t">Formulaire de réservation</p>
@@ -3797,8 +3858,9 @@ const TOUR_ACT = {
     if (k === 'thanks' && !r) { copyText(tourMsg('thanks', {}), 'Message copié'); return; }
     if (!r) return;
     // Un seul message pour tout ce que ce client donne ou récupère à cet arrêt ; on retient l'heure annoncée (pour voir un retard)
-    const D = tourDay(), K = roundKey(D, tourSlot(D)), st = tourStops(D), s = st.find((x) => x.r.id === r.id), items = s ? cliItems(st, s, k) : [];
+    const D = tourDay(), K = roundKey(D, tourSlot(D)), st = tourStops(D), s = st.find((x) => x.r.id === r.id), items = s ? cliItems(st, s, k).filter((x) => k !== 'ready' || x.r.result !== 'ko') : [];
     sendMsg(tourMsg(k, r, s, items.map((x) => x.r)), r.phone);
+    if (k === 'ready') { markReady(items.length ? items.map((x) => x.r.id) : [r.id]); setTimeout(renderTournee, 400); return; }
     if (s && (k === 'late' || k === s.kind)) {
       const m = LS.get('tourSent', {}) || {};
       items.forEach((x) => { if (k !== 'late' && x.kind !== s.kind) return; m[`${K}:${x.r.id}:${x.kind}`] = k === 'late' || (x.at != null && x.late > 0) ? { p: x.from + 10, a: `vers ${hm(x.from)}` } : x.at != null ? { p: x.at + 5, a: `à ${hm(x.at)}` } : { p: x.to + 5, a: `entre ${hm(x.from)} et ${hm(x.to)}` }; });
@@ -3811,14 +3873,19 @@ const TOUR_ACT = {
   'tour-go-now': async (a) => {
     const D = today(), slot = tourSlot(D), K = roundKey(D, slot), c = dayCfg(D, slot), t0 = a.textContent;
     a.disabled = true; a.textContent = 'Position…';
-    const p = await gpsPos(), pt = p || (await townPt(c.from));
+    const p = await gpsPos(), pt = p || fromOf(K) || (await townPt(c.from));
     if (!pt) { a.disabled = false; a.textContent = t0; toast('Point de départ introuvable : vérifie-le dans les réglages', 'bad'); return; }
-    setLive(K, { lat: pt.lat, lon: pt.lon, t: nowMin(), label: p ? 'ta position' : c.from });
+    setLive(K, { lat: pt.lat, lon: pt.lon, t: nowMin(), label: p ? 'ta position' : fromLabel(K, c) });
     await optIdle(); await optimizeRound(true, true);
     renderTournee(); nextToast(D, slot);
-    if (!p) setTimeout(() => toast(`Position non trouvée : trajet calculé depuis ${c.from}`), 2600);
+    if (!p) setTimeout(() => toast(`Position non trouvée : trajet calculé depuis ${fromLabel(K, c)}`), 2600);
     lateCheck(D, slot);
   },
+  'tour-from': () => openFrom(),
+  'fr-pick': (a) => saveFrom(a.dataset.v),
+  'fr-save': () => saveFrom(val('fr-q')),
+  'fr-gps': async (a) => { a.disabled = true; a.textContent = 'Position…'; const p = await gpsPos(); if (!p) { a.disabled = false; a.textContent = '📍 Ma position'; const st = $('#fr-st'); if (st) st.innerHTML = '<span class="neg">Position introuvable : autorise la localisation, ou écris le lieu.</span>'; return; } saveFrom('ta position', p); },
+  'tour-from-reset': async () => { const D = tourDay(), slot = tourSlot(D), c = dayCfg(D, slot); setFrom(roundKey(D, slot), null); await startChanged(D, slot, `Départ de ${c.from}, comme d’habitude`); },
   'tour-go-reset': async () => {
     const D = tourDay(), slot = tourSlot(D); setGo(roundKey(D, slot), null);
     await goChanged(D, slot, 'Heure de départ prévue remise');
@@ -3878,7 +3945,10 @@ const TOUR_ACT = {
   'rep-ready': async (a) => {
     const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return;
     const plan = readyPlan();
-    if (await repFast(r.id, { done: true, result: 'ok', date: today(), returned: false, ...plan }, `Réparé : retour prévu ${momentTxt(plan.planDate, plan.planSlot || 'soir')}`) && (r.phone || r.client)) setTimeout(() => sendMsg(tourMsg('ready', r), r.phone), 300);
+    // Le message part tout de suite (le téléphone n'ouvre les SMS que juste après un appui), puis on enregistre
+    const msg = `Réparé, retour prévu ${momentTxt(plan.planDate, plan.planSlot || 'soir')}`, tell = !!(r.phone || r.client);
+    if (tell) { sendMsg(tourMsg('ready', r), r.phone, msg); markReady([r.id]); }
+    await repFast(r.id, { done: true, result: 'ok', date: today(), returned: false, ...plan }, tell ? null : msg);
   },
   'rep-ready-all': async () => {
     const ids = S.repairs.filter((r) => r.picked !== false && !repDone(r)).map((r) => r.id); if (!ids.length) return;
