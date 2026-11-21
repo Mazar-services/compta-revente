@@ -640,7 +640,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'cd1c6ae31826';
+const APP_VERSION = '2cbd29ac0f5e';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -3450,18 +3450,35 @@ function openFrom() {
     <p class="hint" id="fr-st" style="margin:0"></p>`,
     foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="fr-save">Valider</button>` });
 }
+// Commune la plus proche du texte (nom officiel compris), sans l'accepter d'office : « Gare de Grenoble » n'est pas Grenoble
+async function townHit(q) {
+  try {
+    const j = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&type=municipality&${GEO_BIAS}&limit=1`).then((x) => x.json());
+    const f = (j.features || [])[0];
+    return f ? { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0], name: f.properties.city || f.properties.name || '' } : null;
+  } catch (e) { return null; }
+}
 async function saveFrom(q, pt) {
   const D = tourDay(), slot = tourSlot(D), K = roundKey(D, slot), c = dayCfg(D, slot), st = $('#fr-st');
   q = String(q || '').trim(); if (!q) { fieldErr('fr-q', 'Écris d’où tu pars.'); return; }
   if (!pt && normC(q) === normC(c.from)) { closeSheet(); setFrom(K, null); await startChanged(D, slot, `Départ de ${c.from}, comme d’habitude`); return; }
+  let label = q, approx = '';
   if (!pt) {
     if (st) st.textContent = 'Recherche du lieu…';
-    const sp = /\d/.test(q) || q.split(/\s+/).length > 3;
-    pt = sp ? (await geoOne(q)) || (await townPt(q)) : (await townPt(q)) || (await geoOne(q));
+    // Une ville : seulement si c'est bien son nom. Sinon le lieu ou l'adresse, s'ils sont sûrs ;
+    // en dernier recours la commune écrite dans le texte, nommée comme telle (jamais sous le nom du lieu)
+    const t = await townHit(q);
+    if (t && normC(t.name) === normC(q)) pt = t;
+    else {
+      const r = (await geoSearch(q)).find((x) => x.conf);
+      if (r && r.amb) { if (st) st.innerHTML = '<span class="neg">Plusieurs endroits portent ce nom : ajoute la ville ou l’adresse.</span>'; return; }
+      if (r) pt = { lat: r.lat, lon: r.lon };
+      else if (t && t.name && ` ${normC(q)} `.includes(` ${normC(t.name)} `)) { pt = t; label = t.name; approx = `« ${q} » introuvable : `; }
+    }
   }
   if (!pt) { if (st) st.innerHTML = '<span class="neg">Lieu introuvable : essaie avec la ville, ou une adresse complète.</span>'; return; }
-  closeSheet(); setFrom(K, { label: q, lat: pt.lat, lon: pt.lon });
-  await startChanged(D, slot, `Départ de ${q} pour cette tournée seulement : trajet recalculé`);
+  closeSheet(); setFrom(K, { label, lat: pt.lat, lon: pt.lon });
+  await startChanged(D, slot, approx ? `${approx}départ de ${label}, pour cette tournée seulement` : `Départ de ${label} pour cette tournée seulement : trajet recalculé`);
 }
 // Point de départ changé : le trajet est recalculé depuis ce point
 async function startChanged(D, slot, msg) {
