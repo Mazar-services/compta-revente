@@ -671,7 +671,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '38373f9b2c6a';
+const APP_VERSION = 'a867caa78e4f';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -3695,14 +3695,17 @@ let FUEL_Q = Promise.resolve();
 // Arrêts pas encore comptés : gardés dans le téléphone dès que tu touches le bouton, jusqu'à ce qu'ils soient enregistrés dans tes données.
 // Appli fermée ou pas de réseau : ils sont comptés à la prochaine ouverture (ou au prochain arrêt), jamais perdus.
 const FUEL_GPS = {}, FUEL_WAIT = {};
-const fuelJobs = () => { const L = LS.get('fuelJobs', []); return Array.isArray(L) ? L.filter((j) => j && j.id && j.K && isDate(j.D)) : []; };
-function fuelJobUpd(id, patch) { const L = fuelJobs(), j = L.find((x) => x.id === id); if (j) { Object.assign(j, patch); LS.set('fuelJobs', L); } }
+// La liste en mémoire fait foi pendant que l'appli est ouverte ; le téléphone en garde une copie si son stockage le permet
+let FUEL_JOBS = null;
+const fuelJobs = () => { if (!FUEL_JOBS) { const L = LS.get('fuelJobs', []); FUEL_JOBS = Array.isArray(L) ? L.filter((j) => j && j.id && j.K && isDate(j.D)) : []; } return FUEL_JOBS; };
+const fuelJobsSave = (L) => { FUEL_JOBS = L; LS.set('fuelJobs', L); };
+function fuelJobUpd(id, patch) { const j = fuelJobs().find((x) => x.id === id); if (j) { Object.assign(j, patch); fuelJobsSave(fuelJobs()); } }
 // Arrêt fait : noté tout de suite (lieu du client, ou ta position à ce moment-là), puis km, litres et € sont recalculés et enregistrés.
 // La promesse rend la fiche une fois enregistrée (null sinon).
 function fuelStop(z) {
   const { g, c } = z, id = 'j' + newId(), geo = g.geo && g.geo.lat != null ? { lat: +g.geo.lat, lon: +g.geo.lon } : null;
   const lv = z.lv && z.lv.lat != null ? { n: z.lv.label || 'ta position', lat: z.lv.lat, lon: z.lv.lon, t: z.lv.t } : null;
-  LS.set('fuelJobs', [...fuelJobs(), { id, K: z.K, D: z.D, s: z.slot, w: c.weekend ? 1 : 0, from: c.from, to: c.to, dep: z.dep, lv, fr: z.fr ? { n: z.fr.label, lat: z.fr.lat, lon: z.fr.lon } : null,
+  fuelJobsSave([...fuelJobs(), { id, K: z.K, D: z.D, s: z.slot, w: c.weekend ? 1 : 0, from: c.from, to: c.to, dep: z.dep, lv, fr: z.fr ? { n: z.fr.label, lat: z.fr.lat, lon: z.fr.lon } : null,
     n: [...new Set(g.items.map((x) => x.r.client || 'client'))].join(', '), t: nowMin(), pos: geo, gps: geo ? 0 : 1 }]);
   // Lieu pas vérifié : ta position est prise maintenant, devant le client (pas plus tard, quand tu es déjà reparti)
   if (!geo) FUEL_GPS[id] = gpsPos(0).then((p) => { fuelJobUpd(id, { pos: p ? { lat: +p.lat, lon: +p.lon } : null, gps: 0 }); });
@@ -3713,14 +3716,14 @@ function fuelStop(z) {
 // Compte les arrêts en attente, un à la fois, dans l'ordre ; s'arrête si l'enregistrement échoue (réessayé plus tard)
 function fuelKick() {
   FUEL_Q = FUEL_Q.then(async () => {
-    for (const j0 of fuelJobs()) {
+    for (const j0 of fuelJobs().slice()) {
       if (FUEL_GPS[j0.id]) await FUEL_GPS[j0.id];
       let j = fuelJobs().find((x) => x.id === j0.id); if (!j) continue;
       if (j.gps) j = { ...j, pos: null }; // position jamais reçue (appli fermée avant) : arrêt sans lieu
       let rec = null, ok = false;
       try { rec = await fuelStep(j); } catch (e) { console.error(e); }
       if (rec) ok = await fuelWrite(fuelPut(rec), `Essence · tournée ${slotName(rec.d, rec.s)} · ${decTxt(rec.km, 1)} km`);
-      if (ok || !rec) { LS.set('fuelJobs', fuelJobs().filter((x) => x.id !== j.id)); delete FUEL_GPS[j.id]; }
+      if (ok || !rec) { fuelJobsSave(fuelJobs().filter((x) => x.id !== j.id)); delete FUEL_GPS[j.id]; }
       if (FUEL_WAIT[j.id]) { FUEL_WAIT[j.id](ok ? rec : null); delete FUEL_WAIT[j.id]; }
       if (rec && !ok) break;
     }
