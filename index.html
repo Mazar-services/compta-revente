@@ -137,7 +137,7 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .cl-ic.in{background:var(--good-soft);color:var(--good)} .cl-ic.out{background:var(--bad-soft);color:var(--bad)}
 .mini.lg{width:56px;height:56px;border-radius:11px}
 .row.wl{grid-template-columns:56px minmax(0,1fr) auto}
-.stabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--surface-2);border-radius:14px;padding:4px;margin-bottom:4px}
+.stabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;background:var(--surface-2);border-radius:14px;padding:4px;margin-bottom:4px}
 .stabs button{height:40px;border:0;border-radius:11px;background:none;font:inherit;font-weight:800;font-size:14.5px;color:var(--ink-2);cursor:pointer}
 .stabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .cl.rp{grid-template-columns:46px minmax(0,1fr) auto}
@@ -532,6 +532,25 @@ tr.click{cursor:pointer}
 .wk .b{width:min(24px,70%);background:var(--series-1);border-radius:4px 4px 0 0;min-height:2px}
 .wk .n{font-size:11.5px;font-weight:800;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .wk .l{font-size:11px;color:var(--muted);font-weight:700}
+.chart-host.sm{min-height:200px}
+.daylist{display:grid;gap:8px}
+.day{border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.day.best{border-color:var(--series-1)}
+.day>summary{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;list-style:none}
+.day>summary::-webkit-details-marker{display:none}
+.day .dd{flex:1;min-width:0;font-weight:800;font-size:14px}
+.day .dd small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.day .dv{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.day .dl{padding:0 14px 12px;display:grid;gap:7px;font-size:13px}
+.day .dl div{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.day .dl span{min-width:0;overflow-wrap:anywhere}
+.day .dl i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px;vertical-align:0}
+.day .dl b{white-space:nowrap;font-variant-numeric:tabular-nums}
+.recs{display:grid;gap:10px}
+.rec{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13.5px}
+.rec>span{color:var(--ink-2);font-weight:600}
+.rec b{text-align:right;font-variant-numeric:tabular-nums}
+.rec small{display:block;font-weight:600;color:var(--muted);font-size:12px}
 .kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;margin:0;font-size:13.5px}
 .kv dt{color:var(--ink-2)}
 .kv dd{margin:0;font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
@@ -640,7 +659,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '2cbd29ac0f5e';
+const APP_VERSION = '3d6fae59fc2b';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -726,7 +745,7 @@ const PS5_KEYS = [['slim_std', 'PS5 Slim Standard'], ['slim_dig', 'PS5 Slim Digi
 /* ---------- État ---------- */
 const S = {
   db: null, assets: null, downloads: null,
-  status: 'loading', items: [], allItems: [], cancelled: [], cash: [], repairs: [], settings: { ...DEFAULTS }, statsTab: LS.get('statsTab', 'revente'),
+  status: 'loading', items: [], allItems: [], cancelled: [], cash: [], repairs: [], settings: { ...DEFAULTS }, statsTab: LS.get('statsTab', 'revente'), repPeriod: LS.get('repPeriod', 'all'), dayMonth: null, dayChart: [], repChart: [],
   view: 'accueil', month: thisMonth(), period: '12m', confirmEx: false, chartRows: [],
   f: Object.assign({ q: '', st: 'encours', cat: 'all', sort: 'recent', group: true, view: 'list' }, LS.get('filters', {}), { q: '' }),
 };
@@ -1067,6 +1086,7 @@ function renderAccueil() {
           ${m === cur && repWait() ? `<div class="hero-split">Réparo pas encore payé : ${eur(repWait())}, compté quand tu touches « Payé »</div>` : ''}
           <div class="hero-sub">${deltaHtml}</div>
           ${goalHtml}
+          <button class="btn sm" data-act="goto-days" data-m="${m}" style="margin-top:12px">Voir jour par jour</button>
         </section>
         <div class="tiles">${tiles.map(tileHtml).join('')}</div>
         ${cashCard()}
@@ -2148,7 +2168,150 @@ function projHtml() {
   </section>`;
 }
 
-const statsTabs = () => `<div class="stabs" role="tablist">${[['revente', 'Revente'], ['reparo', 'Réparo']].map(([v, l]) => `<button role="tab" data-act="stats-tab" data-v="${v}" aria-selected="${S.statsTab === v}">${l}</button>`).join('')}</div>`;
+const statsTabs = () => `<div class="stabs" role="tablist">${[['revente', 'Revente'], ['reparo', 'Réparo'], ['jours', 'Jour par jour']].map(([v, l]) => `<button role="tab" data-act="stats-tab" data-v="${v}" aria-selected="${S.statsTab === v}">${l}</button>`).join('')}</div>`;
+
+/* ---------- Jour par jour et stats Réparo ---------- */
+const WDS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+const WDFULL = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const dayName = (d) => `${WDFULL[weekday(d)]} ${dShort(d)}`;
+const weekStart = (d) => addDays(d, -((weekday(d) + 6) % 7));
+// Types de réparation, reconnus dans l'intitulé. Le 3e nombre sert à partager le prix d'une prestation combinée (tes tarifs).
+const REP_CATS = [['drift', 'Drift (joystick changé)', 25], ['hall', 'Joysticks à effet Hall', 45], ['manette', 'Manette, autre panne', 25], ['hdmi', 'Port HDMI', 75], ['lm', 'Liquide métal', 80], ['clean', 'Nettoyage', 40], ['tel', 'Téléphone', 60], ['console', 'Autre console', 40], ['autre', 'Autre', 25], ['sav', 'Garantie, retour SAV', 0]];
+const REP_W = Object.fromEntries(REP_CATS.map((c) => [c[0], c[2]]));
+function repCats(r) {
+  const t = norm(r.type || ''), n = norm(r.note || '');
+  // Reprise gratuite (garantie, retour SAV) : comptée à part
+  if (repTotal(r) <= 0 && /garanti|\bsav\b|retour/.test(t + ' ' + n)) return ['sav'];
+  const c = [];
+  if (/hall/.test(t)) c.push('hall'); else if (/drift|joystick/.test(t)) c.push('drift');
+  if (/hdmi/.test(t)) c.push('hdmi');
+  if (/liqu|lisu|metal/.test(t)) c.push('lm'); else if (/nettoy|poussiere|ventilateur/.test(t)) c.push('clean');
+  if (/iphone|telephone|smartphone|samsung|xiaomi|android|ecran|vitre|\btel\b/.test(t)) c.push('tel');
+  if (/switch|swicth|nintendo/.test(t)) c.push('console');
+  if (!c.length && /manette|bouton|gachette|\b[lr][12]\b|port de charge|batterie/.test(t)) c.push('manette');
+  return c.length ? c : ['autre'];
+}
+// Chiffres d'une liste de prestations payées (dates de paiement)
+function repStats(list) {
+  const o = { net: 0, ca: 0, parts: 0, n: 0, np: list.length, ko: 0, sav: 0, combo: 0, units: 0, cats: {}, days: new Map(), weeks: new Map(), wd: WDS.map(() => ({ net: 0, n: 0, days: 0 })), big: null };
+  list.forEach((r) => {
+    const q = repQty(r), t = repTotal(r), net = repNet(r), d = repPaidOn(r), cs = repCats(r);
+    o.net += net; o.ca += t; o.parts += num(r.partsCost); o.n += q;
+    if (r.result === 'ko') o.ko++;
+    if (cs[0] === 'sav') o.sav += q;
+    if (t > 0) o.units += q;
+    if (cs.length > 1) o.combo++;
+    const ws = sum(cs, (k) => REP_W[k] || 25) || 1;
+    cs.forEach((k) => { const c = o.cats[k] || (o.cats[k] = { n: 0, net: 0, ca: 0, units: 0 }), sh = (REP_W[k] || 25) / ws; c.n += q; c.net += net * sh; c.ca += t * sh; if (t > 0) c.units += q; });
+    const add = (m, k) => { const x = m.get(k) || { d: k, net: 0, n: 0 }; x.net += net; x.n += q; m.set(k, x); };
+    if (isDate(d)) { add(o.days, d); add(o.weeks, weekStart(d)); }
+    if (!o.big || t > repTotal(o.big)) o.big = r;
+  });
+  o.days.forEach((x) => { const w = o.wd[weekday(x.d)]; w.net += x.net; w.n += x.n; w.days++; });
+  o.nDays = o.days.size;
+  const top = (m, f) => [...m.values()].sort(f)[0] || null;
+  o.best = top(o.days, (a, b) => b.net - a.net || b.n - a.n);
+  o.busy = top(o.days, (a, b) => b.n - a.n || b.net - a.net);
+  o.bestWeek = top(o.weeks, (a, b) => b.net - a.net || b.n - a.n);
+  return o;
+}
+// Une ligne par jour du mois (jusqu'à aujourd'hui) : gain Réparo (a) et bénéfice des ventes (b)
+function dayRows(ym, reps, sales) {
+  const last = new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7), 0)).getUTCDate(), t = today(), out = [];
+  for (let k = 1; k <= last; k++) {
+    const d = `${ym}-${pad(k)}`; if (d > t) break;
+    const R = reps.filter((r) => repPaidOn(r) === d), V = sales.filter((i) => paidOn(i) === d);
+    out.push({ d, lbl: String(k), title: dayName(d), a: sum(R, repNet), b: sum(V, profit), n: sum(R, repQty), ns: V.length, reps: R, sales: V, cur: d === t });
+  }
+  return out;
+}
+// Une ligne par semaine (du lundi), de la première prestation à cette semaine
+function weekRows(reps) {
+  const ds = reps.map(repPaidOn).filter(isDate).sort(); if (!ds.length) return [];
+  const out = [], end = weekStart(today());
+  for (let w = weekStart(ds[0]), g = 0; w <= end && g < 200; w = addDays(w, 7), g++) {
+    const R = reps.filter((r) => weekStart(repPaidOn(r)) === w);
+    out.push({ d: w, lbl: dShort(w), title: `semaine du ${dShort(w)}`, a: sum(R, repNet), b: 0, n: sum(R, repQty), ns: 0, cur: w === end });
+  }
+  return out;
+}
+// Barres (Réparo, et ventes empilées dessus) par jour ou par semaine ; toucher une barre affiche le détail
+function drawGainBars(host, rows, opt = {}) {
+  if (!host || !rows || !rows.length) return;
+  const W = Math.max(260, Math.floor(host.clientWidth)), H = 200, ml = 40, mr = 4, mt = 12, mb = 24;
+  const pw = W - ml - mr, ph = H - mt - mb, pos = (v) => Math.max(0, v);
+  let hi = Math.max(0, ...rows.map((r) => pos(r.a) + (opt.sales ? pos(r.b) : 0)));
+  if (hi === 0) hi = 50;
+  const ticks = niceTicks(0, hi, 4); hi = ticks[ticks.length - 1];
+  const y = (v) => mt + ph - (v / hi) * ph, y0 = y(0);
+  const n = rows.length, band = pw / n, bw = Math.max(2, Math.min(opt.week ? 26 : 18, band * 0.72));
+  const every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / (opt.week ? 48 : 26)))));
+  let grid = '', bands = '', bars = '', labels = '', hits = '';
+  ticks.forEach((t) => { const yy = Math.round(y(t)) + 0.5; grid += `<line x1="${ml}" x2="${W - mr}" y1="${yy}" y2="${yy}" class="${t === 0 ? 'axis0' : 'gridl'}"/><text x="${ml - 8}" y="${yy}" dy="0.32em" class="tick" text-anchor="end">${compact(t)}</text>`; });
+  rows.forEach((r, k) => {
+    const bx = ml + k * band, x = +(bx + (band - bw) / 2).toFixed(1), a = pos(r.a), b = opt.sales ? pos(r.b) : 0, ya = y(a), yb = y(a + b);
+    bands += `<rect class="hb" data-i="${k}" x="${bx.toFixed(1)}" y="${mt}" width="${band.toFixed(1)}" height="${ph}" rx="4"/>`;
+    if (b > 0) bars += `<path class="s2" d="${barPath(x, bw, ya, yb)}"/>`;
+    if (a > 0) bars += b > 0 ? `<rect class="s1" x="${x}" y="${ya.toFixed(1)}" width="${bw.toFixed(1)}" height="${(y0 - ya).toFixed(1)}"/>` : `<path class="s1" d="${barPath(x, bw, y0, ya)}"/>`;
+    if (k % every === 0) labels += `<text x="${(bx + band / 2).toFixed(1)}" y="${H - 7}" text-anchor="middle" class="xl ${r.cur ? 'cur' : ''}">${esc(r.lbl)}</text>`;
+    hits += `<rect class="hit" data-i="${k}" x="${bx.toFixed(1)}" y="${mt}" width="${band.toFixed(1)}" height="${ph + mb}" tabindex="0" role="img" aria-label="${esc(r.title)} : Réparo ${eurS(r.a)}${opt.sales ? `, ventes ${eurS(r.b)}` : ''}"/>`;
+  });
+  host.innerHTML = `<svg class="mchart" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="group" aria-label="${opt.week ? 'Gagné par semaine' : 'Gagné par jour'}">${bands}${grid}${bars}${labels}${hits}</svg><div class="tip" hidden></div>`;
+  const svg = host.querySelector('svg'), tip = host.querySelector('.tip');
+  const show = (k) => {
+    const r = rows[k];
+    svg.querySelectorAll('.hb').forEach((e) => e.classList.toggle('on', +e.dataset.i === k));
+    tip.innerHTML = `<div class="tip-h"></div><div class="tip-r"><i class="k1"></i><b>${eurS(r.a)}</b><span>Réparo${r.n ? ` · ${plural(r.n, 'réparation')}` : ''}</span></div>${opt.sales ? `<div class="tip-r"><i class="k2"></i><b>${eurS(r.b)}</b><span>ventes${r.ns ? ` · ${plural(r.ns, 'vente')}` : ''}</span></div><div class="tip-r"><i></i><b>${eurS(r.a + r.b)}</b><span>au total</span></div>` : ''}`;
+    tip.querySelector('.tip-h').textContent = cap1(r.title);
+    tip.hidden = false;
+    const cx = ml + k * band + band / 2, tw = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(W - tw, cx - tw / 2)) + 'px';
+  };
+  const hide = () => { tip.hidden = true; svg.querySelectorAll('.hb.on').forEach((e) => e.classList.remove('on')); };
+  svg.querySelectorAll('.hit').forEach((h) => {
+    const k = +h.dataset.i;
+    h.addEventListener('pointerenter', () => show(k));
+    h.addEventListener('click', () => show(k));
+    h.addEventListener('focus', () => show(k));
+    h.addEventListener('blur', hide);
+  });
+  svg.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') hide(); });
+}
+// Onglet « Jour par jour » : ce que tu as gagné chaque jour du mois (ventes + Réparo)
+function daysHtml() {
+  const cur = thisMonth(), m = S.dayMonth && S.dayMonth <= cur ? S.dayMonth : cur;
+  const reps = S.repairs.filter((r) => repPaid(r) && repPaidOn(r).slice(0, 7) === m);
+  const sales = S.items.filter((i) => isPaid(i) && paidOn(i).slice(0, 7) === m);
+  const rows = dayRows(m, reps, sales); S.dayChart = rows;
+  const act = rows.filter((r) => r.reps.length || r.sales.length).reverse();
+  const totA = sum(rows, (r) => r.a), totB = sum(rows, (r) => r.b), tot = totA + totB;
+  const best = act.slice().sort((x, y) => (y.a + y.b) - (x.a + x.b))[0];
+  const nav = `<div class="monthnav">
+      <button class="iconbtn" data-act="day-month" data-d="-1" aria-label="Mois précédent">${ic('left')}</button>
+      <div class="mn-c"><div class="eyebrow">Gagné jour par jour</div><h1 class="h1">${monthLabel(m)}</h1></div>
+      <button class="iconbtn" data-act="day-month" data-d="1" aria-label="Mois suivant" ${m >= cur ? 'disabled' : ''}>${ic('right')}</button>
+    </div>`;
+  if (!act.length) return nav + `<section class="card"><p style="margin:0">Rien d’encaissé en ${monthName(m)} pour l’instant.</p></section>`;
+  const tiles = [
+    ['Gagné ce mois-ci', eurS(tot), `Réparo ${eurS(totA)} · ventes ${eurS(totB)}`, '', sign(tot)],
+    ['Jours avec une rentrée', String(act.length), `sur ${plural(rows.length, 'jour')}`, '', 'c-info'],
+    ['Moyenne par jour', eurS(tot / act.length), 'les jours où tu as encaissé', '', sign(tot)],
+    ['Meilleur jour', eurS(best.a + best.b), cap1(best.title), '', 'c-good'],
+  ];
+  const line = (cls, label, v) => `<div><span><i class="${cls}"></i>${label}</span><b class="${v < -0.004 ? 'neg' : 'pos'}">${eurS(v)}</b></div>`;
+  const dayHtml = (r) => {
+    const t = r.a + r.b, bits = [r.n ? plural(r.n, 'réparation') : r.reps.length ? 'garantie' : '', r.ns ? plural(r.ns, 'vente') : ''].filter(Boolean).join(' · ');
+    return `<details class="day ${r === best ? 'best' : ''}"><summary><span class="dd">${cap1(r.title)}${r === best ? ' · meilleur jour' : ''}<small>${bits}</small></span><span class="dv ${t < -0.004 ? 'neg' : 'pos'}">${eurS(t)}</span></summary><div class="dl">
+      ${r.reps.map((x) => line('k1', `${esc(x.type || 'Réparation')}${repQty(x) > 1 ? ` ×${repQty(x)}` : ''}${x.client ? ` · ${esc(x.client)}` : ''}${x.result === 'ko' ? ' · échec' : ''}${num(x.partsCost) ? ` · pièces ${eur(num(x.partsCost))}` : ''}`, repNet(x))).join('')}
+      ${r.sales.map((i) => line('k2', `${esc(i.ref || '')} ${esc(i.model || '')} · vendu ${eur(num(i.sellPrice))}`, profit(i))).join('')}
+    </div></details>`;
+  };
+  return nav + `
+    <div class="tiles t4">${tiles.map(tileHtml).join('')}</div>
+    <section class="card"><div class="card-h"><h2 class="sec">Gagné par jour</h2><div class="legend"><span><i class="k1"></i>Réparo</span><span><i class="k2"></i>Ventes</span></div></div><div class="chart-host sm" id="dchart"></div></section>
+    <section class="card"><div class="card-h"><h2 class="sec">Détail de chaque jour</h2><span class="muted" style="font-size:12.5px">touche un jour</span></div><div class="daylist">${act.map(dayHtml).join('')}</div>
+      <p class="foot">Gagné = bénéfice des ventes (prix − frais − prix d’achat), compté le jour où l’argent arrive, + Réparo (prix − pièces notées), compté le jour du paiement. Les dépenses que tu n’as pas notées (pièces, outils, essence) ne sont pas retirées.</p></section>`;
+}
 
 function reparoHtml() {
   const all = S.repairs.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
@@ -2159,14 +2322,38 @@ function reparoHtml() {
   const unpaid = sum(all.filter((r) => !repPaid(r)), repTotal), ko = R.filter((r) => r.result === 'ko').length;
   const head = `<div class="ttl-row"><div><div class="eyebrow">Prestations de réparation</div><h1 class="h1">Réparo</h1></div><button class="btn sm primary" data-act="rep-add">${ic('plus')} Prestation</button></div>`;
   if (!all.length) return head + `<section class="card"><p style="margin:0">Aucune prestation pour l’instant. Ajoute chaque réparation avec « Prestation » dès que tu récupères l’objet, puis coche réparé, rendu et payé au fil de l’eau.</p></section>`;
-  const tiles = R.length ? [
-    ['Réparations', String(nb), `${plural(R.length, 'prestation')}${ko ? ` · ${ko} échec${ko > 1 ? 's' : ''}` : ''}`, '', 'c-info'],
-    ['Encaissé', eur(ca), unpaid ? `+ ${eur(unpaid)} pas encore payés` : 'tout est payé', '', 'c-info'],
-    ['Gain net', eurS(net), parts ? `après ${eur(parts)} de pièces` : 'aucune pièce déduite', '', sign(net)],
-    [`${monthName(cur)[0].toUpperCase()}${monthName(cur).slice(1)}`, eurS(sum(Rm, repNet)), `${sum(Rm, repQty)} réparation${sum(Rm, repQty) > 1 ? 's' : ''}`, '', sign(sum(Rm, repNet))],
-    ['Prix moyen', eur(ca / nb), 'par réparation'],
-    ['Gain moyen', eurS(net / R.length), 'par prestation', '', sign(net)],
+  // Période des stats : ce mois-ci, le mois dernier ou depuis le début (date de paiement)
+  const per = ['m', 'pm', 'all'].includes(S.repPeriod) ? S.repPeriod : 'all', ym = per === 'pm' ? addMonths(cur, -1) : cur;
+  const RP = R.filter((r) => per === 'all' || repPaidOn(r).slice(0, 7) === ym), st = repStats(RP);
+  const prev = per === 'all' ? null : repStats(R.filter((r) => repPaidOn(r).slice(0, 7) === addMonths(ym, -1)));
+  const vs = (a, b) => (prev && b > 0 ? ` · ${a >= b ? '▲' : '▼'} ${pct(Math.abs(a - b) / b)} vs ${monthName(addMonths(ym, -1))}` : '');
+  const pChips = [['m', cap1(monthName(cur))], ['pm', cap1(monthName(addMonths(cur, -1)))], ['all', 'Depuis le début']].map(([v, l]) => `<button class="chip" data-act="rep-period" data-v="${v}" aria-pressed="${per === v}">${l}</button>`).join('');
+  const tiles = RP.length ? [
+    ['Gagné', eurS(st.net), `${st.parts ? `encaissé ${eur(st.ca)} − ${eur(st.parts)} de pièces` : `encaissé ${eur(st.ca)}`}${prev ? vs(st.net, prev.net) : ''}`, '', sign(st.net)],
+    ['Réparations', String(st.n), `${plural(st.np, 'prestation')}${st.ko ? ` · ${st.ko} échec${st.ko > 1 ? 's' : ''}` : ''}${prev ? vs(st.n, prev.n) : ''}`, '', 'c-info'],
+    ['Jours d’activité', String(st.nDays), `${(st.n / Math.max(1, st.nDays)).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} réparations par jour en moyenne`],
+    ['Gain par jour', eurS(st.net / Math.max(1, st.nDays)), 'en moyenne, les jours où tu as été payé', '', sign(st.net)],
+    ['Prix moyen', st.units ? eur(st.ca / st.units) : '—', 'par appareil réparé (sans les garanties)'],
+    ['Garanties et SAV', String(st.sav), st.sav ? 'reprises gratuites' : 'aucune reprise gratuite', '', st.sav ? 'c-warn' : ''],
   ] : [];
+  // Comme sur l'accueil : déjà récupéré (en réparation, réparé ou rendu) mais pas encore payé
+  if (repWait()) tiles.push(['À encaisser', eur(repWait()), 'récupéré, pas encore payé', '', 'c-warn']);
+  S.repChart = RP.length ? (per === 'all' ? weekRows(RP) : dayRows(ym, RP, [])) : [];
+  const recRow = (l, v, sub) => `<div class="rec"><span>${l}</span><b>${v}<small>${sub}</small></b></div>`;
+  const recHtml = RP.length ? `<div class="recs">
+    ${recRow('Meilleur jour', `<span class="pos">${eurS(st.best.net)}</span>`, `${dayName(st.best.d)} · ${plural(st.best.n, 'réparation')}`)}
+    ${recRow('Jour le plus chargé', plural(st.busy.n, 'réparation'), `${dayName(st.busy.d)} · ${eurS(st.busy.net)}`)}
+    ${recRow('Meilleure semaine', `<span class="pos">${eurS(st.bestWeek.net)}</span>`, `semaine du ${dShort(st.bestWeek.d)} · ${plural(st.bestWeek.n, 'réparation')}`)}
+    ${st.big ? recRow('Plus grosse prestation', eur(repTotal(st.big)), `${esc(st.big.type || '')} · ${dShort(repPaidOn(st.big))}`) : ''}
+  </div>` : '';
+  const cats = REP_CATS.map(([k, l]) => ({ k, l, ...(st.cats[k] || { n: 0, net: 0, ca: 0, units: 0 }) })).filter((c) => c.n).sort((a, b) => b.net - a.net || b.n - a.n);
+  const maxC = Math.max(1, ...cats.map((c) => Math.max(0, c.net)));
+  const catHtml = cats.length ? `<div class="hbars">${cats.map((c) => `<div class="hbar"><span class="hb-l">${esc(c.l)}<small>${plural(c.n, 'réparation')}${c.units ? ` · ${eur(c.ca / c.units)} en moyenne` : ''}${st.net > 0 && c.net > 0 ? ` · ${Math.round(c.net / st.net * 100)}${NB}% du gain` : ''}</small></span><span class="hb-t"><span class="hb-f" style="width:${(Math.max(0, c.net) / maxC * 100).toFixed(1)}%"></span></span><span class="hb-v">${eurS(Math.round(c.net))}</span></div>`).join('')}</div>
+    ${st.combo ? `<p class="foot">${plural(st.combo, 'prestation combinée', 'prestations combinées')} (ex. port HDMI + liquide métal) : chaque réparation est comptée, et le prix est partagé selon tes tarifs.</p>` : ''}` : '';
+  const wdo = [1, 2, 3, 4, 5, 6, 0], maxWd = Math.max(1, ...wdo.map((d) => st.wd[d].net));
+  const bestWd = wdo.filter((d) => st.wd[d].days).sort((a, b) => st.wd[b].net / st.wd[b].days - st.wd[a].net / st.wd[a].days)[0];
+  const wdHtml = RP.length ? `<div class="wk">${wdo.map((d) => `<div class="col"><span class="n">${compact(st.wd[d].net)}</span><span class="b" style="height:${(Math.max(0, st.wd[d].net) / maxWd * 100).toFixed(1)}%"></span><span class="l">${WDS[d]}</span></div>`).join('')}</div>
+    <p class="foot">Gain total en euros pour chaque jour de la semaine (jour du paiement).${bestWd != null ? ` Le ${WDFULL[bestWd]} rapporte le plus : ${eurS(st.wd[bestWd].net / st.wd[bestWd].days)} en moyenne les jours où tu encaisses.` : ''}</p>` : '';
   const by = (key) => { const g = new Map(); R.forEach((r) => { const k = key(r); const x = g.get(k) || { n: 0, ca: 0, net: 0 }; x.n += repQty(r); x.ca += repTotal(r); x.net += repNet(r); g.set(k, x); }); return [...g.entries()]; };
   // Même prestation écrite avec d'autres majuscules ou accents : regroupée
   const lbl = new Map(); R.forEach((r) => { const k = norm(r.type || '?'); if (!lbl.has(k)) lbl.set(k, r.type || '?'); });
@@ -2181,10 +2368,17 @@ function reparoHtml() {
       <span class="a"><b class="${repPaid(r) ? 'in' : ''}">${eurS(repNet(r))}</b>${!repPaid(r) ? '<small>à encaisser</small>' : num(r.partsCost) ? `<small>facturé ${eur(repTotal(r))}</small>` : ''}</span>
     </div>`; };
   return head + `
+    ${R.length ? `<div class="chips" role="toolbar" aria-label="Période des stats Réparo">${pChips}</div>` : ''}
+    ${tiles.length ? `<div class="tiles t4">${tiles.map(tileHtml).join('')}</div>` : R.length ? `<section class="card"><p style="margin:0">Aucune réparation payée en ${monthName(ym)}.</p></section>` : ''}
+    ${RP.length ? `<section class="card"><div class="card-h"><h2 class="sec">${per === 'all' ? 'Gagné par semaine' : `Gagné par jour en ${monthName(ym)}`}</h2><span class="muted" style="font-size:12.5px">touche une barre</span></div><div class="chart-host sm" id="rchart"></div></section>
+    <div class="cols">
+      <section class="card"><div class="card-h"><h2 class="sec">Tes records</h2></div>${recHtml}</section>
+      <section class="card"><div class="card-h"><h2 class="sec">Par jour de la semaine</h2></div>${wdHtml}</section>
+    </div>
+    <section class="card"><div class="card-h"><h2 class="sec">Par type de réparation</h2><span class="muted" style="font-size:12.5px">classé par gain</span></div>${catHtml}
+      <details class="tview"><summary>Détail par intitulé, depuis le début</summary>${table(types, 'Intitulé', (k) => k)}</details></section>` : ''}
     ${open.length ? `<section class="card"><div class="card-h"><h2 class="sec">En cours</h2><span class="muted" style="font-size:12.5px">${plural(open.length, 'prestation')} à suivre</span></div><div>${open.map(row).join('')}</div></section>` : ''}
-    ${tiles.length ? `<div class="tiles t4">${tiles.map(tileHtml).join('')}</div>` : ''}
-    ${R.length ? `<section class="card"><div class="card-h"><h2 class="sec">Par type de prestation</h2></div>${table(types, 'Type', (k) => k)}</section>
-    <section class="card"><div class="card-h"><h2 class="sec">Par mois</h2><span class="muted" style="font-size:12.5px">date de paiement</span></div>${table(months, 'Mois', (k) => monthLabel(k))}</section>` : ''}
+    ${R.length ? `<section class="card"><div class="card-h"><h2 class="sec">Par mois</h2><span class="muted" style="font-size:12.5px">date de paiement</span></div>${table(months, 'Mois', (k) => monthLabel(k))}</section>` : ''}
     <section class="card"><div class="card-h"><h2 class="sec">Toutes les prestations</h2><span class="muted" style="font-size:12.5px">${plural(all.length, 'prestation')}</span></div><div>${all.map(row).join('')}</div></section>
     <section class="card"><label class="sw"><span class="sw-t"><b>Compter Réparo dans la caisse</b><small>L’argent reçu pour les réparations s’ajoute à l’argent disponible pour acheter, à la date du paiement</small></span><input type="checkbox" id="rep-cash" role="switch" ${repInCash() ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label></section>`;
 }
@@ -2199,7 +2393,8 @@ function repTypes() {
 function renderStats() {
   const el = $('#v-stats');
   if (S.status !== 'ok') { el.innerHTML = stateBlock(); return; }
-  if (S.statsTab === 'reparo') { el.innerHTML = statsTabs() + reparoHtml(); return; }
+  if (S.statsTab === 'reparo') { el.innerHTML = statsTabs() + reparoHtml(); drawGainBars($('#rchart'), S.repChart, { sales: false, week: S.repPeriod === 'all' }); return; }
+  if (S.statsTab === 'jours') { el.innerHTML = statsTabs() + daysHtml(); drawGainBars($('#dchart'), S.dayChart, { sales: true }); return; }
   const P = S.period, cur = thisMonth(), start12 = addMonths(cur, -11);
   const years = [...new Set(S.items.flatMap((i) => [i.buyDate, isSold(i) ? i.sellDate : null]).filter(isDate).map((d) => d.slice(0, 4)))].sort().reverse();
   const inP = (d) => isDate(d) && (P === 'all' || (P === '12m' ? d.slice(0, 7) >= start12 : d.slice(0, 4) === P));
@@ -4172,6 +4367,9 @@ const ACT = {
   'goto-sales': (a) => { S.f.st = 'vendu'; S.f.cat = 'all'; S.f.month = a.dataset.m; S.f.mkind = 'vente'; S.f.sort = 'recent'; setView('articles'); },
   'stats-tab': (a) => { S.statsTab = a.dataset.v; LS.set('statsTab', S.statsTab); renderStats(); window.scrollTo(0, 0); },
   'goto-reparo': () => { S.statsTab = 'reparo'; LS.set('statsTab', 'reparo'); setView('stats'); },
+  'goto-days': (a) => { S.dayMonth = a.dataset.m || thisMonth(); S.statsTab = 'jours'; LS.set('statsTab', 'jours'); setView('stats'); },
+  'day-month': (a) => { const n = addMonths(S.dayMonth || thisMonth(), +a.dataset.d); if (n <= thisMonth()) { S.dayMonth = n; renderStats(); } },
+  'rep-period': (a) => { S.repPeriod = a.dataset.v; LS.set('repPeriod', S.repPeriod); renderStats(); },
   'rep-add': () => openRep(null),
   'rep-edit': (a) => openRep(a.dataset.id),
   'rep-copy': (a) => openRep(null, a.dataset.id),
@@ -4421,7 +4619,7 @@ function bind() {
   });
   $('#v-simulateur').addEventListener('input', (e) => { if (e.target.id === 's-target') e.target.dataset.touched = '1'; renderSimu(); });
   let rt;
-  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (S.view === 'stats' && S.status === 'ok') drawMonthChart($('#mchart'), S.chartRows); }, 150); });
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (S.view === 'stats' && S.status === 'ok') { drawMonthChart($('#mchart'), S.chartRows); drawGainBars($('#dchart'), S.dayChart, { sales: true }); drawGainBars($('#rchart'), S.repChart, { sales: false, week: S.repPeriod === 'all' }); } }, 150); });
 }
 
 function onData() {
