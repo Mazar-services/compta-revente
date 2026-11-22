@@ -671,7 +671,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '2cf3eb1a12ee';
+const APP_VERSION = '38373f9b2c6a';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -3233,10 +3233,10 @@ function setLive(K, v) {
   Object.keys(o).forEach((k) => { if (k.slice(0, 10) < old) delete o[k]; });
   LS.set('tourLive', o);
 }
-const gpsPos = () => new Promise((ok) => {
+const gpsPos = (maxAge = 60000) => new Promise((ok) => {
   if (!navigator.geolocation) return ok(null);
   const t = setTimeout(() => ok(null), 10000);
-  try { navigator.geolocation.getCurrentPosition((p) => { clearTimeout(t); ok({ lat: p.coords.latitude, lon: p.coords.longitude }); }, () => { clearTimeout(t); ok(null); }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }); } catch (e) { clearTimeout(t); ok(null); }
+  try { navigator.geolocation.getCurrentPosition((p) => { clearTimeout(t); ok({ lat: p.coords.latitude, lon: p.coords.longitude }); }, () => { clearTimeout(t); ok(null); }, { enableHighAccuracy: true, timeout: 8000, maximumAge: maxAge }); } catch (e) { clearTimeout(t); ok(null); }
 });
 // Horaires d'une tournée pour un ordre d'arrêts donné : route + temps sur place.
 // Un RDV à heure fixe est tenu : si on est en avance on attend, et le départ est calé pour arriver pile au premier RDV
@@ -3692,35 +3692,60 @@ function fuelRound(id) {
   return null;
 }
 let FUEL_Q = Promise.resolve();
-// Arrêt fait : il s'ajoute au trajet de sa tournée, puis km, litres et € sont recalculés et enregistrés (un arrêt à la fois)
+// Arrêts pas encore comptés : gardés dans le téléphone dès que tu touches le bouton, jusqu'à ce qu'ils soient enregistrés dans tes données.
+// Appli fermée ou pas de réseau : ils sont comptés à la prochaine ouverture (ou au prochain arrêt), jamais perdus.
+const FUEL_GPS = {}, FUEL_WAIT = {};
+const fuelJobs = () => { const L = LS.get('fuelJobs', []); return Array.isArray(L) ? L.filter((j) => j && j.id && j.K && isDate(j.D)) : []; };
+function fuelJobUpd(id, patch) { const L = fuelJobs(), j = L.find((x) => x.id === id); if (j) { Object.assign(j, patch); LS.set('fuelJobs', L); } }
+// Arrêt fait : noté tout de suite (lieu du client, ou ta position à ce moment-là), puis km, litres et € sont recalculés et enregistrés.
+// La promesse rend la fiche une fois enregistrée (null sinon).
 function fuelStop(z) {
-  let give; const out = new Promise((ok) => { give = ok; });
-  FUEL_Q = FUEL_Q.then(async () => {
-    let rec = null;
-    try { rec = await fuelStep(z); } catch (e) { console.error(e); }
-    give(rec);
-    if (rec) await fuelWrite(fuelPut(rec), `Essence · tournée ${slotName(rec.d, rec.s)} · ${decTxt(rec.km, 1)} km`);
-  }).catch(() => {});
+  const { g, c } = z, id = 'j' + newId(), geo = g.geo && g.geo.lat != null ? { lat: +g.geo.lat, lon: +g.geo.lon } : null;
+  const lv = z.lv && z.lv.lat != null ? { n: z.lv.label || 'ta position', lat: z.lv.lat, lon: z.lv.lon, t: z.lv.t } : null;
+  LS.set('fuelJobs', [...fuelJobs(), { id, K: z.K, D: z.D, s: z.slot, w: c.weekend ? 1 : 0, from: c.from, to: c.to, dep: z.dep, lv, fr: z.fr ? { n: z.fr.label, lat: z.fr.lat, lon: z.fr.lon } : null,
+    n: [...new Set(g.items.map((x) => x.r.client || 'client'))].join(', '), t: nowMin(), pos: geo, gps: geo ? 0 : 1 }]);
+  // Lieu pas vérifié : ta position est prise maintenant, devant le client (pas plus tard, quand tu es déjà reparti)
+  if (!geo) FUEL_GPS[id] = gpsPos(0).then((p) => { fuelJobUpd(id, { pos: p ? { lat: +p.lat, lon: +p.lon } : null, gps: 0 }); });
+  const out = new Promise((ok) => { FUEL_WAIT[id] = ok; });
+  fuelKick();
   return out;
 }
-async function fuelStep(z) {
-  const { D, slot, K, g, c } = z, old = fuelAll().find((x) => x.k === K);
-  const rec = old ? JSON.parse(JSON.stringify(old)) : { id: 'fuel-' + K, k: K, d: D, s: slot, w: c.weekend ? 1 : 0, p: [] };
+// Compte les arrêts en attente, un à la fois, dans l'ordre ; s'arrête si l'enregistrement échoue (réessayé plus tard)
+function fuelKick() {
+  FUEL_Q = FUEL_Q.then(async () => {
+    for (const j0 of fuelJobs()) {
+      if (FUEL_GPS[j0.id]) await FUEL_GPS[j0.id];
+      let j = fuelJobs().find((x) => x.id === j0.id); if (!j) continue;
+      if (j.gps) j = { ...j, pos: null }; // position jamais reçue (appli fermée avant) : arrêt sans lieu
+      let rec = null, ok = false;
+      try { rec = await fuelStep(j); } catch (e) { console.error(e); }
+      if (rec) ok = await fuelWrite(fuelPut(rec), `Essence · tournée ${slotName(rec.d, rec.s)} · ${decTxt(rec.km, 1)} km`);
+      if (ok || !rec) { LS.set('fuelJobs', fuelJobs().filter((x) => x.id !== j.id)); delete FUEL_GPS[j.id]; }
+      if (FUEL_WAIT[j.id]) { FUEL_WAIT[j.id](ok ? rec : null); delete FUEL_WAIT[j.id]; }
+      if (rec && !ok) break;
+    }
+  }).catch(() => {});
+  return FUEL_Q;
+}
+async function fuelStep(j) {
+  const old = fuelAll().find((x) => x.k === j.K);
+  if (old && (old.js || []).includes(j.id)) return null; // déjà compté
+  const rec = old ? JSON.parse(JSON.stringify(old)) : { id: 'fuel-' + j.K, k: j.K, d: j.D, s: j.s, w: j.w, p: [] };
   if (!Array.isArray(rec.p)) rec.p = [];
   if (!rec.a) {
     // Départ : « Je pars maintenant » (ta position), sinon le lieu choisi pour cette tournée, sinon celui des réglages
-    const lv = z.lv && z.lv.lat != null ? z.lv : null;
-    if (lv) rec.a = { n: lv.label || 'ta position', lat: lv.lat, lon: lv.lon, t: lv.t };
-    else if (z.fr) rec.a = { n: z.fr.label, lat: z.fr.lat, lon: z.fr.lon, t: z.dep };
-    else { const p = await townPt(c.from); if (p) rec.a = { n: c.from, lat: p.lat, lon: p.lon, t: z.dep }; }
+    if (j.lv) rec.a = { ...j.lv };
+    else if (j.fr) rec.a = { ...j.fr, t: j.dep };
+    else { const p = await townPt(j.from); if (p) rec.a = { n: j.from, lat: p.lat, lon: p.lon, t: j.dep }; }
   }
-  if (!rec.b) { const p = await townPt(c.to); if (p) rec.b = { n: c.to, lat: p.lat, lon: p.lon }; }
-  const pos = g.geo && g.geo.lat != null ? g.geo : await gpsPos();
+  if (!rec.b) { const p = await townPt(j.to); if (p) rec.b = { n: j.to, lat: p.lat, lon: p.lon }; }
+  const pos = j.pos;
   if (!pos) rec.miss = (rec.miss || 0) + 1;
   else {
     const last = rec.p[rec.p.length - 1] || rec.a;
-    if (!last || kmBetween(last, pos) > 0.05) rec.p.push({ n: [...new Set(g.items.map((s) => s.r.client || 'client'))].join(', '), lat: +(+pos.lat).toFixed(5), lon: +(+pos.lon).toFixed(5), t: nowMin() });
+    if (!last || kmBetween(last, pos) > 0.05) rec.p.push({ n: j.n, lat: +(+pos.lat).toFixed(5), lon: +(+pos.lon).toFixed(5), t: j.t });
   }
+  rec.js = [...(rec.js || []), j.id].slice(-40);
   await fuelCalc(rec);
   rec.at = new Date().toISOString();
   return rec;
@@ -3834,7 +3859,7 @@ async function stopDone(id, run) {
   // Fait bien avant le départ (ex. un client qui dépose sa manette le matin) : la tournée partira toujours du point de départ
   if (!ok || !g || nowMin() < st0.dep - 30) return ok;
   const left = tourStops(D, slot);
-  if (!left.length) { setLive(K, null); renderTournee(); const fr = fp ? await Promise.race([fp, new Promise((ok) => setTimeout(() => ok(null), 4000))]) : null; toast(`Tournée ${slotName(D, slot)} terminée 👏${fr ? ` · ⛽ ${kmTxt(fr.km)} · ${lTxt(fuelL(fr))}${num(fr.px) > 0 ? ' · ≈ ' + eur2(fuelEur(fr)) : ''}` : ''}`); return ok; }
+  if (!left.length) { setLive(K, null); renderTournee(); const fr = fp ? await Promise.race([fp, new Promise((ok) => setTimeout(() => ok(null), 6000))]) : null; toast(`Tournée ${slotName(D, slot)} terminée 👏${fr ? ` · ⛽ ${kmTxt(fr.km)} · ${lTxt(fuelL(fr))}${num(fr.px) > 0 ? ' · ≈ ' + eur2(fuelEur(fr)) : ''}` : ''}`); return ok; }
   if (left.groups.some((x) => x.k === g.k)) return ok; // un autre client au même endroit : tu y es encore
   const r0 = g.items[0].r, pos = g.geo ? { lat: g.geo.lat, lon: g.geo.lon } : (await gpsPos()) || liveOf(K) || fromOf(K) || (await townPt(dayCfg(D, slot).from));
   const label = r0.meet && g.geo && g.geo.name ? g.geo.name : r0.client ? `chez ${r0.client}` : 'ton dernier arrêt';
@@ -4885,7 +4910,7 @@ async function init() {
   if (!TOKEN) { S.status = 'setup'; render(); return; }
   const c = LS.get('cache', null);
   if (c && c.data) { applyData(normalize(c.data), c.sha); S.status = 'ok'; render(); }
-  try { await pull(); S.status = 'ok'; S.offline = false; onData(); } catch (e) {
+  try { await pull(); S.status = 'ok'; S.offline = false; onData(); if (fuelJobs().length) fuelKick(); } catch (e) {
     if (e.code === 'auth') return;
     if (DATA) { S.offline = true; syncLabel(); } else { S.status = 'error'; render(); }
   }
