@@ -548,6 +548,18 @@ tr.click{cursor:pointer}
 .day .dl b{white-space:nowrap;font-variant-numeric:tabular-nums}
 .recs{display:grid;gap:10px}
 .rec{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:13.5px}
+.fuel-rows{display:grid;font-size:13.5px}
+.fuel-rows>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:6px 0}
+.fuel-rows>div+div{border-top:1px solid var(--line)}
+.fuel-rows b{font-variant-numeric:tabular-nums;text-align:right}
+.fday{border-top:1px solid var(--line);padding:10px 0 6px;margin-top:10px}
+.fday-h{display:flex;justify-content:space-between;gap:10px;font-weight:800;font-size:14px}
+.fday-h span:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}
+.frec{display:grid;gap:3px;padding:8px 0 0;font-size:13px}
+.frec-l{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.frec-l>b{white-space:nowrap;font-variant-numeric:tabular-nums}
+.frec small{color:var(--muted);overflow-wrap:anywhere}
+.kf{background:var(--muted)}
 .rec>span{color:var(--ink-2);font-weight:600}
 .rec b{text-align:right;font-variant-numeric:tabular-nums}
 .rec small{display:block;font-weight:600;color:var(--muted);font-size:12px}
@@ -659,7 +671,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '3d6fae59fc2b';
+const APP_VERSION = '2cf3eb1a12ee';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2284,33 +2296,42 @@ function daysHtml() {
   const sales = S.items.filter((i) => isPaid(i) && paidOn(i).slice(0, 7) === m);
   const rows = dayRows(m, reps, sales); S.dayChart = rows;
   const act = rows.filter((r) => r.reps.length || r.sales.length).reverse();
+  // Essence des tournées : affichée à part, jamais retirée de ce qui est gagné
+  const FM = fuelMonth(m), FD = {}; FM.forEach((x) => { (FD[x.d] = FD[x.d] || []).push(x); });
+  const shown = rows.filter((r) => r.reps.length || r.sales.length || FD[r.d]).reverse();
+  const fT = fuelSum(FM), fuelSec = FM.length ? `<section class="card"><div class="card-h"><h2 class="sec">⛽ Essence des tournées</h2><button class="btn sm" data-act="fuel-open" data-m="${m}">Détail</button></div>
+      <div class="fuel-rows"><div><span>${cap1(monthName(m))} · ${plural(fT.n, 'trajet')}</span><b>${fuelSumTxt(fT)}</b></div></div>
+      <p class="hint" style="margin:6px 0 0">À part : pas retiré de ce que tu as gagné, ni de la caisse.</p></section>` : '';
   const totA = sum(rows, (r) => r.a), totB = sum(rows, (r) => r.b), tot = totA + totB;
-  const best = act.slice().sort((x, y) => (y.a + y.b) - (x.a + x.b))[0];
+  const best = act.slice().sort((x, y) => (y.a + y.b) - (x.a + x.b))[0] || null;
   const nav = `<div class="monthnav">
       <button class="iconbtn" data-act="day-month" data-d="-1" aria-label="Mois précédent">${ic('left')}</button>
       <div class="mn-c"><div class="eyebrow">Gagné jour par jour</div><h1 class="h1">${monthLabel(m)}</h1></div>
       <button class="iconbtn" data-act="day-month" data-d="1" aria-label="Mois suivant" ${m >= cur ? 'disabled' : ''}>${ic('right')}</button>
     </div>`;
-  if (!act.length) return nav + `<section class="card"><p style="margin:0">Rien d’encaissé en ${monthName(m)} pour l’instant.</p></section>`;
-  const tiles = [
+  if (!act.length && !FM.length) return nav + `<section class="card"><p style="margin:0">Rien d’encaissé en ${monthName(m)} pour l’instant.</p></section>`;
+  const tiles = act.length ? [
     ['Gagné ce mois-ci', eurS(tot), `Réparo ${eurS(totA)} · ventes ${eurS(totB)}`, '', sign(tot)],
     ['Jours avec une rentrée', String(act.length), `sur ${plural(rows.length, 'jour')}`, '', 'c-info'],
     ['Moyenne par jour', eurS(tot / act.length), 'les jours où tu as encaissé', '', sign(tot)],
     ['Meilleur jour', eurS(best.a + best.b), cap1(best.title), '', 'c-good'],
-  ];
+  ] : [];
   const line = (cls, label, v) => `<div><span><i class="${cls}"></i>${label}</span><b class="${v < -0.004 ? 'neg' : 'pos'}">${eurS(v)}</b></div>`;
   const dayHtml = (r) => {
-    const t = r.a + r.b, bits = [r.n ? plural(r.n, 'réparation') : r.reps.length ? 'garantie' : '', r.ns ? plural(r.ns, 'vente') : ''].filter(Boolean).join(' · ');
+    const F = FD[r.d] || [], fs = fuelSum(F);
+    const t = r.a + r.b, bits = [r.n ? plural(r.n, 'réparation') : r.reps.length ? 'garantie' : '', r.ns ? plural(r.ns, 'vente') : '', F.length ? `⛽ ${fs.unk === fs.n ? kmTxt(fs.km) : '≈ ' + eur2(fs.eur)}` : ''].filter(Boolean).join(' · ');
     return `<details class="day ${r === best ? 'best' : ''}"><summary><span class="dd">${cap1(r.title)}${r === best ? ' · meilleur jour' : ''}<small>${bits}</small></span><span class="dv ${t < -0.004 ? 'neg' : 'pos'}">${eurS(t)}</span></summary><div class="dl">
       ${r.reps.map((x) => line('k1', `${esc(x.type || 'Réparation')}${repQty(x) > 1 ? ` ×${repQty(x)}` : ''}${x.client ? ` · ${esc(x.client)}` : ''}${x.result === 'ko' ? ' · échec' : ''}${num(x.partsCost) ? ` · pièces ${eur(num(x.partsCost))}` : ''}`, repNet(x))).join('')}
       ${r.sales.map((i) => line('k2', `${esc(i.ref || '')} ${esc(i.model || '')} · vendu ${eur(num(i.sellPrice))}`, profit(i))).join('')}
+      ${F.map((x) => `<div><span><i class="kf"></i>⛽ ${esc(fuelName(x))} · ${kmTxt(x.km)} · ${lTxt(fuelL(x))} (pas retiré)</span><b class="muted">${num(x.px) > 0 ? eur2(fuelEur(x)) : '—'}</b></div>`).join('')}
     </div></details>`;
   };
   return nav + `
-    <div class="tiles t4">${tiles.map(tileHtml).join('')}</div>
-    <section class="card"><div class="card-h"><h2 class="sec">Gagné par jour</h2><div class="legend"><span><i class="k1"></i>Réparo</span><span><i class="k2"></i>Ventes</span></div></div><div class="chart-host sm" id="dchart"></div></section>
-    <section class="card"><div class="card-h"><h2 class="sec">Détail de chaque jour</h2><span class="muted" style="font-size:12.5px">touche un jour</span></div><div class="daylist">${act.map(dayHtml).join('')}</div>
-      <p class="foot">Gagné = bénéfice des ventes (prix − frais − prix d’achat), compté le jour où l’argent arrive, + Réparo (prix − pièces notées), compté le jour du paiement. Les dépenses que tu n’as pas notées (pièces, outils, essence) ne sont pas retirées.</p></section>`;
+    ${tiles.length ? `<div class="tiles t4">${tiles.map(tileHtml).join('')}</div>
+    <section class="card"><div class="card-h"><h2 class="sec">Gagné par jour</h2><div class="legend"><span><i class="k1"></i>Réparo</span><span><i class="k2"></i>Ventes</span></div></div><div class="chart-host sm" id="dchart"></div></section>` : `<section class="card"><p style="margin:0">Rien d’encaissé en ${monthName(m)} pour l’instant.</p></section>`}
+    ${fuelSec}
+    <section class="card"><div class="card-h"><h2 class="sec">Détail de chaque jour</h2><span class="muted" style="font-size:12.5px">touche un jour</span></div><div class="daylist">${shown.map(dayHtml).join('')}</div>
+      <p class="foot">Gagné = bénéfice des ventes (prix − frais − prix d’achat), compté le jour où l’argent arrive, + Réparo (prix − pièces notées), compté le jour du paiement. Les dépenses que tu n’as pas notées (pièces, outils) ne sont pas retirées. L’essence des tournées est montrée à part, sans être retirée.</p></section>`;
 }
 
 function reparoHtml() {
@@ -2573,7 +2594,7 @@ function serialize(d) {
   const arr = (a) => '[\n' + (a || []).map((x) => JSON.stringify(x)).join(',\n') + '\n]';
   const { format, settings, items, cash, repairs, ...extra } = d;
   return '{\n"format": 1,\n"settings": ' + JSON.stringify(settings) + ',\n"items": ' + arr(items) + ',\n"cash": ' + arr(cash) + ',\n"repairs": ' + arr(repairs)
-    + Object.entries(extra).map(([k, v]) => ',\n' + JSON.stringify(k) + ': ' + JSON.stringify(v)).join('') + '\n}\n';
+    + Object.entries(extra).map(([k, v]) => ',\n' + JSON.stringify(k) + ': ' + (Array.isArray(v) ? arr(v) : JSON.stringify(v))).join('') + '\n}\n';
 }
 function applyData(d, sha) {
   DATA = d; SHA = sha;
@@ -2942,7 +2963,7 @@ function openAd(id, focus) {
 function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el.textContent = `(${t.value.length} caractères)`; }
 
 /* ---------- Tournée : demandes clients, ordre de passage (semaine : boucle Crolles → Crolles ; week-end : Saint-Égrève → Crolles), messages prêts ---------- */
-const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', wdFrom: 'Crolles', wdTo: 'Crolles', wdStart: '18:00', wdEnd: '21:00', wd2: true, midStart: '12:00', midEnd: '14:00', apStart: '15:00', apEnd: '17:00', send: 'sms', ocrLeft: true, msgs: {}, stop: 7, autoLate: true, formUrl: '', ntfy: '',
+const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', wdFrom: 'Crolles', wdTo: 'Crolles', wdStart: '18:00', wdEnd: '21:00', wd2: true, midStart: '12:00', midEnd: '14:00', apStart: '15:00', apEnd: '17:00', send: 'sms', ocrLeft: true, msgs: {}, stop: 7, autoLate: true, formUrl: '', ntfy: '', fuelL100: 6, fuelPx: '',
   services: 'Joystick drift (manette PS5) : 25 € (50 € les deux, 20 € la manette à partir de la 3e)\nJoystick drift (manette Xbox) : 25 € (mêmes tarifs que PS5)\nJoysticks à effet Hall (plus jamais de drift) : 45 € la manette\nManette PS5 : 25 € (bouton, gâchette, port de charge, batterie : à partir de 20 €)\nPS5 nettoyage simple : 40 € (poussière, ventilateur)\nPS5 nettoyage liquide métal : 80 € (surchauffe, bruit, nettoyage complet)\nHDMI PS5 : 75 € (port HDMI remplacé)\nTéléphone (batterie, écran, vitre arrière) : sur devis\nDiagnostic : gratuit si tu répares, 15 € sinon', p1: 25, p2: 50, delai: '24-48 h', garantie: '30 jours' };
 const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
 // Temps sur place (donner / récupérer, encaisser) : la route est comptée à part. Sans trajet calculé, 10 min de route estimées entre deux arrêts.
@@ -3587,16 +3608,233 @@ async function optimizeRound1(auto, tried, quiet) {
   // Tournée commencée (ou départ dans moins de 30 min) : un client qui va attendre plus que l'heure annoncée est prévenu tout de suite
   if (D === today() && nowMin() >= st.dep - 30) setTimeout(() => lateCheck(D, slot, true), 400);
 }
+/* ---------- Essence des tournées : km, litres et € de chaque tournée. Affiché à part, jamais retiré de la caisse ni du bénéfice ---------- */
+// Une fiche par tournée dans les données (« fuel ») : le départ, chaque client dans l'ordre où tu as touché « Récupéré » ou « Rendu »,
+// puis le retour à la maison. Distance par la route (OSRM). Consommation des réglages, ajustée selon la route :
+// Scénic II 1.5 dCi d'après Renault, 6,2 L/100 en ville, 4,7 sur route, 5,2 en mixte → ville +19 %, route −10 %.
+// Les litres et les € se calculent à l'affichage : changer la consommation dans les réglages corrige aussi les tournées déjà faites.
+const FUEL_CITY = 6.2 / 5.2, FUEL_ROAD = 4.7 / 5.2;
+const fuelAll = () => (DATA && Array.isArray(DATA.fuel) ? DATA.fuel.filter((x) => x && typeof x === 'object' && isDate(x.d)) : []);
+const parseDec = (s) => { const t = String(s == null ? '' : s).replace(',', '.').replace(/[^\d.]/g, ''); if (!t) return null; const v = parseFloat(t); return isFinite(v) ? v : null; };
+const fuelL100 = () => { const v = num(tourCfg().fuelL100); return v >= 2 && v <= 25 ? v : TOUR_DEF.fuelL100; };
+const fuelPxSet = () => { const v = num(tourCfg().fuelPx); return v >= 0.5 && v <= 5 ? v : null; };
+const fuelL = (x) => (num(x.kmw) * fuelL100()) / 100;
+const fuelEur = (x) => (num(x.px) > 0 ? fuelL(x) * num(x.px) : null);
+const fuelBaseEur = (x) => (x.base && num(x.px) > 0 ? ((num(x.base.kmw) * fuelL100()) / 100) * num(x.px) : null);
+const legF = (l) => { const v = l.min > 0 ? l.km / (l.min / 60) : 40; return v <= 30 ? FUEL_CITY : v >= 70 ? FUEL_ROAD : FUEL_CITY + ((FUEL_ROAD - FUEL_CITY) * (v - 30)) / 40; };
+const r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100, r3 = (v) => Math.round(v * 1000) / 1000;
+const decTxt = (v, d) => num(v).toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const kmTxt = (v) => `${num(v).toLocaleString('fr-FR', { maximumFractionDigits: 1 })}${NB}km`;
+const lTxt = (v) => `${decTxt(v, 2)}${NB}L`;
+const eur2 = (v) => (v == null || !isFinite(v) ? '—' : `${decTxt(v, 2)}${NB}€`);
+const pxTxt = (v) => `${decTxt(v, 3)}${NB}€/L`;
+async function fetchJ(u, ms = 9000) {
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
+  try { return await fetch(u, { signal: ac.signal }).then((x) => x.json()); } finally { clearTimeout(t); }
+}
+// Distance et temps de chaque morceau du trajet, par la route ; sans réseau : ligne droite × 1,3 à 40 km/h (marqué « estimé »)
+async function routeLegs(pts) {
+  try {
+    const j = await fetchJ(`https://router.project-osrm.org/route/v1/driving/${pts.map((p) => `${(+p.lon).toFixed(5)},${(+p.lat).toFixed(5)}`).join(';')}?overview=false`);
+    const L = j && j.code === 'Ok' && j.routes && j.routes[0] && j.routes[0].legs;
+    if (L && L.length === pts.length - 1) return L.map((l) => ({ km: num(l.distance) / 1000, min: num(l.duration) / 60 }));
+  } catch (e) {}
+  const out = [];
+  for (let i = 1; i < pts.length; i++) { const km = kmBetween(pts[i - 1], pts[i]) * 1.3; out.push({ km, min: (km / 40) * 60 }); }
+  out.est = true; return out;
+}
+// Prix du gazole : le tien (réglages), sinon le prix médian du jour des stations à 20 km de chez toi
+// (site officiel prix-carburants, stations d'autoroute exclues). Gardé pour la journée.
+async function fuelPrice() {
+  const fix = fuelPxSet(); if (fix) return { px: fix, src: 'moi' };
+  const C = LS.get('fuelPx', null);
+  if (C && C.d === today() && C.px > 0) return { px: C.px, src: 'auto', n: C.n };
+  try {
+    const c = tourCfg(), h = (await townPt(c.wdTo || c.to || 'Crolles')) || { lat: 45.2846, lon: 5.8836 };
+    const w = `gazole_prix is not null and within_distance(geom, geom'POINT(${(+h.lon).toFixed(4)} ${(+h.lat).toFixed(4)})', 20km)`;
+    const j = await fetchJ(`https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?select=gazole_prix,gazole_maj,adresse,ville&where=${encodeURIComponent(w)}&limit=100`);
+    const old = Date.now() - 7 * 864e5, moto = /autoroute|\baire\b|\bA ?\d{2,3}\b/i;
+    let L = (j.results || []).filter((x) => num(x.gazole_prix) > 0.5 && num(x.gazole_prix) < 5 && !moto.test(`${x.adresse || ''} ${x.ville || ''}`));
+    const fresh = L.filter((x) => Date.parse(x.gazole_maj) >= old); if (fresh.length >= 3) L = fresh;
+    if (L.length) {
+      const v = L.map((x) => num(x.gazole_prix)).sort((a, b) => a - b), m = v.length >> 1, px = r3(v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2);
+      LS.set('fuelPx', { d: today(), px, n: L.length }); return { px, src: 'auto', n: L.length };
+    }
+  } catch (e) {}
+  return C && C.px > 0 ? { px: C.px, src: 'auto', n: C.n, old: C.d } : null;
+}
+// Km, km pondérés selon la route (ville / route), temps, trajet direct départ → maison, prix du jour
+async function fuelCalc(rec) {
+  if (!rec.man) {
+    const pts = [rec.a, ...(rec.p || []), rec.b].filter((x) => x && x.lat != null);
+    const legs = pts.length > 1 ? await routeLegs(pts) : [];
+    rec.km = r1(sum(legs, (l) => l.km)); rec.kmw = r2(sum(legs, (l) => l.km * legF(l))); rec.min = Math.round(sum(legs, (l) => l.min));
+    if (legs.est) rec.est = 1; else delete rec.est;
+  }
+  // Départ loin de la maison (Saint-Égrève après Amazon, « Je pars de… ») : le trajet direct pour rentrer, que tu fais de toute façon, est montré à part
+  if (!rec.base && rec.a && rec.b && kmBetween(rec.a, rec.b) > 1) {
+    const L = await routeLegs([rec.a, rec.b]);
+    if (!L.est) rec.base = { n: `${cap1(rec.a.n)} → ${rec.b.n}`, km: r1(sum(L, (l) => l.km)), kmw: r2(sum(L, (l) => l.km * legF(l))) };
+  }
+  if (!(num(rec.px) > 0)) { const P = await fuelPrice(); if (P) { rec.px = P.px; rec.pxs = P.src; } }
+}
+const fuelSort = (x, y) => (x.d || '').localeCompare(y.d || '') || slotIdx(x.s) - slotIdx(y.s) || (x.at || '').localeCompare(y.at || '');
+const fuelWrite = (fn, msg) => write(() => commit((d) => { const L = Array.isArray(d.fuel) ? d.fuel : []; fn(L); L.sort(fuelSort); d.fuel = L; }, msg));
+const fuelPut = (rec) => (L) => { const i = L.findIndex((x) => x && x.id === rec.id); if (i >= 0) L[i] = rec; else L.push(rec); };
+// La tournée d'aujourd'hui où passe ce client (quelle que soit la page où tu touches « Récupéré » ou « Rendu »).
+// Pris avant l'arrêt : le point de départ (« Je pars maintenant », lieu choisi) est lu avant d'être remplacé par cet arrêt.
+function fuelRound(id) {
+  const D = today();
+  for (const s of slotsOf(D)) {
+    const st = tourStops(D, s), g = st.groups.find((x) => x.items.some((y) => y.r.id === id));
+    if (g) { const K = roundKey(D, s); return { D, slot: s, K, g, dep: st.dep, c: dayCfg(D, s), lv: liveOf(K), fr: fromOf(K) }; }
+  }
+  return null;
+}
+let FUEL_Q = Promise.resolve();
+// Arrêt fait : il s'ajoute au trajet de sa tournée, puis km, litres et € sont recalculés et enregistrés (un arrêt à la fois)
+function fuelStop(z) {
+  let give; const out = new Promise((ok) => { give = ok; });
+  FUEL_Q = FUEL_Q.then(async () => {
+    let rec = null;
+    try { rec = await fuelStep(z); } catch (e) { console.error(e); }
+    give(rec);
+    if (rec) await fuelWrite(fuelPut(rec), `Essence · tournée ${slotName(rec.d, rec.s)} · ${decTxt(rec.km, 1)} km`);
+  }).catch(() => {});
+  return out;
+}
+async function fuelStep(z) {
+  const { D, slot, K, g, c } = z, old = fuelAll().find((x) => x.k === K);
+  const rec = old ? JSON.parse(JSON.stringify(old)) : { id: 'fuel-' + K, k: K, d: D, s: slot, w: c.weekend ? 1 : 0, p: [] };
+  if (!Array.isArray(rec.p)) rec.p = [];
+  if (!rec.a) {
+    // Départ : « Je pars maintenant » (ta position), sinon le lieu choisi pour cette tournée, sinon celui des réglages
+    const lv = z.lv && z.lv.lat != null ? z.lv : null;
+    if (lv) rec.a = { n: lv.label || 'ta position', lat: lv.lat, lon: lv.lon, t: lv.t };
+    else if (z.fr) rec.a = { n: z.fr.label, lat: z.fr.lat, lon: z.fr.lon, t: z.dep };
+    else { const p = await townPt(c.from); if (p) rec.a = { n: c.from, lat: p.lat, lon: p.lon, t: z.dep }; }
+  }
+  if (!rec.b) { const p = await townPt(c.to); if (p) rec.b = { n: c.to, lat: p.lat, lon: p.lon }; }
+  const pos = g.geo && g.geo.lat != null ? g.geo : await gpsPos();
+  if (!pos) rec.miss = (rec.miss || 0) + 1;
+  else {
+    const last = rec.p[rec.p.length - 1] || rec.a;
+    if (!last || kmBetween(last, pos) > 0.05) rec.p.push({ n: [...new Set(g.items.map((s) => s.r.client || 'client'))].join(', '), lat: +(+pos.lat).toFixed(5), lon: +(+pos.lon).toFixed(5), t: nowMin() });
+  }
+  await fuelCalc(rec);
+  rec.at = new Date().toISOString();
+  return rec;
+}
+// Totaux d'une liste de trajets (tournées et trajets ajoutés à la main)
+function fuelSum(L) {
+  const known = L.filter((x) => num(x.px) > 0), lk = sum(known, fuelL), base = known.filter((x) => x.base);
+  return { n: L.length, nR: L.filter((x) => x.k).length, km: sum(L, (x) => num(x.km)), l: sum(L, fuelL), eur: sum(known, fuelEur), unk: L.length - known.length, px: lk > 0 ? sum(known, fuelEur) / lk : null, baseEur: sum(base, fuelBaseEur), nBase: base.length, baseN: [...new Set(base.map((x) => x.base.n))] };
+}
+const fuelMonth = (ym) => fuelAll().filter((x) => x.d.slice(0, 7) === ym);
+const fuelSumTxt = (t) => `${kmTxt(t.km)} · ${lTxt(t.l)} · ${t.unk === t.n ? 'prix inconnu' : '≈ ' + eur2(t.eur)}`;
+const fuelName = (x) => (x.k ? `Tournée ${slotName(x.d, x.s)}` : x.n || 'Trajet ajouté');
+// Carte de la page Tournée : aujourd'hui et le mois
+function fuelCard() {
+  const td = fuelAll().filter((x) => x.d === today()), mo = fuelMonth(thisMonth());
+  return `<section class="card"><div class="card-h"><h2 class="sec">⛽ Essence</h2><button class="btn sm" data-act="fuel-open">Détail du mois</button></div>
+    <div class="fuel-rows"><div><span>Aujourd’hui</span><b>${td.length ? fuelSumTxt(fuelSum(td)) : 'rien pour l’instant'}</b></div><div><span>${cap1(monthName(thisMonth()))}</span><b>${mo.length ? fuelSumTxt(fuelSum(mo)) : '—'}</b></div></div>
+    <p class="hint" style="margin:6px 0 0">Compté tout seul à chaque « Récupéré » ou « Rendu ». À part : jamais retiré de la caisse ni du bénéfice.</p></section>`;
+}
+// Fenêtre « Essence des tournées » : récap du mois, détail de chaque jour, corriger ou ajouter un trajet
+function fuelBody() {
+  const cur = thisMonth(), ym = S.fuelMonth && S.fuelMonth <= cur ? S.fuelMonth : cur, L = fuelMonth(ym), t = fuelSum(L), c = tourCfg();
+  const nav = `<div class="monthnav" style="margin-bottom:12px"><button class="iconbtn" data-act="fuel-month" data-d="-1" aria-label="Mois précédent">${ic('left')}</button><div class="mn-c"><b>${monthLabel(ym)}</b></div><button class="iconbtn" data-act="fuel-month" data-d="1" aria-label="Mois suivant" ${ym >= cur ? 'disabled' : ''}>${ic('right')}</button></div>`;
+  const add = `<div class="btns"><button class="btn sm" data-act="fuel-add">${ic('plus')} Ajouter un trajet oublié</button></div>`;
+  const how = `<p class="foot">Calcul : distance par la route entre ton départ, chaque client dans l’ordre où tu touches « Récupéré » ou « Rendu », puis le retour à ${esc(c.wdTo || c.to)}. Consommation ${decTxt(fuelL100(), 1)} L/100 km (Réglages de la tournée), ajustée selon la route : +19 % en ville, −10 % sur route. Prix du gazole du jour de la tournée${fuelPxSet() ? '' : ' (stations à 20 km, hors autoroute)'}. Jamais retiré de la caisse ni du bénéfice.</p>`;
+  if (!L.length) return nav + `<p style="margin:0 0 10px">Aucun trajet compté en ${monthName(ym)}.</p>` + add + how;
+  const nM = t.n - t.nR, tiles = [
+    ['Essence dépensée', t.unk === t.n ? '—' : '≈ ' + eur2(t.eur), `${lTxt(t.l)} de gazole${t.unk && t.unk < t.n ? ` · ${plural(t.unk, 'trajet')} sans prix` : ''}`],
+    ['Distance', kmTxt(t.km), `${plural(t.nR, 'tournée')}${nM ? ` + ${plural(nM, 'trajet')} ajouté${nM > 1 ? 's' : ''}` : ''}`],
+    ['Prix moyen du litre', t.px ? pxTxt(t.px) : '—', 'prix du jour de chaque trajet'],
+    (() => { const R = fuelSum(L.filter((x) => x.k)), k = R.n - R.unk; return ['Par tournée', k ? '≈ ' + eur2(R.eur / k) : '—', R.n ? `${kmTxt(R.km / R.n)} en moyenne` : 'aucune tournée ce mois-ci']; })(),
+  ];
+  const byD = {}; L.forEach((x) => { (byD[x.d] = byD[x.d] || []).push(x); });
+  const rec = (x) => {
+    const path = x.k ? [x.a && cap1(x.a.n), ...(x.p || []).map((p) => p.n), x.b && x.b.n].filter(Boolean).join(' → ') : '';
+    const notes = [x.man && x.k ? 'km corrigés à la main' : '', x.est ? 'distance estimée (pas de réseau)' : '', x.miss ? `${plural(x.miss, 'arrêt')} sans lieu connu` : '',
+      x.base && num(x.px) > 0 ? `dont ${kmTxt(x.base.km)} ≈ ${eur2(fuelBaseEur(x))} pour rentrer directement (${x.base.n}), que tu fais de toute façon` : '',
+      num(x.px) > 0 ? `gazole ${pxTxt(x.px)}${x.pxs === 'moi' ? ' (ton prix)' : ''}` : 'prix du gazole inconnu'].filter(Boolean);
+    return `<div class="frec"><div class="frec-l"><span><b>${esc(fuelName(x))}</b> · ${kmTxt(x.km)} · ${lTxt(fuelL(x))}</span><b>${num(x.px) > 0 ? eur2(fuelEur(x)) : '—'}</b></div>${path ? `<small>${esc(path)}</small>` : ''}<small>${esc(notes.join(' · '))}</small><div><button class="chip" data-act="fuel-edit" data-id="${esc(x.id)}">✏️ Corriger</button></div></div>`;
+  };
+  return nav + `<div class="tiles t4">${tiles.map(tileHtml).join('')}</div>
+    ${t.nBase ? `<p class="hint">Dont ≈ ${eur2(t.baseEur)} pour rentrer directement de ton point de départ (${esc(t.baseN.slice(0, 3).join(', '))}${t.baseN.length > 3 ? '…' : ''}) : ce trajet, tu le fais de toute façon. Les clients t’ont coûté ≈ ${eur2(Math.max(0, t.eur - t.baseEur))} en plus.</p>` : ''}
+    ${Object.keys(byD).sort().reverse().map((d) => { const R = byD[d].slice().sort(fuelSort), s = fuelSum(R); return `<div class="fday"><div class="fday-h"><span>${cap1(dayName(d))}</span><span>${s.unk === s.n ? '—' : '≈ ' + eur2(s.eur)}</span></div>${R.map(rec).join('')}</div>`; }).join('')}
+    ${add}${how}`;
+}
+function openFuel() { openSheet({ kind: 'fuel', title: '⛽ Essence des tournées', body: fuelBody(), foot: '<button class="btn grow" data-act="close">Fermer</button>' }); }
+function refreshFuel() { if (!SHEET || SHEET.kind !== 'fuel') return; const b = $('#sheet-body'), top = b.scrollTop; b.innerHTML = fuelBody(); b.scrollTop = top; }
+function openFuelEdit(id) {
+  const x = fuelAll().find((y) => y.id === id); if (!x) return;
+  openSheet({ kind: 'fuel-edit', id, title: 'Corriger ce trajet', body: `
+    <p class="hint" style="margin-top:0">${esc(fuelName(x))} · ${esc(dayName(x.d))}${x.k && !x.man ? ` · calculé par la route : ${kmTxt(x.km)}` : ''}</p>
+    <div class="field"><label for="fu-km">Kilomètres</label><input id="fu-km" class="inp" inputmode="decimal" value="${esc(decTxt(x.km, 1))}"><small class="hint">Le compteur journalier de ta voiture (« trip ») donne les km exacts : remets-le à zéro en partant.</small>${errSlot('fu-km')}</div>
+    <div class="btns">${x.k && (x.man || x.est) ? `<button class="btn sm" data-act="fuel-recalc" data-id="${esc(x.id)}">Recalculer par la route</button>` : ''}<button class="btn sm danger" data-act="fuel-del" data-id="${esc(x.id)}">Supprimer ce trajet</button></div>`,
+    foot: `<button class="btn" data-act="fuel-back">Retour</button><button class="btn primary grow" data-act="fuel-km-save" data-id="${esc(x.id)}">Enregistrer</button>` });
+}
+function openFuelAdd() {
+  openSheet({ kind: 'fuel-add', title: 'Ajouter un trajet oublié', body: `
+    <p class="hint" style="margin-top:0">Une tournée faite sans toucher « Récupéré » ou « Rendu », ou un aller-retour pour un client. Compté à part, comme les tournées.</p>
+    <div class="row2"><div class="field"><label for="fa-d">Jour</label><input id="fa-d" class="inp" type="date" max="${today()}" value="${today()}"></div><div class="field"><label for="fa-km">Kilomètres</label><input id="fa-km" class="inp" inputmode="decimal" placeholder="ex. 12">${errSlot('fa-km')}</div></div>
+    ${textF('fa-n', 'Pour quoi ? (facultatif)', '', 'ex. chercher une PS5 à Voiron')}`,
+    foot: `<button class="btn" data-act="fuel-back">Retour</button><button class="btn primary grow" data-act="fuel-add-save">Ajouter</button>` });
+}
+const FUEL_ACT = {
+  'fuel-open': (a) => { S.fuelMonth = a.dataset.m || thisMonth(); openFuel(); },
+  'fuel-month': (a) => { const n = addMonths(S.fuelMonth || thisMonth(), +a.dataset.d); if (n <= thisMonth()) { S.fuelMonth = n; refreshFuel(); } },
+  'fuel-back': () => openFuel(),
+  'fuel-edit': (a) => openFuelEdit(a.dataset.id),
+  'fuel-add': () => openFuelAdd(),
+  'fuel-km-save': async (a) => {
+    const id = a.dataset.id, km = parseDec(val('fu-km'));
+    if (km == null || km < 0 || km > 2000) { fieldErr('fu-km', 'Écris le nombre de km, ex. 18,5'); return; }
+    a.disabled = true;
+    const ok = await fuelWrite((L) => { const x = L.find((y) => y && y.id === id); if (x) { const f = num(x.km) > 0 && num(x.kmw) > 0 ? num(x.kmw) / num(x.km) : 1; x.km = r1(km); x.kmw = r2(km * f); x.man = 1; } }, `Essence · trajet corrigé à ${decTxt(km, 1)} km`);
+    a.disabled = false;
+    if (ok) { const x = fuelAll().find((y) => y.id === id); openFuel(); if (x) toast(`Trajet corrigé : ${kmTxt(x.km)} · ${lTxt(fuelL(x))}${num(x.px) > 0 ? ' · ≈ ' + eur2(fuelEur(x)) : ''}`); }
+  },
+  'fuel-recalc': async (a) => {
+    const x0 = fuelAll().find((y) => y.id === a.dataset.id); if (!x0) return;
+    a.disabled = true; a.textContent = 'Calcul…';
+    const rec = JSON.parse(JSON.stringify(x0)); delete rec.man; await fuelCalc(rec);
+    const ok = await fuelWrite((L) => { const x = L.find((y) => y && y.id === rec.id); if (x) { delete x.man; ['km', 'kmw', 'min', 'est', 'base', 'px', 'pxs'].forEach((k) => { if (rec[k] === undefined) delete x[k]; else x[k] = rec[k]; }); } }, `Essence · trajet recalculé par la route · ${decTxt(rec.km, 1)} km`);
+    if (ok) { openFuel(); toast(`Recalculé par la route : ${kmTxt(rec.km)}${rec.est ? ' (toujours estimé : pas de réseau)' : ''}`); } else { a.disabled = false; a.textContent = 'Recalculer par la route'; }
+  },
+  'fuel-del': async (a) => {
+    if (a.dataset.sure !== '1') { a.dataset.sure = '1'; a.classList.add('solid'); a.textContent = 'Confirmer la suppression'; return; }
+    const id = a.dataset.id; a.disabled = true;
+    const ok = await fuelWrite((L) => { const i = L.findIndex((y) => y && y.id === id); if (i >= 0) L.splice(i, 1); }, 'Essence · trajet supprimé');
+    if (ok) { openFuel(); toast('Trajet supprimé'); } else a.disabled = false;
+  },
+  'fuel-add-save': async (a) => {
+    const d = val('fa-d'), km = parseDec(val('fa-km'));
+    if (km == null || km <= 0 || km > 2000) { fieldErr('fa-km', 'Écris le nombre de km, ex. 12'); return; }
+    if (!isDate(d) || d > today()) { toast('Choisis un jour passé ou aujourd’hui', 'bad'); return; }
+    a.disabled = true;
+    const P = await fuelPrice(), rec = { id: 'fuel-m' + newId(), k: null, d, s: null, n: val('fa-n').trim() || 'Trajet ajouté', km: r1(km), kmw: r2(km), man: 1, at: new Date().toISOString() };
+    if (P) { rec.px = P.px; rec.pxs = P.src; }
+    const ok = await fuelWrite(fuelPut(rec), `Essence · trajet ajouté le ${dShort(d)} · ${decTxt(rec.km, 1)} km`);
+    a.disabled = false;
+    if (ok) { S.fuelMonth = d.slice(0, 7); openFuel(); toast(`Trajet ajouté : ${kmTxt(rec.km)}${P ? ' · ≈ ' + eur2(fuelEur(rec)) : ''}`); }
+  },
+};
 // Arrêt fait (« Récupéré », « Rendu ») depuis la tournée d'aujourd'hui : tu repars de là, maintenant.
 // Le meilleur trajet vers les clients restants se recalcule depuis ce point (pas depuis Crolles).
 async function stopDone(id, run) {
   const D = tourDay(), slot = tourSlot(D), K = roundKey(D, slot);
   const st0 = S.view === 'tournee' && D === today() ? tourStops(D, slot) : null, g = st0 && st0.groups.find((x) => x.items.some((s) => s.r.id === id));
+  const fz = fuelRound(id);
   const ok = await run();
+  // Essence : l'arrêt compte dans le trajet de sa tournée (pas s'il est fait bien avant le départ, ex. manette déposée le matin)
+  const fp = ok && fz && nowMin() >= fz.dep - 30 ? fuelStop(fz) : null;
   // Fait bien avant le départ (ex. un client qui dépose sa manette le matin) : la tournée partira toujours du point de départ
   if (!ok || !g || nowMin() < st0.dep - 30) return ok;
   const left = tourStops(D, slot);
-  if (!left.length) { setLive(K, null); renderTournee(); toast(`Tournée ${slotName(D, slot)} terminée 👏`); return ok; }
+  if (!left.length) { setLive(K, null); renderTournee(); const fr = fp ? await Promise.race([fp, new Promise((ok) => setTimeout(() => ok(null), 4000))]) : null; toast(`Tournée ${slotName(D, slot)} terminée 👏${fr ? ` · ⛽ ${kmTxt(fr.km)} · ${lTxt(fuelL(fr))}${num(fr.px) > 0 ? ' · ≈ ' + eur2(fuelEur(fr)) : ''}` : ''}`); return ok; }
   if (left.groups.some((x) => x.k === g.k)) return ok; // un autre client au même endroit : tu y es encore
   const r0 = g.items[0].r, pos = g.geo ? { lat: g.geo.lat, lon: g.geo.lon } : (await gpsPos()) || liveOf(K) || fromOf(K) || (await townPt(dayCfg(D, slot).from));
   const label = r0.meet && g.geo && g.geo.name ? g.geo.name : r0.client ? `chez ${r0.client}` : 'ton dernier arrêt';
@@ -3830,6 +4068,7 @@ function renderTournee() {
       : (() => { const other = slotsOf(D).filter((x) => x !== slot && tourStops(D, x).length); return `<p style="margin:0">Aucun arrêt ${momentTxt(D, slot)}.${other.length ? '' : ' Ajoute une demande dès qu’un client t’écrit : elle va dans la tournée que tu choisis, à la bonne place sur ton trajet.'}</p>${other.length ? `<div class="btns">${other.map((x) => `<button class="btn sm primary" data-act="tour-slot" data-v="${x}">Voir la tournée ${SLOT_NAMES[x] === 'Soir' ? 'du soir' : SLOT_NAMES[x] === 'Midi' ? 'de midi' : 'de l’après-midi'} (${tourStops(D, x).slice(-1)[0].n})</button>`).join('')}</div>` : ''}`; })()}
     </section>
     ${stops.map(card).join('')}
+    ${fuelCard()}
     <section class="card"><div class="card-h"><h2 class="sec">Atelier</h2><span class="muted" style="font-size:12.5px">${sum(atelier, repQty)} à réparer</span></div>
       ${atelier.length ? atelier.map((r) => `<div class="cl rp"><span class="d">${dShort(r.gotDate || r.date)}</span><span class="t">${esc(r.client || 'Client')} · ${esc(r.type)} ×${repQty(r)}<small>${esc(r.city || '')}</small></span><span class="a"><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></span></div>`).join('')
         + (atelier.length > 1 ? `<div class="btns" style="margin-top:8px"><button class="btn sm" data-act="rep-ready-all">Tout est réparé</button></div>` : '') : '<p class="muted" style="margin:0">Rien à réparer pour l’instant.</p>'}
@@ -4003,6 +4242,10 @@ function openTourCfg() {
       <div class="row2">${textF('t-from', 'Départ', c.from)}${textF('t-to', 'Arrivée (domicile)', c.to)}</div>
       <div class="row2"><div class="field"><label for="t-start">Heure de départ</label><input id="t-start" class="inp" type="time" value="${esc(c.start)}"></div><div class="field"><label for="t-end">Fin de tournée</label><input id="t-end" class="inp" type="time" value="${esc(c.end || '21:00')}"></div></div>
     </div>
+    <div class="fs"><p class="fs-t">⛽ Essence (à part : jamais retirée de la caisse ni du bénéfice)</p>
+      <div class="row2"><div class="field"><label for="t-fuel-l">Consommation (L/100 km)</label><input id="t-fuel-l" class="inp" inputmode="decimal" value="${esc(decTxt(fuelL100(), 1))}">${errSlot('t-fuel-l')}<small class="hint">Ta moyenne, lue sur l’ordinateur de bord. Ajustée selon la route : +19 % en ville, −10 % sur route. La changer corrige aussi les tournées déjà comptées.</small></div>
+      <div class="field"><label for="t-fuel-px">Prix du gazole (€/L)</label><input id="t-fuel-px" class="inp" inputmode="decimal" placeholder="auto" value="${fuelPxSet() ? esc(decTxt(fuelPxSet(), 3)) : ''}">${errSlot('t-fuel-px')}<small class="hint">Vide : prix du jour des stations à 20 km de chez toi (site officiel prix-carburants). Sinon ton prix, pour les prochaines tournées.</small></div></div>
+    </div>
     <div class="row2"><div class="field"><label for="t-stop">Minutes sur place par arrêt</label><input id="t-stop" class="inp" inputmode="numeric" value="${esc(String(c.stop))}"><small class="hint">Le temps de donner ou récupérer et d’encaisser. La route est comptée à part.</small></div>${textF('t-delai', 'Délai annoncé', c.delai)}</div>
     <div class="row2">${moneyF('t-p1', 'Drift : 1 manette', c.p1)}${moneyF('t-p2', 'Drift : 2 manettes', c.p2)}</div>
     ${textF('t-gar', 'Garantie', c.garantie)}
@@ -4136,6 +4379,10 @@ const TOUR_ACT = {
       wd2: !!($('#t-wd2') || {}).checked, midStart: val('t-mid-start') || TOUR_DEF.midStart, midEnd: val('t-mid-end') || TOUR_DEF.midEnd, apStart: val('t-ap-start') || TOUR_DEF.apStart, apEnd: val('t-ap-end') || TOUR_DEF.apEnd,
       send: radioVal('t-send') || 'sms', ocrLeft: !!($('#t-ocrleft') || {}).checked, msgs: (() => { const ta = $('#t-msg'); if (ta) MSG_DRAFT[ta.dataset.k] = ta.value; const o = {}; Object.keys(MSG_DEF).forEach((k) => { const v = (MSG_DRAFT[k] || '').trim(); if (v && v !== MSG_DEF[k]) o[k] = v; }); return o; })(),
       p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie, services: $('#t-serv').value.trim() || TOUR_DEF.services };
+    const fl = parseDec(val('t-fuel-l')), fpx = parseDec(val('t-fuel-px'));
+    if (fl == null || fl < 2 || fl > 25) { fieldErr('t-fuel-l', 'Entre 2 et 25 L/100 km, ex. 6,2'); return; }
+    if (fpx != null && (fpx < 0.5 || fpx > 5)) { fieldErr('t-fuel-px', 'Un prix au litre, ex. 2,089 (ou vide pour le prix du jour)'); return; }
+    t.fuelL100 = Math.round(fl * 10) / 10; t.fuelPx = fpx == null ? '' : r3(fpx);
     // Horaires cohérents : chaque tournée finit après son départ, et midi → après-midi → soir ne se chevauchent pas
     const bad = [['Semaine, soir', t.wdStart, t.wdEnd], ['Week-end', t.start, t.end], ...(t.wd2 ? [['Midi', t.midStart, t.midEnd], ['Après-midi', t.apStart, t.apEnd]] : [])].find(([, x, y]) => toMin(y) <= toMin(x));
     if (bad) { toast(`${bad[0]} : l’heure de fin doit être après l’heure de départ`, 'bad'); return; }
@@ -4536,7 +4783,7 @@ const ACT = {
     openForm('new', null, { category: a.dataset.cat || 'autre', model: g ? g.name : model, buyPrice: parseNum(val('s-price')), buyCosts: parseNum(val('s-costs')) });
   },
 };
-Object.assign(ACT, TOUR_ACT);
+Object.assign(ACT, TOUR_ACT, FUEL_ACT);
 
 function bind() {
   document.addEventListener('click', (e) => {
@@ -4625,6 +4872,7 @@ function bind() {
 function onData() {
   render();
   if (SHEET && SHEET.kind === 'detail') refreshDetail();
+  if (SHEET && SHEET.kind === 'fuel') refreshFuel();
 }
 
 async function init() {
