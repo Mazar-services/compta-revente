@@ -671,7 +671,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'f446e07ab518';
+const APP_VERSION = 'e29b5c99cfa2';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -3668,7 +3668,8 @@ async function fuelCalc(rec) {
   if (!rec.man) {
     const pts = [rec.a, ...(rec.p || []), rec.b].filter((x) => x && x.lat != null);
     const legs = pts.length > 1 ? await routeLegs(pts) : [];
-    rec.km = r1(sum(legs, (l) => l.km)); rec.kmw = r2(sum(legs, (l) => l.km * legF(l))); rec.min = Math.round(sum(legs, (l) => l.min));
+    // Tournée estimée après coup : les clients sans adresse comptent pour la moyenne de tes clients (xkm), en plus des lieux connus
+    rec.km = r1(sum(legs, (l) => l.km) + num(rec.xkm)); rec.kmw = r2(sum(legs, (l) => l.km * legF(l)) + num(rec.xkmw)); rec.min = Math.round(sum(legs, (l) => l.min));
     if (legs.est) rec.est = 1; else delete rec.est;
   }
   // Départ loin de la maison (Saint-Égrève après Amazon, « Je pars de… ») : le trajet direct pour rentrer, que tu fais de toute façon, est montré à part
@@ -3769,7 +3770,7 @@ function fuelSum(L) {
 }
 const fuelMonth = (ym) => fuelAll().filter((x) => x.d.slice(0, 7) === ym);
 const fuelSumTxt = (t) => `${kmTxt(t.km)} · ${lTxt(t.l)} · ${t.unk === t.n ? 'prix inconnu' : '≈ ' + eur2(t.eur)}`;
-const fuelName = (x) => (x.k ? `Tournée ${slotName(x.d, x.s)}` : x.n || 'Trajet ajouté');
+const fuelName = (x) => (x.k ? `Tournée ${slotName(x.d, x.s)}${x.old && !x.man ? ' (estimée)' : ''}` : x.n || 'Trajet ajouté');
 // Carte de la page Tournée : aujourd'hui et le mois
 function fuelCard() {
   const td = fuelAll().filter((x) => x.d === today()), mo = fuelMonth(thisMonth());
@@ -3793,12 +3794,14 @@ function fuelBody() {
   const byD = {}; L.forEach((x) => { (byD[x.d] = byD[x.d] || []).push(x); });
   const rec = (x) => {
     const path = x.k ? [x.a && cap1(x.a.n), ...(x.p || []).map((p) => p.n), x.b && x.b.n].filter(Boolean).join(' → ') : '';
-    const notes = [x.man && x.k ? 'km corrigés à la main' : '', x.est ? 'distance estimée (pas de réseau)' : '', x.miss ? `${plural(x.miss, 'arrêt')} sans lieu connu` : '',
+    const notes = [x.old && !x.man ? 'estimée après coup d’après tes réparations' : '', x.man && x.k ? 'km corrigés à la main' : '', x.est ? 'distance estimée (pas de réseau)' : '', x.miss ? `${plural(x.miss, 'arrêt')} sans lieu connu` : '',
+      x.old && num(x.xs) > 0 && !x.man ? `${plural(num(x.xs), 'client')} sans adresse compté${num(x.xs) > 1 ? 's' : ''} ≈ ${kmTxt(r1(num(x.xkm) / num(x.xs)))} chacun` : '',
       x.base && num(x.px) > 0 ? `dont ${kmTxt(x.base.km)} ≈ ${eur2(fuelBaseEur(x))} pour rentrer directement (${x.base.n}), que tu fais de toute façon` : '',
       num(x.px) > 0 ? `gazole ${pxTxt(x.px)}${x.pxs === 'moi' ? ' (ton prix)' : ''}` : 'prix du gazole inconnu'].filter(Boolean);
     return `<div class="frec"><div class="frec-l"><span><b>${esc(fuelName(x))}</b> · ${kmTxt(x.km)} · ${lTxt(fuelL(x))}</span><b>${num(x.px) > 0 ? eur2(fuelEur(x)) : '—'}</b></div>${path ? `<small>${esc(path)}</small>` : ''}<small>${esc(notes.join(' · '))}</small><div><button class="chip" data-act="fuel-edit" data-id="${esc(x.id)}">✏️ Corriger</button></div></div>`;
   };
   return nav + `<div class="tiles t4">${tiles.map(tileHtml).join('')}</div>
+    ${L.some((x) => x.old) ? `<p class="hint">Les tournées marquées « estimée » ont été calculées après coup, d’après tes réparations : les adresses connues par la route, dans l’ordre le plus rapide ; un client sans adresse compte comme un de tes clients habituels ; départ de Saint-Égrève jusqu’au 15 novembre et le week-end. Si tu connais les vrais km, corrige-les.</p>` : ''}
     ${t.nBase ? `<p class="hint">Dont ≈ ${eur2(t.baseEur)} pour rentrer directement de ton point de départ (${esc(t.baseN.slice(0, 3).join(', '))}${t.baseN.length > 3 ? '…' : ''}) : ce trajet, tu le fais de toute façon. Les clients t’ont coûté ≈ ${eur2(Math.max(0, t.eur - t.baseEur))} en plus.</p>` : ''}
     ${Object.keys(byD).sort().reverse().map((d) => { const R = byD[d].slice().sort(fuelSort), s = fuelSum(R); return `<div class="fday"><div class="fday-h"><span>${cap1(dayName(d))}</span><span>${s.unk === s.n ? '—' : '≈ ' + eur2(s.eur)}</span></div>${R.map(rec).join('')}</div>`; }).join('')}
     ${add}${how}`;
