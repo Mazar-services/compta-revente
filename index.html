@@ -671,7 +671,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '13067ac2b3cc';
+const APP_VERSION = 'c8cd3d082dcd';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -3618,7 +3618,8 @@ const fuelAll = () => (DATA && Array.isArray(DATA.fuel) ? DATA.fuel.filter((x) =
 const parseDec = (s) => { const t = String(s == null ? '' : s).replace(',', '.').replace(/[^\d.]/g, ''); if (!t) return null; const v = parseFloat(t); return isFinite(v) ? v : null; };
 const fuelL100 = () => { const v = num(tourCfg().fuelL100); return v >= 2 && v <= 25 ? v : TOUR_DEF.fuelL100; };
 const fuelPxSet = () => { const v = num(tourCfg().fuelPx); return v >= 0.5 && v <= 5 ? v : null; };
-const fuelL = (x) => (num(x.kmw) * fuelL100()) / 100;
+// Litres : ceux de l'ordinateur de bord quand tu les as tapés (« 🏁 Fini »), sinon calculés avec ta consommation
+const fuelL = (x) => (num(x.l) > 0 ? num(x.l) : (num(x.kmw) * fuelL100()) / 100);
 const fuelEur = (x) => (num(x.px) > 0 ? fuelL(x) * num(x.px) : null);
 const fuelBaseEur = (x) => (x.base && num(x.px) > 0 ? ((num(x.base.kmw) * fuelL100()) / 100) * num(x.px) : null);
 const legF = (l) => { const v = l.min > 0 ? l.km / (l.min / 60) : 40; return v <= 30 ? FUEL_CITY : v >= 70 ? FUEL_ROAD : FUEL_CITY + ((FUEL_ROAD - FUEL_CITY) * (v - 30)) / 40; };
@@ -3732,7 +3733,7 @@ function fuelKick() {
       let rec = null, ok = false;
       try { rec = await fuelStep(j); } catch (e) { console.error(e); }
       // (déjà compté entre-temps, par exemple depuis un autre onglet : on ne réécrit pas la fiche)
-      if (rec) ok = await fuelWrite((L) => { const cur = L.find((x) => x && x.id === rec.id); if (!(cur && (cur.js || []).includes(j.id))) fuelPut(rec)(L); }, `Essence · tournée ${slotName(rec.d, rec.s)} · ${decTxt(rec.km, 1)} km`);
+      if (rec) ok = await fuelWrite((L) => { const cur = L.find((x) => x && x.id === rec.id); if (cur && (cur.js || []).includes(j.id)) return; if (cur && cur.car) { ['km', 'kmw', 'l', 'car', 'man'].forEach((k) => { rec[k] = cur[k]; }); } fuelPut(rec)(L); }, `Essence · tournée ${slotName(rec.d, rec.s)} · ${decTxt(rec.km, 1)} km`);
       if (ok || !rec) { FUEL_DONE.add(j.id); fuelJobsSave(fuelJobs().filter((x) => x.id !== j.id)); delete FUEL_GPS[j.id]; }
       if (FUEL_WAIT[j.id]) { FUEL_WAIT[j.id](ok ? rec : null); delete FUEL_WAIT[j.id]; }
       if (rec && !ok) break;
@@ -3776,14 +3777,15 @@ function fuelCard() {
   const td = fuelAll().filter((x) => x.d === today()), mo = fuelMonth(thisMonth());
   return `<section class="card"><div class="card-h"><h2 class="sec">⛽ Essence</h2><button class="btn sm" data-act="fuel-open">Détail du mois</button></div>
     <div class="fuel-rows"><div><span>Aujourd’hui</span><b>${td.length ? fuelSumTxt(fuelSum(td)) : 'rien pour l’instant'}</b></div><div><span>${cap1(monthName(thisMonth()))}</span><b>${mo.length ? fuelSumTxt(fuelSum(mo)) : '—'}</b></div></div>
-    <p class="hint" style="margin:6px 0 0">Compté tout seul à chaque « Récupéré » ou « Rendu ». À part : jamais retiré de la caisse ni du bénéfice.</p></section>`;
+    <div class="btns" style="margin-top:8px"><button class="btn sm" data-act="fuel-car">🏁 Fini : km et litres de la voiture</button></div>
+    <p class="hint" style="margin:6px 0 0">En partant, remets l’ordinateur de bord à zéro (reste appuyé 2 secondes sur le bouton de la manette des essuie-glaces). À la fin, touche « 🏁 Fini » et tape ses km et litres : tout est compté, détours compris. Sinon, c’est calculé à chaque « Récupéré » ou « Rendu ». Jamais retiré de la caisse ni du bénéfice.</p></section>`;
 }
 // Fenêtre « Essence des tournées » : récap du mois, détail de chaque jour, corriger ou ajouter un trajet
 function fuelBody() {
   const cur = thisMonth(), ym = S.fuelMonth && S.fuelMonth <= cur ? S.fuelMonth : cur, L = fuelMonth(ym), t = fuelSum(L), c = tourCfg();
   const nav = `<div class="monthnav" style="margin-bottom:12px"><button class="iconbtn" data-act="fuel-month" data-d="-1" aria-label="Mois précédent">${ic('left')}</button><div class="mn-c"><b>${monthLabel(ym)}</b></div><button class="iconbtn" data-act="fuel-month" data-d="1" aria-label="Mois suivant" ${ym >= cur ? 'disabled' : ''}>${ic('right')}</button></div>`;
   const add = `<div class="btns"><button class="btn sm" data-act="fuel-add">${ic('plus')} Ajouter un trajet oublié</button></div>`;
-  const how = `<p class="foot">Calcul : distance par la route entre ton départ, chaque client dans l’ordre où tu touches « Récupéré » ou « Rendu », puis le retour à ${esc(c.wdTo || c.to)}. Consommation ${decTxt(fuelL100(), 1)} L/100 km (Réglages de la tournée), ajustée selon la route : +19 % en ville, −10 % sur route. Prix du gazole du jour de la tournée${fuelPxSet() ? '' : ' (stations à 20 km, hors autoroute)'}. Jamais retiré de la caisse ni du bénéfice.</p>`;
+  const how = `<p class="foot">Calcul : distance par la route entre ton départ, chaque client dans l’ordre où tu touches « Récupéré » ou « Rendu », puis le retour à ${esc(c.wdTo || c.to)}. Consommation ${decTxt(fuelL100(), 1)} L/100 km (Réglages de la tournée), ajustée selon la route : +19 % en ville, −10 % sur route. Prix du gazole du jour de la tournée${fuelPxSet() ? '' : ' (stations à 20 km, hors autoroute)'}. Avec « 🏁 Fini », ce sont les km et les litres de l’ordinateur de bord qui comptent, détours compris. Jamais retiré de la caisse ni du bénéfice.</p>`;
   if (!L.length) return nav + `<p style="margin:0 0 10px">Aucun trajet compté en ${monthName(ym)}.</p>` + add + how;
   const nM = t.n - t.nR, tiles = [
     ['Essence dépensée', t.unk === t.n ? '—' : '≈ ' + eur2(t.eur), `${lTxt(t.l)} de gazole${t.unk && t.unk < t.n ? ` · ${plural(t.unk, 'trajet')} sans prix` : ''}`],
@@ -3794,13 +3796,14 @@ function fuelBody() {
   const byD = {}; L.forEach((x) => { (byD[x.d] = byD[x.d] || []).push(x); });
   const rec = (x) => {
     const path = x.k ? [x.a && cap1(x.a.n), ...(x.p || []).map((p) => p.n), x.b && x.b.n].filter(Boolean).join(' → ') : '';
-    const notes = [x.old && !x.man ? 'estimée après coup d’après tes réparations' : '', x.man && x.k ? 'km corrigés à la main' : '', x.est ? 'distance estimée (pas de réseau)' : '', x.miss ? `${plural(x.miss, 'arrêt')} sans lieu connu` : '',
+    const notes = [x.old && !x.man ? 'estimée après coup d’après tes réparations' : '', x.car ? `ordinateur de bord : ${kmTxt(x.km)}${num(x.l) > 0 ? `, ${lTxt(x.l)}${num(x.km) > 0 ? ` (${decTxt((num(x.l) / num(x.km)) * 100, 1)} L/100)` : ''}` : ''}` : x.man && x.k ? 'km corrigés à la main' : '', x.est ? 'distance estimée (pas de réseau)' : '', x.miss ? `${plural(x.miss, 'arrêt')} sans lieu connu` : '',
       x.old && num(x.xs) > 0 && !x.man ? `${plural(num(x.xs), 'client')} sans adresse compté${num(x.xs) > 1 ? 's' : ''} ≈ ${kmTxt(r1(num(x.xkm) / num(x.xs)))} chacun` : '',
       x.base && num(x.px) > 0 ? `dont ${kmTxt(x.base.km)} ≈ ${eur2(fuelBaseEur(x))} pour rentrer directement (${x.base.n}), que tu fais de toute façon` : '',
       num(x.px) > 0 ? `gazole ${pxTxt(x.px)}${x.pxs === 'moi' ? ' (ton prix)' : ''}` : 'prix du gazole inconnu'].filter(Boolean);
     return `<div class="frec"><div class="frec-l"><span><b>${esc(fuelName(x))}</b> · ${kmTxt(x.km)} · ${lTxt(fuelL(x))}</span><b>${num(x.px) > 0 ? eur2(fuelEur(x)) : '—'}</b></div>${path ? `<small>${esc(path)}</small>` : ''}<small>${esc(notes.join(' · '))}</small><div><button class="chip" data-act="fuel-edit" data-id="${esc(x.id)}">✏️ Corriger</button></div></div>`;
   };
   return nav + `<div class="tiles t4">${tiles.map(tileHtml).join('')}</div>
+    ${(() => { const C = L.filter((x) => x.car && num(x.km) > 0 && num(x.l) > 0), km = sum(C, (x) => num(x.km)); return C.length ? `<p class="hint">Consommation mesurée par ta voiture : ${decTxt((sum(C, (x) => num(x.l)) / km) * 100, 1)} L/100 km sur ${plural(C.length, 'tournée')} (réglage : ${decTxt(fuelL100(), 1)} L/100, utilisé quand tu ne tapes pas les litres).</p>` : ''; })()}
     ${L.some((x) => x.old) ? `<p class="hint">Les tournées marquées « estimée » ont été calculées après coup, d’après tes réparations : les adresses connues par la route, dans l’ordre le plus rapide ; un client sans adresse compte comme un de tes clients habituels ; départ de Saint-Égrève jusqu’au 15 novembre et le week-end. Si tu connais les vrais km, corrige-les.</p>` : ''}
     ${t.nBase ? `<p class="hint">Dont ≈ ${eur2(t.baseEur)} pour rentrer directement de ton point de départ (${esc(t.baseN.slice(0, 3).join(', '))}${t.baseN.length > 3 ? '…' : ''}) : ce trajet, tu le fais de toute façon. Les clients t’ont coûté ≈ ${eur2(Math.max(0, t.eur - t.baseEur))} en plus.</p>` : ''}
     ${Object.keys(byD).sort().reverse().map((d) => { const R = byD[d].slice().sort(fuelSort), s = fuelSum(R); return `<div class="fday"><div class="fday-h"><span>${cap1(dayName(d))}</span><span>${s.unk === s.n ? '—' : '≈ ' + eur2(s.eur)}</span></div>${R.map(rec).join('')}</div>`; }).join('')}
@@ -3813,8 +3816,21 @@ function openFuelEdit(id) {
   openSheet({ kind: 'fuel-edit', id, title: 'Corriger ce trajet', body: `
     <p class="hint" style="margin-top:0">${esc(fuelName(x))} · ${esc(dayName(x.d))}${x.k && !x.man ? ` · calculé par la route : ${kmTxt(x.km)}` : ''}</p>
     <div class="field"><label for="fu-km">Kilomètres</label><input id="fu-km" class="inp" inputmode="decimal" value="${esc(decTxt(x.km, 1))}"><small class="hint">Le compteur journalier de ta voiture (« trip ») donne les km exacts : remets-le à zéro en partant.</small>${errSlot('fu-km')}</div>
+    <div class="field"><label for="fu-l">Litres consommés (facultatif)</label><input id="fu-l" class="inp" inputmode="decimal" value="${num(x.l) > 0 ? esc(decTxt(x.l, 2)) : ''}" placeholder="« carburant consommé » de l’ordinateur de bord"><small class="hint">Vide : calculé avec ta consommation (${esc(decTxt(fuelL100(), 1))} L/100).</small>${errSlot('fu-l')}</div>
     <div class="btns">${x.k && (x.man || x.est) ? `<button class="btn sm" data-act="fuel-recalc" data-id="${esc(x.id)}">Recalculer par la route</button>` : ''}<button class="btn sm danger" data-act="fuel-del" data-id="${esc(x.id)}">Supprimer ce trajet</button></div>`,
     foot: `<button class="btn" data-act="fuel-back">Retour</button><button class="btn primary grow" data-act="fuel-km-save" data-id="${esc(x.id)}">Enregistrer</button>` });
+}
+// « 🏁 Fini » : les km et les litres de l'ordinateur de bord pour une tournée d'aujourd'hui (détours compris). Ils remplacent le calcul.
+const FUEL_SLOT = { midi: 'Midi', aprem: 'Après-midi', soir: 'Soir' };
+function openFuelCar() {
+  const D = today(), L = slotsOf(D), td = fuelAll().filter((x) => x.d === D && x.k), last = td.slice().sort((x, y) => (x.at || '').localeCompare(y.at || '')).pop();
+  const cur = last && L.includes(last.s) ? last.s : tourSlot(D);
+  openSheet({ kind: 'fuel-car', title: '🏁 Fin de la tournée', body: `
+    <p class="hint" style="margin-top:0">Lis l’ordinateur de bord (le bouton de la manette des essuie-glaces fait défiler) : la distance parcourue et le carburant consommé depuis ta remise à zéro. Ces chiffres remplacent le calcul, détours compris.</p>
+    ${L.length > 1 ? `<div class="field"><label>Tournée</label>${radios('fc-s', L.map((v) => [v, FUEL_SLOT[v]]), cur)}</div>` : ''}
+    <div class="row2"><div class="field"><label for="fc-km">Kilomètres</label><input id="fc-km" class="inp" inputmode="decimal" placeholder="ex. 42,5">${errSlot('fc-km')}</div><div class="field"><label for="fc-l">Litres consommés</label><input id="fc-l" class="inp" inputmode="decimal" placeholder="ex. 2,6">${errSlot('fc-l')}</div></div>
+    <p class="hint">Litres pas affichés ? Laisse vide : ils sont calculés avec ta consommation (${esc(decTxt(fuelL100(), 1))} L/100). Ensuite, remets l’ordinateur de bord à zéro pour la prochaine tournée (reste appuyé 2 secondes sur le bouton).</p>`,
+    foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="fuel-car-save">Enregistrer</button>` });
 }
 function openFuelAdd() {
   openSheet({ kind: 'fuel-add', title: 'Ajouter un trajet oublié', body: `
@@ -3824,24 +3840,50 @@ function openFuelAdd() {
     foot: `<button class="btn" data-act="fuel-back">Retour</button><button class="btn primary grow" data-act="fuel-add-save">Ajouter</button>` });
 }
 const FUEL_ACT = {
+  'fuel-car': () => openFuelCar(),
+  'fuel-car-save': async (a) => {
+    const D = today(), s = radioVal('fc-s') || slotsOf(D)[0], K = roundKey(D, s), c = dayCfg(D, s), km = parseDec(val('fc-km')), lt = val('fc-l').trim(), l = lt ? parseDec(lt) : null;
+    if (km == null || km <= 0 || km > 2000) { fieldErr('fc-km', 'Écris les km affichés, ex. 42,5'); return; }
+    if (lt && (l == null || l <= 0 || l > 200 || (l / km) * 100 > 30)) { fieldErr('fc-l', 'Écris les litres affichés, ex. 2,6'); return; }
+    a.disabled = true;
+    const P = await fuelPrice(), at = new Date().toISOString();
+    let rec = null;
+    // À la suite des arrêts en attente (un arrêt compté ensuite garde ces chiffres)
+    const job = () => fuelWrite((L) => {
+      let x = L.find((y) => y && y.k === K);
+      if (!x) { x = { id: 'fuel-' + K, k: K, d: D, s, w: c.weekend ? 1 : 0, p: [], js: [] }; L.push(x); }
+      const f = num(x.km) > 0 && num(x.kmw) > 0 && !x.car ? num(x.kmw) / num(x.km) : 1;
+      x.km = r1(km); x.kmw = r2(km * f); x.man = 1; x.car = 1; x.at = at;
+      if (l) x.l = r2(l); else delete x.l;
+      if (!(num(x.px) > 0) && P) { x.px = P.px; x.pxs = P.src; }
+      rec = JSON.parse(JSON.stringify(x));
+    }, `Essence · tournée ${slotName(D, s)} · ordinateur de bord ${decTxt(km, 1)} km${l ? ` · ${decTxt(l, 2)} L` : ''}`);
+    const pr = FUEL_Q.then(job); FUEL_Q = pr.catch(() => {});
+    const ok = await pr.catch(() => false);
+    a.disabled = false;
+    if (!ok || !rec) return;
+    closeSheet(); if (S.view === 'tournee') renderTournee();
+    toast(`Tournée ${slotName(D, s)} : ${kmTxt(rec.km)} · ${lTxt(fuelL(rec))}${num(rec.px) > 0 ? ' · ≈ ' + eur2(fuelEur(rec)) : ''}. Remets l’ordinateur de bord à zéro pour la prochaine.`);
+  },
   'fuel-open': (a) => { S.fuelMonth = a.dataset.m || thisMonth(); openFuel(); },
   'fuel-month': (a) => { const n = addMonths(S.fuelMonth || thisMonth(), +a.dataset.d); if (n <= thisMonth()) { S.fuelMonth = n; refreshFuel(); } },
   'fuel-back': () => openFuel(),
   'fuel-edit': (a) => openFuelEdit(a.dataset.id),
   'fuel-add': () => openFuelAdd(),
   'fuel-km-save': async (a) => {
-    const id = a.dataset.id, km = parseDec(val('fu-km'));
+    const id = a.dataset.id, km = parseDec(val('fu-km')), lt = val('fu-l').trim(), l = lt ? parseDec(lt) : null;
     if (km == null || km < 0 || km > 2000) { fieldErr('fu-km', 'Écris le nombre de km, ex. 18,5'); return; }
+    if (lt && (l == null || l <= 0 || l > 200 || (km > 0 && (l / km) * 100 > 30))) { fieldErr('fu-l', 'Écris les litres, ex. 2,4'); return; }
     a.disabled = true;
-    const ok = await fuelWrite((L) => { const x = L.find((y) => y && y.id === id); if (x) { const f = num(x.km) > 0 && num(x.kmw) > 0 ? num(x.kmw) / num(x.km) : 1; x.km = r1(km); x.kmw = r2(km * f); x.man = 1; } }, `Essence · trajet corrigé à ${decTxt(km, 1)} km`);
+    const ok = await fuelWrite((L) => { const x = L.find((y) => y && y.id === id); if (x) { const f = num(x.km) > 0 && num(x.kmw) > 0 ? num(x.kmw) / num(x.km) : 1; x.km = r1(km); x.kmw = r2(km * f); x.man = 1; if (l) { x.l = r2(l); x.car = 1; } else { delete x.l; delete x.car; } } }, `Essence · trajet corrigé à ${decTxt(km, 1)} km${l ? ` · ${decTxt(l, 2)} L` : ''}`);
     a.disabled = false;
     if (ok) { const x = fuelAll().find((y) => y.id === id); openFuel(); if (x) toast(`Trajet corrigé : ${kmTxt(x.km)} · ${lTxt(fuelL(x))}${num(x.px) > 0 ? ' · ≈ ' + eur2(fuelEur(x)) : ''}`); }
   },
   'fuel-recalc': async (a) => {
     const x0 = fuelAll().find((y) => y.id === a.dataset.id); if (!x0) return;
     a.disabled = true; a.textContent = 'Calcul…';
-    const rec = JSON.parse(JSON.stringify(x0)); delete rec.man; await fuelCalc(rec);
-    const ok = await fuelWrite((L) => { const x = L.find((y) => y && y.id === rec.id); if (x) { delete x.man; ['km', 'kmw', 'min', 'est', 'base', 'px', 'pxs'].forEach((k) => { if (rec[k] === undefined) delete x[k]; else x[k] = rec[k]; }); } }, `Essence · trajet recalculé par la route · ${decTxt(rec.km, 1)} km`);
+    const rec = JSON.parse(JSON.stringify(x0)); delete rec.man; delete rec.car; delete rec.l; await fuelCalc(rec);
+    const ok = await fuelWrite((L) => { const x = L.find((y) => y && y.id === rec.id); if (x) { delete x.man; delete x.car; delete x.l; ['km', 'kmw', 'min', 'est', 'base', 'px', 'pxs'].forEach((k) => { if (rec[k] === undefined) delete x[k]; else x[k] = rec[k]; }); } }, `Essence · trajet recalculé par la route · ${decTxt(rec.km, 1)} km`);
     if (ok) { openFuel(); toast(`Recalculé par la route : ${kmTxt(rec.km)}${rec.est ? ' (toujours estimé : pas de réseau)' : ''}`); } else { a.disabled = false; a.textContent = 'Recalculer par la route'; }
   },
   'fuel-del': async (a) => {
