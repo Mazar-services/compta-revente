@@ -243,7 +243,7 @@ textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-
 .slow-card{border:2px solid var(--bad);background:var(--bad-soft)} .slow-card h2{color:var(--bad)} .slow-r{display:grid;gap:6px;padding:10px 0 4px;border-top:1px solid var(--line)} .slow-r:first-of-type{border-top:0} .slow-d{color:var(--bad);font-weight:800}
 .strip.slow{background:var(--bad-soft);border:2px solid var(--bad);color:var(--bad);margin:0 0 14px;font-size:14px} .strip.slow b{color:var(--bad)}
 .xp-r{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--line)} .xp-r:first-of-type{border-top:0;padding-top:2px} .xp-h{font-size:15px} .xp-r.late .xp-h{color:var(--bad)} .xp-al{font-size:12.5px;color:var(--ink-2)} .xp-al.ok{color:var(--good);font-weight:700}
-.pill.rp-xp{background:var(--accent-soft);color:var(--accent)} ol.xp-steps{margin:0;padding-left:20px;display:grid;gap:4px}
+.fu-bub{margin:0;padding:10px 12px;border-radius:14px 14px 14px 4px;background:var(--accent-soft);color:var(--ink);font-size:13.5px;line-height:1.45;white-space:pre-wrap} .pill.rp-xp{background:var(--accent-soft);color:var(--accent)} ol.xp-steps{margin:0;padding-left:20px;display:grid;gap:4px}
 .stop-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .stop-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--surface);font-weight:800;font-size:13px}
 .stop-t{font-size:16px;font-variant-numeric:tabular-nums} .stop-m{font-size:14px;line-height:1.45} .stop-m a{color:var(--accent);text-decoration:none}
 .stop-a{display:flex;flex-wrap:wrap;gap:6px} .stop-a .grow{flex:1 1 auto}
@@ -314,7 +314,7 @@ textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-
 .search-in:focus{outline:2px solid var(--accent);outline-offset:-1px}
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding:1px 16px 2px}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:none;height:34px;padding:0 13px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.chip{flex:none;height:34px;padding:0 13px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap} a.chip{text-decoration:none}
 .tour-reply{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0 4px}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .chip .n{font-family:var(--f-mono);font-size:11px;opacity:.7}
@@ -675,7 +675,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '714e5a9bda3e';
+const APP_VERSION = '418098c7ad72';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2391,7 +2391,7 @@ function reparoHtml() {
   const row = (r) => { const st = repStage(r); return `<div class="cl rp">
       <span class="d">${dShort(r.date || r.gotDate)}</span>
       <span class="t">${esc(r.type)}${repQty(r) > 1 ? ` <b>×${repQty(r)}</b>` : ''} <span class="pill rp-${st.k}">${st.t}</span><small>${steps(r) ? steps(r) + ' · ' : ''}${eur(num(r.unitPrice))} l’unité${repTotal(r) < repQty(r) * num(r.unitPrice) - 0.004 ? ` · payé ${eur(repTotal(r))} (remise ${eur(repQty(r) * num(r.unitPrice) - repTotal(r))})` : ''}${num(r.partsCost) ? ` · pièces ${eur(num(r.partsCost))}` : ''}${r.client ? ' · ' + esc(r.client) : ''}${r.note ? ' · ' + esc(r.note) : ''}</small>
-        <span class="rp-act">${st.next ? `<button class="btn sm primary" data-act="${st.next[0]}" data-id="${esc(r.id)}">${st.next[1]}</button>` : ''}<button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button><button class="btn sm" data-act="rep-copy" data-id="${esc(r.id)}">Dupliquer</button><button class="xbtn ${S.confirmRep === r.id ? 'on' : ''}" data-act="rep-del" data-id="${esc(r.id)}">${S.confirmRep === r.id ? 'Confirmer la suppression' : 'Supprimer'}</button></span></span>
+        <span class="rp-act">${st.next ? `<button class="btn sm primary" data-act="${st.next[0]}" data-id="${esc(r.id)}">${st.next[1]}</button>` : ''}<button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button>${smsBtn(r, 'btn sm', '💬 SMS')}<button class="btn sm" data-act="rep-copy" data-id="${esc(r.id)}">Dupliquer</button><button class="xbtn ${S.confirmRep === r.id ? 'on' : ''}" data-act="rep-del" data-id="${esc(r.id)}">${S.confirmRep === r.id ? 'Confirmer la suppression' : 'Supprimer'}</button></span></span>
       <span class="a"><b class="${repPaid(r) ? 'in' : ''}">${eurS(repNet(r))}</b>${!repPaid(r) ? '<small>à encaisser</small>' : num(r.partsCost) ? `<small>facturé ${eur(repTotal(r))}</small>` : ''}</span>
     </div>`; };
   return head + `
@@ -4097,6 +4097,10 @@ function tourMsg(kind, r, s, list) {
     + (kind === 'eta' && list.some((x) => x.loan && x.picked !== false) ? ' Pense aussi à préparer la manette de prêt 🎮' : '');
   return '';
 }
+// Discussion SMS du client (Messages s'ouvre sur sa conversation) ; avec un texte : déjà écrit, il n'y a plus qu'à envoyer
+const telNum = (phone) => String(phone || '').replace(/[^\d+]/g, '');
+const smsUrl = (phone, text) => { const p = telNum(phone); return !p ? '' : text ? `sms:${p}${/iPhone|iPad|Mac/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(text)}` : `sms:${p}`; };
+const smsBtn = (r, cls = 'btn sm', lbl = '💬 Voir la discussion SMS') => (telNum(r && r.phone) ? `<a class="${cls}" href="${esc(smsUrl(r.phone))}">${lbl}</a>` : '');
 function sendMsg(text, phone, pre) {
   const m = tourCfg().send === 'copy' ? 'message copié : colle-le dans la conversation' : 'message copié';
   copyText(text, pre ? `${pre} · ${m}` : m[0].toUpperCase() + m.slice(1));
@@ -4111,7 +4115,7 @@ const loanChip = (r, cls = '') => `<button class="chip ${cls}" data-act="rep-loa
 function loanCard() {
   const L = loanOut(); if (!L.length) return '';
   return `<section class="card"><div class="card-h"><h2 class="sec">🎮 Manette${L.length > 1 ? 's' : ''} de prêt</h2><span class="muted" style="font-size:12.5px">${L.length > 1 ? `${L.length} prêtées` : 'prêtée'}</span></div>
-    ${L.map((r) => `<div class="cl rp"><span class="d">${isDate(r.loanDate) ? dShort(r.loanDate) : ''}</span><span class="t">Chez <b>${esc(r.client || 'un client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<small>${esc([r.city, repStage(r).t].filter(Boolean).join(' · '))}</small></span><span class="a"><button class="btn sm" data-act="rep-loan" data-id="${esc(r.id)}">Rendue</button></span></div>`).join('')}
+    ${L.map((r) => `<div class="cl rp"><span class="d">${isDate(r.loanDate) ? dShort(r.loanDate) : ''}</span><span class="t">Chez <b>${esc(r.client || 'un client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<small>${esc([r.city, repStage(r).t].filter(Boolean).join(' · '))}</small></span><span class="a"><button class="btn sm" data-act="rep-loan" data-id="${esc(r.id)}">Rendue</button>${smsBtn(r, 'chip loan-chip', '💬 SMS')}</span></div>`).join('')}
     <p class="hint" style="margin:6px 0 0">Quand tu touches « Rendu » pour ce client, l’appli te rappelle de la reprendre et l’enlève d’ici.</p></section>`;
 }
 // Rendu : la manette de prêt revient (rappel dans le message)
@@ -4145,11 +4149,15 @@ function fuCard() {
   const prep = LS.get('fuPrep', {}) || {};
   return `<section class="card"><div class="card-h"><h2 class="sec">💬 À contacter</h2><span class="muted" style="font-size:12.5px">${plural(G.length, 'client')}</span></div>
     ${G.map((g) => {
-      const r = g.items[0], ids = esc(g.items.map((x) => x.id).join(',')), done = g.items.some((x) => prep[x.id]);
-      return `<div class="xp-r"><div class="stop-m"><b>${esc(r.client || 'Client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<br><small class="muted">${esc(g.items.map((x) => `${x.type} ×${repQty(x)}`).join(' + '))} · rendu ${dayWord(g.d)}</small></div>
-        <div class="btns"><button class="btn sm ${done ? '' : 'primary'}" data-act="fu-msg" data-ids="${ids}">📩 ${done ? 'Message préparé ✓' : 'Préparer le message'}</button><button class="btn sm ${done ? 'primary' : ''}" data-act="fu-done" data-v="sent" data-ids="${ids}">☐ Message envoyé</button><button class="btn sm" data-act="fu-done" data-v="skip" data-ids="${ids}">Ignorer</button></div></div>`;
+      const r = g.items[0], ids = esc(g.items.map((x) => x.id).join(',')), done = g.items.some((x) => prep[x.id]), txt = tourMsg('follow', r, null, g.items), sms = telNum(r.phone) && tourCfg().send !== 'copy';
+      const go = sms ? `<a class="btn sm ${done ? '' : 'primary'} grow" href="${esc(smsUrl(r.phone, txt))}" data-act="fu-open" data-ids="${ids}">📩 ${done ? 'SMS ouvert ✓ (rouvrir)' : 'Ouvrir le SMS prêt à envoyer'}</a>`
+        : `<button class="btn sm ${done ? '' : 'primary'} grow" data-act="fu-msg" data-ids="${ids}">📋 ${done ? 'Message copié ✓' : 'Copier le message'}</button>${telNum(r.phone) ? '' : `<button class="btn sm" data-act="fu-phone" data-ids="${ids}">📱 Ajouter son numéro</button>`}`;
+      return `<div class="xp-r"><div class="stop-m"><b>${esc(r.client || 'Client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ' · <span class="muted">pas de numéro</span>'}<br><small class="muted">${esc(g.items.map((x) => `${x.type} ×${repQty(x)}`).join(' + '))} · rendu ${dayWord(g.d)}</small></div>
+        <p class="fu-bub">${esc(txt)}</p>
+        <div class="btns">${go}${sms ? smsBtn(r) : ''}</div>
+        <div class="btns"><button class="btn sm ${done ? 'primary' : ''}" data-act="fu-done" data-v="sent" data-ids="${ids}">☐ Message envoyé</button><button class="btn sm" data-act="fu-done" data-v="skip" data-ids="${ids}">Ignorer</button></div></div>`;
     }).join('')}
-    <p class="hint" style="margin:6px 0 0">Un message court pour le remercier et savoir s’il est satisfait. Une fois parti, coche « Message envoyé ». Pas envie de lui écrire ? « Ignorer ». Dans les deux cas, il passe dans l’historique (Stats, Réparo).</p></section>`;
+    <p class="hint" style="margin:6px 0 0">Le message est déjà écrit : « Ouvrir le SMS » ouvre sa conversation avec le texte dedans, tu n’as plus qu’à appuyer sur Envoyer. Puis coche « Message envoyé ». Pas envie de lui écrire ? « Ignorer ». Dans les deux cas, il passe dans l’historique (Stats, Réparo).</p></section>`;
 }
 /* ---------- Drift : les 2 joysticks changés sur une manette ---------- */
 const j2Chip = (r, cls = '') => {
@@ -4178,7 +4186,7 @@ function slowCard() {
   const sent = LS.get('slowSent', {}) || {};
   return `<section class="card slow-card"><div class="card-h"><h2 class="sec">⚠️ ${L.length > 1 ? `${L.length} objets attendent` : '1 objet attend'} à l’atelier depuis trop longtemps</h2></div>
     ${L.map((r) => `<div class="slow-r"><div><b>${esc(r.client || 'Client')}</b> · ${esc(r.type)} ×${repQty(r)}<br><span class="slow-d">Depuis ${plural(ago(r.gotDate), 'jour')}</span> <small class="muted">· récupéré le ${dShort(r.gotDate)}${sent[r.id] ? ` · excuse envoyée le ${dShort(sent[r.id])}` : ''}</small></div>
-      <div class="btns"><button class="btn sm" data-act="tour-msg" data-k="slow" data-id="${esc(r.id)}">📩 Excuse</button><button class="btn sm" data-act="tour-msg" data-k="slowd" data-id="${esc(r.id)}">📩 Excuse + « demain »</button><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></div></div>`).join('')}
+      <div class="btns"><button class="btn sm" data-act="tour-msg" data-k="slow" data-id="${esc(r.id)}">📩 Excuse</button><button class="btn sm" data-act="tour-msg" data-k="slowd" data-id="${esc(r.id)}">📩 Excuse + « demain »</button><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button>${smsBtn(r)}</div></div>`).join('')}
     <p class="hint" style="margin:6px 0 0">Les boutons 📩 copient un message d’excuse${tourCfg().send === 'copy' ? '' : ' et ouvrent tes SMS'}. Alerte à partir de ${plural(slowDays(), 'jour')} à l’atelier : modifiable dans Réglages.</p></section>`;
 }
 
@@ -4213,7 +4221,7 @@ function xpCard() {
       <div class="stop-m"><b>${esc(r.client || 'Client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<br><small class="muted">${esc(r.type)} ×${repQty(r)} · ${eur(repTotal(r))}${r.note ? ' · ' + esc(r.note) : ''}</small></div>
       ${al ? `<div>${al}</div>` : ''}
       ${isDriftType(r.type) ? `<div>${j2Chip(r)}</div>` : ''}
-      <div class="btns"><button class="btn sm primary grow" data-act="xp-done" data-id="${esc(r.id)}">✅ Réparé, rendu et payé</button><button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button></div></div>`;
+      <div class="btns"><button class="btn sm primary grow" data-act="xp-done" data-id="${esc(r.id)}">✅ Réparé, rendu et payé</button><button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button>${smsBtn(r)}</div></div>`;
   };
   return `<section class="card"><div class="card-h"><h2 class="sec">⚡ Express à l’atelier</h2><span class="muted" style="font-size:12.5px">${plural(L.length, 'client')}</span></div>
     ${L.map(row).join('')}
@@ -4307,6 +4315,7 @@ function renderTournee() {
         ${s.lateBy > 0 ? `<button class="btn sm danger" data-act="tour-msg" data-k="late" data-id="${esc(r.id)}">Prévenir du retard</button>` : `<button class="btn sm" data-act="tour-msg" data-k="${s.kind}" data-id="${esc(r.id)}">${s.sent ? 'Heure envoyée ✓' : 'Envoyer l’heure'}</button>`}
         <a class="btn sm" href="${esc(wazeUrl(r))}" target="_blank" rel="noopener">🚗 Waze</a>
         <button class="btn sm" data-act="tour-msg" data-k="eta" data-id="${esc(r.id)}">J'arrive</button>
+        ${smsBtn(r)}
         ${!pick && r.result !== 'ko' ? `<button class="btn sm" data-act="tour-msg" data-k="ready" data-id="${esc(r.id)}">${(LS.get('readySent', {}) || {})[r.id] ? 'Réparé prévenu ✓' : '📩 C’est réparé'}</button>` : ''}
         ${pick ? `<button class="btn sm primary grow" data-act="rep-pick" data-id="${esc(r.id)}">Récupéré</button>` : `<button class="btn sm primary grow" data-act="rep-retpay" data-id="${esc(r.id)}">Rendu + payé</button>`}
       </div>
@@ -4350,7 +4359,7 @@ function renderTournee() {
     ${fuelCard()}
     ${loanCard()}
     <section class="card"><div class="card-h"><h2 class="sec">Atelier</h2><span class="muted" style="font-size:12.5px">${sum(atelier, repQty)} à réparer</span></div>
-      ${atelier.length ? atelier.map((r) => `<div class="cl rp"><span class="d">${dShort(r.gotDate || r.date)}</span><span class="t">${esc(r.client || 'Client')} · ${esc(r.type)} ×${repQty(r)}<small>${esc(r.city || '')}${isDate(r.gotDate) && ago(r.gotDate) >= slowDays() ? `${r.city ? ' · ' : ''}<b class="slow-d">⚠️ depuis ${plural(ago(r.gotDate), 'jour')}</b>` : ''}</small>${loanChip(r, 'loan-chip')} ${j2Chip(r, 'loan-chip')}</span><span class="a"><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></span></div>`).join('')
+      ${atelier.length ? atelier.map((r) => `<div class="cl rp"><span class="d">${dShort(r.gotDate || r.date)}</span><span class="t">${esc(r.client || 'Client')} · ${esc(r.type)} ×${repQty(r)}<small>${esc(r.city || '')}${isDate(r.gotDate) && ago(r.gotDate) >= slowDays() ? `${r.city ? ' · ' : ''}<b class="slow-d">⚠️ depuis ${plural(ago(r.gotDate), 'jour')}</b>` : ''}</small>${loanChip(r, 'loan-chip')} ${j2Chip(r, 'loan-chip')} ${smsBtn(r, 'chip loan-chip', '💬 Discussion SMS')}</span><span class="a"><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></span></div>`).join('')
         + (atelier.length > 1 ? `<div class="btns" style="margin-top:8px"><button class="btn sm" data-act="rep-ready-all">Tout est réparé</button></div>` : '') : '<p class="muted" style="margin:0">Rien à réparer pour l’instant.</p>'}
     </section>
     <section class="card"><div class="card-h"><h2 class="sec">Messages utiles</h2></div>
@@ -4929,6 +4938,20 @@ const ACT = {
     const L = a.dataset.ids.split(',').map((id) => S.repairs.find((x) => x.id === id)).filter(Boolean); if (!L.length) return;
     sendMsg(tourMsg('follow', L[0], null, L), L[0].phone);
     const m = LS.get('fuPrep', {}) || {}; L.forEach((x) => { m[x.id] = today(); }); LS.set('fuPrep', m); setTimeout(renderTournee, 400);
+  },
+  'fu-open': (a) => { const m = LS.get('fuPrep', {}) || {}; a.dataset.ids.split(',').forEach((id) => { m[id] = today(); }); LS.set('fuPrep', m); setTimeout(renderTournee, 1200); },
+  'fu-phone': (a) => {
+    const r = S.repairs.find((x) => x.id === a.dataset.ids.split(',')[0]); if (!r) return;
+    openSheet({ kind: 'fuph', title: `📱 Numéro de ${r.client || 'ce client'}`, body: `${textF('fu-ph', 'Téléphone', '', '06 …', 'inputmode="tel" autocomplete="tel"')}<p class="hint" style="margin:0">Enregistré sur sa fiche : le SMS de suivi s’ouvrira avec le message déjà écrit.</p>`,
+      foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="fu-phone-save" data-ids="${esc(a.dataset.ids)}">Enregistrer</button>` });
+    setTimeout(() => { const i = $('#fu-ph'); if (i) i.focus(); }, 60);
+  },
+  'fu-phone-save': async (a) => {
+    clearErrs(); const ph = val('fu-ph'), ids = a.dataset.ids.split(',');
+    if (telNum(ph).replace(/^\+33/, '0').length < 10) return fieldErr('fu-ph', 'Numéro incomplet (10 chiffres).');
+    a.disabled = true;
+    const ok = await write(() => commit((d) => { d.repairs.forEach((x) => { if (ids.includes(x.id)) x.phone = ph; }); }, `Réparo ${(S.repairs.find((x) => x.id === ids[0]) || {}).client || 'Client'} · numéro ajouté`));
+    a.disabled = false; if (ok) { closeSheet(); toast('Numéro ajouté : touche « Ouvrir le SMS prêt à envoyer »'); }
   },
   'fu-done': async (a) => {
     const ids = a.dataset.ids.split(','), v = a.dataset.v === 'skip' ? 'skip' : 'sent', r = S.repairs.find((x) => x.id === ids[0]); if (!r) return;
