@@ -675,7 +675,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '43ac9a353a36';
+const APP_VERSION = '714e5a9bda3e';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2387,7 +2387,7 @@ function reparoHtml() {
   const types = by((r) => lbl.get(norm(r.type || '?'))).sort((a, b) => b[1].net - a[1].net);
   const months = by((r) => repPaidOn(r).slice(0, 7)).sort((a, b) => b[0].localeCompare(a[0]));
   const table = (rows, first, lab) => `<div class="tbl-wrap"><table><thead><tr><th>${first}</th><th>Nb</th><th>Encaissé</th><th>Gain</th></tr></thead><tbody>${rows.map(([k, x]) => `<tr><td>${esc(lab(k))}</td><td>${x.n}</td><td>${eur(x.ca)}</td><td><b class="${x.net < 0 ? 'neg' : 'pos'}">${eurS(x.net)}</b></td></tr>`).join('')}</tbody></table></div>`;
-  const steps = (r) => [[isDate(r.gotDate) ? `récupéré ${dShort(r.gotDate)}` : '', repDone(r) && isDate(r.date) ? `${r.result === 'ko' ? 'échec' : 'réparé'} ${dShort(r.date)}` : '', r.returned !== false && isDate(r.returnDate) ? `rendu ${dShort(r.returnDate)}` : '', repPaid(r) && isDate(r.paidDate) ? `payé ${dShort(r.paidDate)}` : ''].filter(Boolean).join(' → '), r.loan ? '🎮 a ta manette de prêt' : ''].filter(Boolean).join(' · ');
+  const steps = (r) => [[isDate(r.gotDate) ? `récupéré ${dShort(r.gotDate)}` : '', repDone(r) && isDate(r.date) ? `${r.result === 'ko' ? 'échec' : 'réparé'} ${dShort(r.date)}` : '', r.returned !== false && isDate(r.returnDate) ? `rendu ${dShort(r.returnDate)}` : '', repPaid(r) && isDate(r.paidDate) ? `payé ${dShort(r.paidDate)}` : ''].filter(Boolean).join(' → '), r.loan ? '🎮 a ta manette de prêt' : '', r.fu === 'sent' ? `💬 suivi envoyé${isDate(r.fuDate) ? ' ' + dShort(r.fuDate) : ''}` : r.fu === 'skip' ? '💬 sans message de suivi' : fuWait(r) ? '💬 à contacter' : ''].filter(Boolean).join(' · ');
   const row = (r) => { const st = repStage(r); return `<div class="cl rp">
       <span class="d">${dShort(r.date || r.gotDate)}</span>
       <span class="t">${esc(r.type)}${repQty(r) > 1 ? ` <b>×${repQty(r)}</b>` : ''} <span class="pill rp-${st.k}">${st.t}</span><small>${steps(r) ? steps(r) + ' · ' : ''}${eur(num(r.unitPrice))} l’unité${repTotal(r) < repQty(r) * num(r.unitPrice) - 0.004 ? ` · payé ${eur(repTotal(r))} (remise ${eur(repQty(r) * num(r.unitPrice) - repTotal(r))})` : ''}${num(r.partsCost) ? ` · pièces ${eur(num(r.partsCost))}` : ''}${r.client ? ' · ' + esc(r.client) : ''}${r.note ? ' · ' + esc(r.note) : ''}</small>
@@ -4071,9 +4071,10 @@ const MSG_DEF = {
   ready: "{salut}{repare} Je t'envoie un message dès que je sais quand je peux passer, selon ma tournée. Si tu préfères, tu peux aussi venir {la} récupérer à l'atelier, à Crolles. À payer : {prix} (espèces, Wero ou Lydia).",
   slow: "{salut}Je te donne des nouvelles de {objet} : la réparation prend plus de temps que prévu, désolé pour l'attente 🙏 Je fais au plus vite et je te préviens dès que c'est prêt.",
   slowd: "{salut}Désolé pour l'attente 🙏 La réparation de {objet} prend plus de temps que prévu. Je fais au plus vite : je pense te {la} ramener {quand}, je te préviens avant de passer.",
+  follow: "{salut}Merci encore pour ta confiance 🙏 {suivi} Dis-moi si tout te convient, ton avis compte beaucoup pour moi. Je reste dispo si besoin !",
   thanks: "{salut}Merci pour ta confiance ! Est-ce que tout fonctionne bien, le résultat te plaît ? Pour n'importe quel autre besoin, je suis là, écris-moi quand tu veux 🤝"
 };
-const MSG_NAMES = { confirm: 'Confirmation de la demande', pick: 'Heure précise (récupération)', ret: 'Heure précise (retour)', retko: 'Retour sans réparation possible', late: 'Retard', eta: "J'arrive (10 min)", ready: 'C’est réparé (prévenir le client)', slow: 'Retard de réparation (excuses)', slowd: 'Retard de réparation (excuses + « demain »)', thanks: 'Remerciement' };
+const MSG_NAMES = { confirm: 'Confirmation de la demande', pick: 'Heure précise (récupération)', ret: 'Heure précise (retour)', retko: 'Retour sans réparation possible', late: 'Retard', eta: "J'arrive (10 min)", ready: 'C’est réparé (prévenir le client)', slow: 'Retard de réparation (excuses)', slowd: 'Retard de réparation (excuses + « demain »)', follow: 'Suivi après le retour (satisfait ? + merci)', thanks: 'Remerciement' };
 // list : tout ce que ce client donne ou récupère à cet arrêt (« tes manettes », un seul prix total)
 function tourMsg(kind, r, s, list) {
   r = r || {}; list = list && list.length ? list : [r];
@@ -4087,7 +4088,7 @@ function tourMsg(kind, r, s, list) {
   // Retour sans réparation possible : jamais « réparée ». Mélange réparé / pas réparé : texte neutre, avec le prix à payer.
   const ko = kind === 'ret' && list.some((x) => x.result === 'ko'), mixed = ko && !list.every((x) => x.result === 'ko');
   if (ko) kind = 'retko';
-  const fill = (t, quand, plage2, cren) => String(t).replace(/\{(\w+)\}/g, (m, k) => ({ salut: hi, prenom: nm, objet: w.ta, Objet: w.Ta, la: w.la, est: w.sont, reparee: w.rep, prete: w.pret, lieu: lieuTxt(r), quand, plage: plage2, creneau: cren, prix: amt, garantie: c.garantie, repare: repPhrase(list) }[k] ?? m)).replace(/ {2,}/g, ' ').replace(/ ([.,])/g, '$1');
+  const fill = (t, quand, plage2, cren) => String(t).replace(/\{(\w+)\}/g, (m, k) => ({ salut: hi, prenom: nm, objet: w.ta, Objet: w.Ta, la: w.la, est: w.sont, reparee: w.rep, prete: w.pret, lieu: lieuTxt(r), quand, plage: plage2, creneau: cren, prix: amt, garantie: c.garantie, repare: repPhrase(list), suivi: fuQuestion(list) }[k] ?? m)).replace(/ {2,}/g, ' ').replace(/ ([.,])/g, '$1');
   const tpl = (k) => ((c.msgs || {})[k] || '').trim() || MSG_DEF[k];
   if (kind === 'confirm') { const D = isDate(r.planDate) ? r.planDate : today(), f = fixOf(r, D); if (f != null) return fill(tpl('confirm'), dayWord(D), `à ${hm(f)}`, `à ${hm(f)}`); return fill(tpl('confirm'), momentTxt(D, r.planSlot), plage(D, r.planSlot), plage(D, r.planSlot)); }
   if (kind === 'ready') { const [nD, nS] = nextRound(); return fill(tpl('ready'), momentTxt(nD, nS), plage(nD, nS), plage(nD, nS)); }
@@ -4116,6 +4117,40 @@ function loanCard() {
 // Rendu : la manette de prêt revient (rappel dans le message)
 const loanBack = (r) => (r && r.loan ? { loan: false } : {});
 const loanMsg = (had) => (had ? ' · 🎮 Reprends ta manette de prêt' : '');
+/* ---------- Après le retour : demander s'il est satisfait (liste « À contacter ») ---------- */
+// Un client rendu (réparation réussie) y reste jusqu'à « Message envoyé » (fu: 'sent') ou « Ignorer » (fu: 'skip') : il passe alors dans l'historique.
+const FU_FROM = '2026-11-23'; // les clients rendus avant la création de la liste n'y entrent pas
+const fuWait = (r) => !r.fu && repDone(r) && r.result !== 'ko' && r.returned !== false && isDate(r.returnDate) && r.returnDate >= FU_FROM;
+function fuGroups() {
+  const G = [];
+  S.repairs.filter(fuWait).sort((a, b) => a.returnDate.localeCompare(b.returnDate)).forEach((r) => {
+    const g = G.find((x) => x.d === r.returnDate && sameCli(x.items[0], r)); if (g) g.items.push(r); else G.push({ d: r.returnDate, items: [r] });
+  });
+  return G;
+}
+// La question de suivi, d'après ce qui a été réparé : « Plus aucun drift sur ta manette ? »
+function fuQuestion(list) {
+  const w = objWords(list), pl = sum(list, repQty) > 1, T = list.map((x) => norm(x.type || '')), all = (re) => T.length && T.every((t) => re.test(t));
+  const ps = T.every((t) => /ps5/.test(t)) ? 'PS5' : 'console', pss = ps === 'PS5' ? 'PS5' : 'consoles';
+  if (all(/hdmi/)) return pl ? `L’image passe bien sur tes ${pss} ?` : `L’image passe bien sur ta ${ps} ?`;
+  if (all(/liquide|nettoy|pate|thermique/)) return pl ? `Tes ${pss} tournent bien, plus silencieuses ?` : `Ta ${ps} tourne bien, plus silencieuse ?`;
+  if (all(/drift|joystick|hall/)) return pl ? 'Plus aucun drift sur tes manettes ?' : 'Plus aucun drift sur ta manette ?';
+  if (all(/batterie/)) return 'La batterie tient bien ?';
+  if (all(/ecran|vitre/)) return 'L’écran fonctionne bien ?';
+  if (T.length === 1) return `${w.Ta} ${pl ? 'fonctionnent' : 'fonctionne'} bien ?`;
+  return 'Tout fonctionne bien ?';
+}
+function fuCard() {
+  const G = fuGroups(); if (!G.length) return '';
+  const prep = LS.get('fuPrep', {}) || {};
+  return `<section class="card"><div class="card-h"><h2 class="sec">💬 À contacter</h2><span class="muted" style="font-size:12.5px">${plural(G.length, 'client')}</span></div>
+    ${G.map((g) => {
+      const r = g.items[0], ids = esc(g.items.map((x) => x.id).join(',')), done = g.items.some((x) => prep[x.id]);
+      return `<div class="xp-r"><div class="stop-m"><b>${esc(r.client || 'Client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<br><small class="muted">${esc(g.items.map((x) => `${x.type} ×${repQty(x)}`).join(' + '))} · rendu ${dayWord(g.d)}</small></div>
+        <div class="btns"><button class="btn sm ${done ? '' : 'primary'}" data-act="fu-msg" data-ids="${ids}">📩 ${done ? 'Message préparé ✓' : 'Préparer le message'}</button><button class="btn sm ${done ? 'primary' : ''}" data-act="fu-done" data-v="sent" data-ids="${ids}">☐ Message envoyé</button><button class="btn sm" data-act="fu-done" data-v="skip" data-ids="${ids}">Ignorer</button></div></div>`;
+    }).join('')}
+    <p class="hint" style="margin:6px 0 0">Un message court pour le remercier et savoir s’il est satisfait. Une fois parti, coche « Message envoyé ». Pas envie de lui écrire ? « Ignorer ». Dans les deux cas, il passe dans l’historique (Stats, Réparo).</p></section>`;
+}
 /* ---------- Drift : les 2 joysticks changés sur une manette ---------- */
 const j2Chip = (r, cls = '') => {
   if (!isDriftType(r.type)) return '';
@@ -4310,6 +4345,7 @@ function renderTournee() {
       : (() => { const other = slotsOf(D).filter((x) => x !== slot && tourStops(D, x).length); return `<p style="margin:0">Aucun arrêt ${momentTxt(D, slot)}.${other.length ? '' : ' Ajoute une demande dès qu’un client t’écrit : elle va dans la tournée que tu choisis, à la bonne place sur ton trajet.'}</p>${other.length ? `<div class="btns">${other.map((x) => `<button class="btn sm primary" data-act="tour-slot" data-v="${x}">Voir la tournée ${SLOT_NAMES[x] === 'Soir' ? 'du soir' : SLOT_NAMES[x] === 'Midi' ? 'de midi' : 'de l’après-midi'} (${tourStops(D, x).slice(-1)[0].n})</button>`).join('')}</div>` : ''}`; })()}
     </section>
     ${stops.map(card).join('')}
+    ${fuCard()}
     ${xpCard()}
     ${fuelCard()}
     ${loanCard()}
@@ -4502,7 +4538,7 @@ function openTourCfg() {
       <label class="sw"><span class="sw-t"><b>Captures : garder seulement le client</b><small>Ignore les bulles de droite (tes propres messages) quand une capture est lue</small></span><input type="checkbox" id="t-ocrleft" role="switch" ${c.ocrLeft !== false ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>
       <div class="field"><label for="t-msgk">Modifier un message</label><span class="selw" style="display:block"><select id="t-msgk" class="inp">${Object.keys(MSG_DEF).map((k) => `<option value="${k}">${esc(MSG_NAMES[k])}</option>`).join('')}</select></span></div>
       <div class="field"><textarea id="t-msg" class="inp" rows="5" data-k="confirm">${esc(((c.msgs || {}).confirm || '').trim() || MSG_DEF.confirm)}</textarea>
-        <small class="hint">Les mots entre accolades se remplissent seuls : {salut} {prenom} {objet} {Objet} {la} {est} {reparee} {prete} {lieu} (« devant chez toi » ou le lieu de RDV) {quand} (« ce soir »…) {plage} {creneau} (heure précise) {prix} {garantie} {repare} (« Le port HDMI de ta PS5 est réparé ✅ »…). Change de message dans la liste : celui que tu viens de modifier est gardé.</small>
+        <small class="hint">Les mots entre accolades se remplissent seuls : {salut} {prenom} {objet} {Objet} {la} {est} {reparee} {prete} {lieu} (« devant chez toi » ou le lieu de RDV) {quand} (« ce soir »…) {plage} {creneau} (heure précise) {prix} {garantie} {repare} (« Le port HDMI de ta PS5 est réparé ✅ »…) {suivi} (« Plus aucun drift sur ta manette ? »…). Change de message dans la liste : celui que tu viens de modifier est gardé.</small>
         <div class="btns"><button class="btn sm" data-act="msg-reset">Remettre le texte d'origine</button></div></div>
     </div>
     <div class="fs"><p class="fs-t">Atelier</p>
@@ -4889,6 +4925,17 @@ const ACT = {
   'rep-edit': (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && r.xp && r.picked === false) openXp(r.id); else openRep(a.dataset.id); },
   'rep-full': (a) => openRep(a.dataset.id),
   'xp-add': () => openXp(null),
+  'fu-msg': (a) => {
+    const L = a.dataset.ids.split(',').map((id) => S.repairs.find((x) => x.id === id)).filter(Boolean); if (!L.length) return;
+    sendMsg(tourMsg('follow', L[0], null, L), L[0].phone);
+    const m = LS.get('fuPrep', {}) || {}; L.forEach((x) => { m[x.id] = today(); }); LS.set('fuPrep', m); setTimeout(renderTournee, 400);
+  },
+  'fu-done': async (a) => {
+    const ids = a.dataset.ids.split(','), v = a.dataset.v === 'skip' ? 'skip' : 'sent', r = S.repairs.find((x) => x.id === ids[0]); if (!r) return;
+    const nm = r.client || 'Client', T = today(); a.disabled = true;
+    const ok = await write(() => commit((d) => { d.repairs.forEach((x) => { if (ids.includes(x.id)) { x.fu = v; x.fuDate = T; } }); }, `Réparo ${nm} · ${v === 'sent' ? 'message de suivi envoyé' : 'pas de message de suivi'}`));
+    if (ok) toast(v === 'sent' ? `${nm} : message envoyé, rangé dans l’historique` : `${nm} : rangé dans l’historique, sans message`); else { a.disabled = false; await pull().catch(() => {}); render(); }
+  },
   'rep-j2': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; if (repQty(r) > 1) { openJ2(r); return; } await setJ2(r, j2Of(r) ? 0 : 1); },
   'j2-save': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; const n = Math.min(repQty(r), parseInt(radioVal('j2-n'), 10) || 0); closeSheet(); if (n !== j2Of(r)) await setJ2(r, n); },
   'xp-save': (a) => xpSave(a),
