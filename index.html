@@ -671,7 +671,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'e29b5c99cfa2';
+const APP_VERSION = '81d574ab2055';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -3361,7 +3361,7 @@ function replyMsg(k) {
   const c = tourCfg(), hi = 'Salut ! Merci pour ton message 🙏', noPar = (p) => p.replace(/\s*\(.*\)$/, '');
   const ask = c.formUrl ? `Remplis ce petit formulaire (30 secondes) et je te cale un passage : ${c.formUrl}` : 'Envoie-moi ton prénom, ton numéro et ton adresse : je te cale un passage 👍';
   const L = (...x) => x.filter(Boolean).join('\n');
-  if (k === 'drift') { const p = svcPrice(/drift.*ps5|drift/); return L(hi, `Pour le drift, je remplace le joystick en entier : ta manette repart comme neuve. Garantie ${c.garantie}.`, p && `Tarif : ${p}.`, 'Je passe la récupérer chez toi et je te la ramène réparée le lendemain. Je peux te prêter une manette en attendant (selon dispo).', `Dis-moi combien de manettes, et ${ask.charAt(0).toLowerCase() + ask.slice(1)}`); }
+  if (k === 'drift') { const p = svcPrice(/drift.*ps5|drift/); return L(hi, `Pour le drift, je remplace le joystick en entier : ta manette repart comme neuve. Garantie ${c.garantie}.`, p && `Tarif : ${p}.`, 'Je passe la récupérer chez toi et je te la ramène réparée le lendemain. Je peux te prêter une manette en attendant (selon dispo).', 'Ou tu viens à mon atelier, à Crolles : réparation express en 20-25 min, tu repars avec ta manette.', `Dis-moi combien de manettes et si tu préfères venir à l’atelier. Pour que je passe chez toi, ${ask.charAt(0).toLowerCase() + ask.slice(1)}`); }
   if (k === 'clean') { const p = svcPrice(/nettoyage complet/) || svcPrice(/nettoyage(?!.*liquide)/); return L(hi, 'Ta PS5 chauffe ou souffle fort ? Je fais un nettoyage complet : j’ouvre la console, j’enlève toute la poussière et je nettoie le ventilateur. Elle refroidit mieux et fait moins de bruit.', p && `Tarif : ${noPar(p)}.`, 'Je passe la récupérer chez toi et je te la ramène propre.', ask); }
   if (k === 'lm') { const p = svcPrice(/liquide/); return L(hi, 'Ta PS5 surchauffe, fait beaucoup de bruit ou s’éteint toute seule ? Souvent, c’est le métal liquide (ce qui fait passer la chaleur de la puce au radiateur) qui ne fait plus son travail.', `Je le remplace et je fais le nettoyage complet en même temps.${p ? ` Tarif : ${noPar(p)}.` : ''} Garantie ${c.garantie}.`, 'Je passe la récupérer chez toi et je te la ramène réparée.', ask); }
   if (k === 'hdmi') { const p = svcPrice(/hdmi/); return L(hi, 'Plus d’image sur la télé ? Sur PS5, c’est souvent le port HDMI qui est abîmé. Je le remplace par un neuf et je teste la console sur une télé avant de te la rendre.', `${p ? `Tarif : ${noPar(p)}. ` : ''}Garantie ${c.garantie}.`, 'Je passe la récupérer chez toi et je te la ramène réparée. Si tu peux, envoie-moi une photo du port.', ask); }
