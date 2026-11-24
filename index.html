@@ -240,6 +240,10 @@ textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-
 .stop.pk{border-left:5px solid var(--warn)} .stop.rt{border-left:5px solid var(--good)}
 .stop.fx{box-shadow:inset 0 0 0 2px var(--accent-soft)} .st-fix{background:var(--accent-soft);color:var(--accent)}
 .stop-w{margin:0;font-size:13px;font-weight:700;color:var(--bad);line-height:1.4} .stop-loan{margin:0;font-size:13px;font-weight:700;color:var(--accent);line-height:1.4} .loan-chip{margin-top:4px;height:28px;padding:0 10px;font-size:12px;max-width:100%} .stop-i{margin:0;font-size:12.5px;color:var(--ink-2)}
+.slow-card{border:2px solid var(--bad);background:var(--bad-soft)} .slow-card h2{color:var(--bad)} .slow-r{display:grid;gap:6px;padding:10px 0 4px;border-top:1px solid var(--line)} .slow-r:first-of-type{border-top:0} .slow-d{color:var(--bad);font-weight:800}
+.strip.slow{background:var(--bad-soft);border:2px solid var(--bad);color:var(--bad);margin:0 0 14px;font-size:14px} .strip.slow b{color:var(--bad)}
+.xp-r{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--line)} .xp-r:first-of-type{border-top:0;padding-top:2px} .xp-h{font-size:15px} .xp-r.late .xp-h{color:var(--bad)} .xp-al{font-size:12.5px;color:var(--ink-2)} .xp-al.ok{color:var(--good);font-weight:700}
+.pill.rp-xp{background:var(--accent-soft);color:var(--accent)} ol.xp-steps{margin:0;padding-left:20px;display:grid;gap:4px}
 .stop-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .stop-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--surface);font-weight:800;font-size:13px}
 .stop-t{font-size:16px;font-variant-numeric:tabular-nums} .stop-m{font-size:14px;line-height:1.45} .stop-m a{color:var(--accent);text-decoration:none}
 .stop-a{display:flex;flex-wrap:wrap;gap:6px} .stop-a .grow{flex:1 1 auto}
@@ -671,7 +675,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '5c433adc6486';
+const APP_VERSION = '43ac9a353a36';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -953,6 +957,7 @@ const repDone = (r) => r.done !== false;
 const repPaid = (r) => r.paid !== false;
 const repPaidOn = (r) => (isDate(r.paidDate) ? r.paidDate : r.date || '');
 function repStage(r) {
+  if (r.xp && r.returned === false) return { k: 'xp', t: r.picked === false ? `Express · ${xpWhen(r)}` : 'Express · en cours', next: ['xp-done', 'Réparé et payé'] };
   if (r.picked === false) return { k: 'pick', t: 'À récupérer', next: ['rep-pick', 'Récupéré'] };
   if (!repDone(r)) return { k: 'wip', t: 'En réparation', next: ['rep-done', 'Réparé'] };
   if (r.returned === false) return { k: 'ret', t: r.result === 'ko' ? 'Échec · à rendre' : 'Réparé · à rendre', next: ['rep-ret', 'Rendu'] };
@@ -1087,6 +1092,7 @@ function renderAccueil() {
       <button class="iconbtn" data-act="month" data-d="1" aria-label="Mois suivant" ${m >= cur ? 'disabled' : ''}>${ic('right')}</button>
     </div>
     ${S.items.length ? '' : onboarding()}
+    ${(() => { const L = slowList(); if (!L.length) return ''; return `<button class="strip slow" data-act="tour-open" data-v="${autoSlot(today())}"><span>⚠️ <b>${L.length > 1 ? `${L.length} objets` : '1 objet'}</b> à l’atelier depuis trop longtemps</span><span>le plus ancien : <b>${plural(ago(L[0].gotDate), 'jour')}</b> (${esc(L[0].client || 'client')})</span>${ic('right')}</button>`; })()}
     <div class="dash">
       <div class="stack">
         <section class="card hero" aria-label="Bénéfice du mois">
@@ -2963,7 +2969,7 @@ function openAd(id, focus) {
 function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el.textContent = `(${t.value.length} caractères)`; }
 
 /* ---------- Tournée : demandes clients, ordre de passage (semaine : boucle Crolles → Crolles ; week-end : Saint-Égrève → Crolles), messages prêts ---------- */
-const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', wdFrom: 'Crolles', wdTo: 'Crolles', wdStart: '18:00', wdEnd: '21:00', wd2: true, midStart: '12:00', midEnd: '14:00', apStart: '15:00', apEnd: '17:00', send: 'sms', ocrLeft: true, msgs: {}, stop: 7, autoLate: true, formUrl: '', ntfy: '', fuelL100: 6, fuelPx: '',
+const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', wdFrom: 'Crolles', wdTo: 'Crolles', wdStart: '18:00', wdEnd: '21:00', wd2: true, midStart: '12:00', midEnd: '14:00', apStart: '15:00', apEnd: '17:00', send: 'sms', ocrLeft: true, msgs: {}, stop: 7, autoLate: true, formUrl: '', ntfy: '', fuelL100: 6, fuelPx: '', slowDays: 2, pj2: 35,
   services: 'Joystick drift (manette PS5) : 25 € (50 € les deux, 20 € la manette à partir de la 3e)\nJoystick drift (manette Xbox) : 25 € (mêmes tarifs que PS5)\nJoysticks à effet Hall (plus jamais de drift) : 45 € la manette\nManette PS5 : 25 € (bouton, gâchette, port de charge, batterie : à partir de 20 €)\nPS5 nettoyage simple : 40 € (poussière, ventilateur)\nPS5 nettoyage liquide métal : 80 € (surchauffe, bruit, nettoyage complet)\nHDMI PS5 : 75 € (port HDMI remplacé)\nTéléphone (batterie, écran, vitre arrière) : sur devis\nDiagnostic : gratuit si tu répares, 15 € sinon', p1: 25, p2: 50, delai: '24-48 h', garantie: '30 jours' };
 const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
 // Temps sur place (donner / récupérer, encaisser) : la route est comptée à part. Sans trajet calculé, 10 min de route estimées entre deux arrêts.
@@ -3145,7 +3151,14 @@ function repPhrase(list) {
 const telKey = (p) => String(p || '').replace(/\D/g, '').replace(/^33/, '0');
 const sameCli = (a, b) => a.id === b.id || (!!telKey(a.phone) && telKey(a.phone) === telKey(b.phone)) || (!!norm(a.client) && norm(a.client) === norm(b.client));
 const cliItems = (st, s, kind) => st.filter((x) => x.key === s.key && sameCli(x.r, s.r) && (kind === 'eta' || kind === 'late' || x.kind === s.kind));
-const tourPrice = (q, type) => {
+// Drift : une manette où tu changes les 2 joysticks coûte « pj2 » (35 €) au lieu du tarif d'une manette (25 €)
+const isDriftType = (t) => !t || (/drift|joystick/i.test(t) && !/hall/i.test(t));
+const j2Price = () => { const v = num(tourCfg().pj2); return v > 0 ? v : TOUR_DEF.pj2; };
+const j2Extra = () => Math.max(0, j2Price() - num(tourCfg().p1));
+const j2Of = (r) => Math.min(repQty(r), Math.max(0, parseInt(r && r.j2, 10) || 0));
+const j2Opts = (q, cur) => Array.from({ length: Math.max(1, q) + 1 }, (_, i) => `<option value="${i}" ${i === cur ? 'selected' : ''}>${i ? plural(i, 'manette') : 'aucune'}</option>`).join('');
+const tourPrice = (q, type, j2 = 0) => tourPrice0(q, type) + (isDriftType(type) ? Math.min(q, Math.max(0, j2 || 0)) * j2Extra() : 0);
+const tourPrice0 = (q, type) => {
   const c = tourCfg(), sv = services().find((s) => s.name === type), drift = !type || (/drift|joystick/i.test(type) && !/hall/i.test(type));
   if (sv && /diagnostic/i.test(sv.name)) return 0;
   if (sv && !drift) return sv.price != null ? sv.price * q : 0; // « sur devis » : à remplir
@@ -3164,7 +3177,7 @@ const plage = (D, slot) => { const c = dayCfg(D || today(), slot); return `entre
 // Rendez-vous à heure fixe : r.fix = { d: jour, t: 'HH:MM', k: 'pick' | 'ret' }.
 // Valable seulement ce jour-là et pour ce passage-là (une heure fixe de récupération ne s'applique pas au retour).
 const stopKind = (r) => (r.picked === false ? 'pick' : 'ret');
-const inRound = (r) => r.picked === false || (repDone(r) && r.returned === false);
+const inRound = (r) => !r.xp && (r.picked === false || (repDone(r) && r.returned === false));
 const isHM = (t) => /^\d{1,2}:\d{2}$/.test(String(t || ''));
 function fixOf(r, D) { const f = r && r.fix; return f && f.d === D && f.k === stopKind(r) && isHM(f.t) ? toMin(f.t) : null; }
 // La tournée d'une heure fixe : celle dont les horaires la contiennent, sinon la plus proche (à égalité, la suivante)
@@ -3276,8 +3289,8 @@ function planRound(G, o) {
 function tourStops(D, slot) {
   if (!slot || !slotsOf(D).includes(slot)) slot = tourSlot(D);
   const mk = (r, kind) => { const f = fixOf(r, D), own = f != null && slotForTime(D, f) === slot ? f : null; return { r, kind, own, missed: f != null && own == null ? f : null }; };
-  const pick = S.repairs.filter((r) => r.picked === false && effSlot(r, D) === slot).map((r) => mk(r, 'pick'));
-  const ret = S.repairs.filter((r) => r.picked !== false && repDone(r) && r.returned === false && effSlot(r, D) === slot).map((r) => mk(r, 'ret'));
+  const pick = S.repairs.filter((r) => r.picked === false && !r.xp && effSlot(r, D) === slot).map((r) => mk(r, 'pick'));
+  const ret = S.repairs.filter((r) => r.picked !== false && !r.xp && repDone(r) && r.returned === false && effSlot(r, D) === slot).map((r) => mk(r, 'ret'));
   const K = roundKey(D, slot), ord = LS.get('tourOrd', {})[K] || [];
   const all = [...pick, ...ret];
   all.sort((a, b) => {
@@ -4056,9 +4069,11 @@ const MSG_DEF = {
   late: "{salut}Petit retard, désolé 🙏 Je serai là {creneau}.",
   eta: "J'arrive dans 10 min {lieu} 🚗 Tu peux te préparer, à tout de suite !",
   ready: "{salut}{repare} Je t'envoie un message dès que je sais quand je peux passer, selon ma tournée. Si tu préfères, tu peux aussi venir {la} récupérer à l'atelier, à Crolles. À payer : {prix} (espèces, Wero ou Lydia).",
+  slow: "{salut}Je te donne des nouvelles de {objet} : la réparation prend plus de temps que prévu, désolé pour l'attente 🙏 Je fais au plus vite et je te préviens dès que c'est prêt.",
+  slowd: "{salut}Désolé pour l'attente 🙏 La réparation de {objet} prend plus de temps que prévu. Je fais au plus vite : je pense te {la} ramener {quand}, je te préviens avant de passer.",
   thanks: "{salut}Merci pour ta confiance ! Est-ce que tout fonctionne bien, le résultat te plaît ? Pour n'importe quel autre besoin, je suis là, écris-moi quand tu veux 🤝"
 };
-const MSG_NAMES = { confirm: 'Confirmation de la demande', pick: 'Heure précise (récupération)', ret: 'Heure précise (retour)', retko: 'Retour sans réparation possible', late: 'Retard', eta: "J'arrive (10 min)", ready: 'C’est réparé (prévenir le client)', thanks: 'Remerciement' };
+const MSG_NAMES = { confirm: 'Confirmation de la demande', pick: 'Heure précise (récupération)', ret: 'Heure précise (retour)', retko: 'Retour sans réparation possible', late: 'Retard', eta: "J'arrive (10 min)", ready: 'C’est réparé (prévenir le client)', slow: 'Retard de réparation (excuses)', slowd: 'Retard de réparation (excuses + « demain »)', thanks: 'Remerciement' };
 // list : tout ce que ce client donne ou récupère à cet arrêt (« tes manettes », un seul prix total)
 function tourMsg(kind, r, s, list) {
   r = r || {}; list = list && list.length ? list : [r];
@@ -4076,7 +4091,9 @@ function tourMsg(kind, r, s, list) {
   const tpl = (k) => ((c.msgs || {})[k] || '').trim() || MSG_DEF[k];
   if (kind === 'confirm') { const D = isDate(r.planDate) ? r.planDate : today(), f = fixOf(r, D); if (f != null) return fill(tpl('confirm'), dayWord(D), `à ${hm(f)}`, `à ${hm(f)}`); return fill(tpl('confirm'), momentTxt(D, r.planSlot), plage(D, r.planSlot), plage(D, r.planSlot)); }
   if (kind === 'ready') { const [nD, nS] = nextRound(); return fill(tpl('ready'), momentTxt(nD, nS), plage(nD, nS), plage(nD, nS)); }
-  if (MSG_DEF[kind]) return fill(tpl(kind), soir, s ? (fx ? when : plage(tourDay(), tourSlot())) : '', when) + (mixed && tot > 0 ? ` À payer sur place : ${amt} (espèces, Wero ou Lydia).` : '');
+  if (kind === 'slowd') return fill(tpl('slowd'), 'demain', '', '');
+  if (MSG_DEF[kind]) return fill(tpl(kind), soir, s ? (fx ? when : plage(tourDay(), tourSlot())) : '', when) + (mixed && tot > 0 ? ` À payer sur place : ${amt} (espèces, Wero ou Lydia).` : '')
+    + (kind === 'eta' && list.some((x) => x.loan && x.picked !== false) ? ' Pense aussi à préparer la manette de prêt 🎮' : '');
   return '';
 }
 function sendMsg(text, phone, pre) {
@@ -4099,12 +4116,139 @@ function loanCard() {
 // Rendu : la manette de prêt revient (rappel dans le message)
 const loanBack = (r) => (r && r.loan ? { loan: false } : {});
 const loanMsg = (had) => (had ? ' · 🎮 Reprends ta manette de prêt' : '');
+/* ---------- Drift : les 2 joysticks changés sur une manette ---------- */
+const j2Chip = (r, cls = '') => {
+  if (!isDriftType(r.type)) return '';
+  const q = repQty(r), n = j2Of(r);
+  return `<button class="chip ${cls}" data-act="rep-j2" data-id="${esc(r.id)}" aria-pressed="${n > 0}">${q === 1 ? `${n ? '☑' : '☐'} 🕹️🕹️ Les 2 joysticks · ${eur(j2Price())}` : `🕹️🕹️ 2 joysticks : ${n ? `${n} manette${n > 1 ? 's' : ''}` : 'aucune'} ✎`}</button>`;
+};
+async function setJ2(r, n) {
+  const total = Math.round((repTotal(r) + (n - j2Of(r)) * j2Extra()) * 100) / 100;
+  await repFast(r.id, { j2: n, total }, `${n ? `Les 2 joysticks sur ${plural(n, 'manette')}` : 'Un seul joystick par manette'} : ${eur(total)} au total`);
+}
+function openJ2(r) {
+  const q = repQty(r);
+  openSheet({ kind: 'j2', id: r.id, title: '🕹️🕹️ Les 2 joysticks', body: `
+    <p style="margin:0">${esc(r.client || 'Ce client')} · ${plural(q, 'manette')} · ${eur(repTotal(r))} pour l’instant.</p>
+    <div class="field"><span class="lbl">Sur combien de manettes changes-tu les 2 joysticks ?</span>${radios('j2-n', Array.from({ length: q + 1 }, (_, i) => [String(i), i ? plural(i, 'manette') : 'Aucune']), String(j2Of(r)), 'opts seg3')}</div>
+    <p class="hint" style="margin:0">Chacune : ${eur(j2Price())} au lieu de ${eur(num(tourCfg().p1))}, soit +${eur(j2Extra())} sur le prix.</p>`,
+    foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="j2-save" data-id="${esc(r.id)}">Enregistrer</button>` });
+}
+/* ---------- Objets restés trop longtemps à l'atelier ---------- */
+// Récupéré depuis « slowDays » jours ou plus et pas encore réparé : grosse alerte rouge + messages d'excuse
+const slowDays = () => Math.max(1, parseInt(tourCfg().slowDays, 10) || TOUR_DEF.slowDays);
+const slowList = () => S.repairs.filter((r) => r.picked !== false && !repDone(r) && !r.xp && isDate(r.gotDate) && ago(r.gotDate) >= slowDays()).sort((a, b) => a.gotDate.localeCompare(b.gotDate));
+function slowCard() {
+  const L = slowList(); if (!L.length) return '';
+  const sent = LS.get('slowSent', {}) || {};
+  return `<section class="card slow-card"><div class="card-h"><h2 class="sec">⚠️ ${L.length > 1 ? `${L.length} objets attendent` : '1 objet attend'} à l’atelier depuis trop longtemps</h2></div>
+    ${L.map((r) => `<div class="slow-r"><div><b>${esc(r.client || 'Client')}</b> · ${esc(r.type)} ×${repQty(r)}<br><span class="slow-d">Depuis ${plural(ago(r.gotDate), 'jour')}</span> <small class="muted">· récupéré le ${dShort(r.gotDate)}${sent[r.id] ? ` · excuse envoyée le ${dShort(sent[r.id])}` : ''}</small></div>
+      <div class="btns"><button class="btn sm" data-act="tour-msg" data-k="slow" data-id="${esc(r.id)}">📩 Excuse</button><button class="btn sm" data-act="tour-msg" data-k="slowd" data-id="${esc(r.id)}">📩 Excuse + « demain »</button><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></div></div>`).join('')}
+    <p class="hint" style="margin:6px 0 0">Les boutons 📩 copient un message d’excuse${tourCfg().send === 'copy' ? '' : ' et ouvrent tes SMS'}. Alerte à partir de ${plural(slowDays(), 'jour')} à l’atelier : modifiable dans Réglages.</p></section>`;
+}
+
+/* ---------- Client express : il vient à l'atelier, à Crolles (réparé sur place en 20-25 min) ---------- */
+// r.xp = 1 : jamais dans la tournée ni dans l'essence. RDV prévu : picked false, planDate = jour, xpT = 'HH:MM' (facultatif), xpAl = 1 : réveil 30 min avant.
+const XP_SHORTCUT = 'Réveil REPARO', XP_ALARM_TXT = 'Client arrive dans 30 minutes';
+const xpKey = (r) => `${r.planDate || r.date || ''} ${isHM(r.xpT) ? r.xpT.padStart(5, '0') : '99:99'}`;
+const xpOpen = () => S.repairs.filter((r) => r.xp && r.returned === false).sort((a, b) => xpKey(a).localeCompare(xpKey(b)));
+const xpWhen = (r) => `${dayWord(r.planDate || r.date)}${isHM(r.xpT) ? ` à ${hm(toMin(r.xpT))}` : ''}`;
+const xpAlarmMin = (r) => (isHM(r.xpT) ? toMin(r.xpT) - 30 : null);
+// L'Horloge de l'iPhone ne connaît que l'heure : un réveil sonne la prochaine fois que cette heure arrive.
+// On ne le met donc que s'il sonnera le bon jour : le jour du RDV (heure pas encore passée), ou la veille une fois cette heure passée.
+function xpAlarmState(r) {
+  const a = xpAlarmMin(r); if (!r.xpAl || a == null || a < 0 || r.picked !== false || !isDate(r.planDate)) return '';
+  const T = today(), n = nowMin();
+  if (r.planDate < T || (r.planDate === T && a <= n)) return '';
+  if ((LS.get('xpAlSet', {}) || {})[r.id] === `${r.planDate} ${r.xpT}`) return 'set';
+  return (r.planDate === T && a > n) || (r.planDate === addDays(T, 1) && a <= n) ? 'now' : 'later';
+}
+function xpAlarmGo(r) {
+  const M = LS.get('xpAlSet', {}) || {}; M[r.id] = `${r.planDate} ${r.xpT}`; LS.set('xpAlSet', M);
+  location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(XP_SHORTCUT)}&input=text&text=${encodeURIComponent(hhmm(xpAlarmMin(r)))}`;
+}
+function xpCard() {
+  const L = xpOpen(); if (!L.length) return '';
+  const row = (r) => {
+    const st = xpAlarmState(r), a = xpAlarmMin(r), past = r.picked === false && (r.planDate || '') < today();
+    const al = st === 'now' ? `<button class="btn sm primary" data-act="xp-alarm" data-id="${esc(r.id)}">⏰ Mettre le réveil de ${hm(a)}</button>`
+      : st === 'set' ? `<span class="xp-al ok">⏰ Réveil mis à ${hm(a)}</span> <button class="chip" data-act="xp-alarm" data-id="${esc(r.id)}">Le remettre</button>`
+      : st === 'later' ? `<span class="xp-al">⏰ Réveil de ${hm(a)} : le bouton pour le mettre apparaît ${r.planDate === addDays(today(), 1) ? `aujourd’hui à partir de ${hm(a)}` : `la veille du RDV, à partir de ${hm(a)}`} (l’Horloge ne règle un réveil que pour les prochaines 24 h).</span>` : '';
+    return `<div class="xp-r${past ? ' late' : ''}"><div class="xp-h"><b>${r.picked === false ? (past ? `⚠️ Prévu ${xpWhen(r)} : pas venu ?` : `🕒 ${cap1(xpWhen(r))}`) : '🔧 En cours'}</b></div>
+      <div class="stop-m"><b>${esc(r.client || 'Client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<br><small class="muted">${esc(r.type)} ×${repQty(r)} · ${eur(repTotal(r))}${r.note ? ' · ' + esc(r.note) : ''}</small></div>
+      ${al ? `<div>${al}</div>` : ''}
+      ${isDriftType(r.type) ? `<div>${j2Chip(r)}</div>` : ''}
+      <div class="btns"><button class="btn sm primary grow" data-act="xp-done" data-id="${esc(r.id)}">✅ Réparé, rendu et payé</button><button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button></div></div>`;
+  };
+  return `<section class="card"><div class="card-h"><h2 class="sec">⚡ Express à l’atelier</h2><span class="muted" style="font-size:12.5px">${plural(L.length, 'client')}</span></div>
+    ${L.map(row).join('')}
+    <p class="hint" style="margin:6px 0 0">Il vient à ton atelier, à Crolles : pas de tournée, pas d’essence. Quand c’est fini, touche « Réparé, rendu et payé » : c’est encaissé aujourd’hui.</p></section>`;
+}
+function openXp(id) {
+  const r = id ? S.repairs.find((x) => x.id === id) : null, T = repTypes(), sv = services();
+  const last = (sv[0] && sv[0].name) || [...T.keys()].find((t) => /drift/i.test(t)) || [...T.keys()].pop();
+  const v = r || { type: last, qty: 1, planDate: today(), xpT: '', xpAl: 1 };
+  const sw = (id2, on, label, hint) => `<label class="sw"><span class="sw-t"><b>${label}</b><small>${hint}</small></span><input type="checkbox" id="${id2}" role="switch" ${on ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label>`;
+  openSheet({ kind: 'xp', id, title: r ? 'Client express' : '⚡ Client express à l’atelier', body: `
+    <p class="hint" style="margin:0">Il vient à ton atelier, à Crolles : tu répares sur place en 20-25 min et il repart avec. Il n’entre pas dans la tournée.</p>
+    <div class="row2">${textF('x-name', 'Prénom', v.client || '', 'Prénom ou pseudo')}${textF('x-phone', 'Téléphone <span class="opt-l">(facultatif)</span>', v.phone || '', '06 …', 'inputmode="tel"')}</div>
+    <div class="row2"><div class="field"><label for="x-type">Prestation</label><input id="x-type" class="inp" list="dl-rep3" autocomplete="off" value="${esc(v.type)}"><datalist id="dl-rep3">${[...new Set([...sv.map((x) => x.name), ...T.keys()])].map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>
+      <div class="field"><label for="x-qty">Nombre</label><span class="selw" style="display:block"><select id="x-qty" class="inp">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}" ${n === repQty(v) ? 'selected' : ''}>${n}</option>`).join('')}</select></span></div></div>
+    <div class="field" id="x-j2-f" ${isDriftType(v.type) ? '' : 'hidden'}><label for="x-j2">Les 2 joysticks à changer sur</label><span class="selw" style="display:block"><select id="x-j2" class="inp">${j2Opts(6, j2Of(v))}</select></span><small class="hint">${eur(j2Price())} la manette où les 2 joysticks driftent (au lieu de ${eur(num(tourCfg().p1))}).</small></div>
+    ${moneyF('x-total', 'Prix total', r ? repTotal(r) : tourPrice(1, v.type), 'Même prix que d’habitude')}
+    ${r ? '' : sw('x-now', false, 'Déjà réparé, rendu et payé', 'Il est déjà venu et c’est fini : la prestation est encaissée ce jour-là')}
+    <div class="row2"><div class="field"><label for="x-day" id="x-day-l">Jour du RDV</label><input id="x-day" class="inp" type="date" value="${esc(isDate(v.planDate) ? v.planDate : today())}">${errSlot('x-day')}</div>
+      <div class="field" id="x-time-f"><label for="x-time">Heure <span class="opt-l">(facultatif)</span></label><input id="x-time" class="inp" type="time" step="300" value="${esc(isHM(v.xpT) ? v.xpT : '')}">${errSlot('x-time')}</div></div>
+    <div id="x-al-w">${sw('x-al', !!v.xpAl, '⏰ Réveil 30 min avant', `Un réveil « ${XP_ALARM_TXT} » dans l’Horloge de ton iPhone. La 1re fois, crée le raccourci : Réglages de la tournée, « Réveil des clients express ».`)}</div>
+    ${textF('x-note', 'Note <span class="opt-l">(facultatif)</span>', v.note || '', 'ex. manette blanche, 2 joysticks')}`,
+    foot: `<button class="btn" data-act="close">Annuler</button>${r ? `<button class="btn" data-act="rep-full" data-id="${esc(id)}">Fiche complète</button>` : ''}<button class="btn primary grow" data-act="xp-save" ${id ? `data-id="${esc(id)}"` : ''}>${r ? 'Enregistrer' : 'Ajouter'}</button>` });
+  if (r) $('#x-total').dataset.touched = '1'; xpSync();
+}
+function xpSync() {
+  const now = !!($('#x-now') && $('#x-now').checked), f = $('#x-time-f'), w = $('#x-al-w'), l = $('#x-day-l');
+  if (f) f.hidden = now; if (w) w.hidden = now || !val('x-time'); if (l) l.textContent = now ? 'Fait le' : 'Jour du RDV';
+}
+async function xpSave(a) {
+  clearErrs();
+  const id = a.dataset.id, old = id ? S.repairs.find((x) => x.id === id) : null;
+  const qty = Number(val('x-qty')) || 1, T = repTypes(), type = val('x-type').trim() || 'Joystick drift (manette PS5)';
+  const j2 = isDriftType(type) ? Math.min(qty, Number(val('x-j2')) || 0) : 0, total = parseNum(val('x-total')) ?? tourPrice(qty, type, j2);
+  const D = val('x-day'), t = val('x-time'), now = !!($('#x-now') && $('#x-now').checked), client = val('x-name').trim(), phone = val('x-phone').trim();
+  if (!isDate(D)) return fieldErr('x-day', 'Choisis le jour.');
+  if (now && D > today()) return fieldErr('x-day', 'Ce jour n’est pas encore arrivé : décoche « Déjà réparé, rendu et payé ».');
+  if (!now && D < today()) return fieldErr('x-day', 'Ce jour est passé : choisis aujourd’hui ou un autre jour.');
+  if (!now && t && !isHM(t)) return fieldErr('x-time', 'Heure invalide.');
+  if (!now && !client && !phone) return fieldErr('x-name', 'Indique au moins le prénom ou le numéro.');
+  if (total == null || total < 0) return fieldErr('x-total', 'Indique le prix.');
+  const base = { type, qty, unitPrice: num(T.get(type)) || (old ? num(old.unitPrice) : num(tourCfg().p1)), total, client, phone, note: val('x-note').trim(), xp: 1, fix: null, planSlot: '', j2 };
+  const r = now ? { ...base, picked: true, gotDate: D, done: true, result: 'ok', date: D, returned: true, returnDate: D, paid: true, paidDate: D, planDate: '', xpT: '', xpAl: 0 }
+    : { ...base, picked: false, gotDate: '', done: false, result: '', date: D, returned: false, returnDate: '', paid: false, paidDate: '', planDate: D, xpT: t || '', xpAl: t && $('#x-al').checked ? 1 : 0 };
+  const at = new Date().toISOString();
+  a.disabled = true;
+  const ok = await write(() => (old ? updRepair(id, r) : addRepair({ ...r, partsCost: 0, createdAt: at })));
+  a.disabled = false;
+  if (!ok) return;
+  closeSheet(); S.tourDay = 'ce-soir';
+  if (S.view !== 'tournee') setView('tournee'); else renderTournee();
+  const x = old ? S.repairs.find((y) => y.id === id) : S.repairs.find((y) => y.createdAt === at);
+  if (now) { toast(`Express encaissé : +${eur(repNet(r))}${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); return; }
+  const st = x ? xpAlarmState(x) : '';
+  if (st === 'now') { openXpAlarm(x); return; }
+  toast(`${client || 'Client'} : express ${xpWhen(r)}${st === 'later' ? ' · le bouton du réveil apparaîtra la veille' : ''}`);
+}
+// iOS n'ouvre un autre appli que juste après un appui : on demande un dernier appui pour créer le réveil
+function openXpAlarm(r) {
+  openSheet({ kind: 'xpal', id: r.id, title: '⏰ Dernière étape : le réveil', body: `
+    <p style="margin:0">${esc(r.client || 'Ton client')} arrive ${xpWhen(r)}. Touche le bouton : le raccourci « ${XP_SHORTCUT} » met un réveil à <b>${hm(xpAlarmMin(r))}</b> dans l’Horloge, « ${XP_ALARM_TXT} ».</p>
+    <p class="hint" style="margin:0">Pas encore de raccourci ? Réglages de la tournée, « Réveil des clients express » : 1 minute à créer, une seule fois.</p>`,
+    foot: `<button class="btn" data-act="close">Plus tard</button><button class="btn primary grow" data-act="xp-alarm" data-id="${esc(r.id)}">⏰ Créer le réveil de ${hm(xpAlarmMin(r))}</button>` });
+}
 function renderTournee() {
   const el = $('#v-tournee');
   if (S.status !== 'ok') { el.innerHTML = stateBlock(); return; }
   const D = tourDay(), slot = tourSlot(D), K = roundKey(D, slot), c = dayCfg(D, slot), stops = tourStops(D, slot), lv = stops.live, isT = D === today();
   const nStops = stops.length ? stops[stops.length - 1].n : 0;
-  const atelier = S.repairs.filter((r) => r.picked !== false && !repDone(r));
+  const atelier = S.repairs.filter((r) => r.picked !== false && !repDone(r) && !r.xp);
   const pickN = sum(stops.filter((s) => s.kind === 'pick'), (s) => repQty(s.r)), retN = sum(stops.filter((s) => s.kind === 'ret'), (s) => repQty(s.r));
   const cash = sum(stops.filter((s) => s.kind === 'ret' && !repPaid(s.r)), (s) => repTotal(s.r));
   const card = (s) => {
@@ -4123,7 +4267,7 @@ function renderTournee() {
         ${adr ? `<a href="${esc(wazeUrl(r))}" target="_blank" rel="noopener">${r.geo ? '📍 ' : ''}${esc(adr)}</a>${r.meet ? ` <small class="muted">· RDV : ${esc(lieuTxt(r))}</small>` : ''}${r.geo ? '' : ` <button class="chip warn" data-act="geo-fix" data-id="${esc(r.id)}">📍 Trouver ce lieu</button>`}` : '<span class="neg">Adresse manquante : touche Modifier</span>'}${cityRank(r.city) === 50 && r.city ? ' <small class="muted">(commune hors trajet : placée à la fin)</small>' : ''}
         <small class="muted"> · ${esc(r.type)}${r.note ? ' · ' + esc(r.note) : ''}</small></div>
       ${!pick && r.loan ? '<p class="stop-loan">🎮 Il a ta manette de prêt : reprends-la en lui rendant la sienne.</p>' : ''}
-      <div class="stop-mv">${loanChip(r)}</div>
+      <div class="stop-mv">${loanChip(r)} ${j2Chip(r)}</div>
       <div class="stop-a">
         ${s.lateBy > 0 ? `<button class="btn sm danger" data-act="tour-msg" data-k="late" data-id="${esc(r.id)}">Prévenir du retard</button>` : `<button class="btn sm" data-act="tour-msg" data-k="${s.kind}" data-id="${esc(r.id)}">${s.sent ? 'Heure envoyée ✓' : 'Envoyer l’heure'}</button>`}
         <a class="btn sm" href="${esc(wazeUrl(r))}" target="_blank" rel="noopener">🚗 Waze</a>
@@ -4141,8 +4285,9 @@ function renderTournee() {
   };
   el.innerHTML = `
     <div class="ttl-row"><div><div class="eyebrow">Réparo · récupérations et retours</div><h1 class="h1">Tournée</h1></div><button class="btn sm" data-act="tour-cfg">Réglages</button></div>
+    ${slowCard()}
     <div class="tour-quick">
-      <button class="btn primary grow" data-act="dem-add">${ic('plus')} Nouvelle demande</button>
+      <button class="btn primary grow" data-act="dem-add">${ic('plus')} Nouvelle demande</button><button class="btn" data-act="xp-add">⚡ Client express</button>
     </div>
     <div class="tour-reply"><span class="muted" style="font-size:12.5px">Répondre à un nouveau client :</span> ${REPLY_KINDS.map(([k, l]) => `<button class="chip" data-act="tour-reply" data-k="${k}">${l}</button>`).join(' ')}</div>
     <div class="stabs" role="tablist">${[['ce-soir', "Aujourd'hui"], ['demain', 'Demain']].map(([v, l]) => `<button role="tab" data-act="tour-day" data-v="${v}" aria-selected="${(S.tourDay || 'ce-soir') === v}">${l}</button>`).join('')}</div>
@@ -4165,10 +4310,11 @@ function renderTournee() {
       : (() => { const other = slotsOf(D).filter((x) => x !== slot && tourStops(D, x).length); return `<p style="margin:0">Aucun arrêt ${momentTxt(D, slot)}.${other.length ? '' : ' Ajoute une demande dès qu’un client t’écrit : elle va dans la tournée que tu choisis, à la bonne place sur ton trajet.'}</p>${other.length ? `<div class="btns">${other.map((x) => `<button class="btn sm primary" data-act="tour-slot" data-v="${x}">Voir la tournée ${SLOT_NAMES[x] === 'Soir' ? 'du soir' : SLOT_NAMES[x] === 'Midi' ? 'de midi' : 'de l’après-midi'} (${tourStops(D, x).slice(-1)[0].n})</button>`).join('')}</div>` : ''}`; })()}
     </section>
     ${stops.map(card).join('')}
+    ${xpCard()}
     ${fuelCard()}
     ${loanCard()}
     <section class="card"><div class="card-h"><h2 class="sec">Atelier</h2><span class="muted" style="font-size:12.5px">${sum(atelier, repQty)} à réparer</span></div>
-      ${atelier.length ? atelier.map((r) => `<div class="cl rp"><span class="d">${dShort(r.gotDate || r.date)}</span><span class="t">${esc(r.client || 'Client')} · ${esc(r.type)} ×${repQty(r)}<small>${esc(r.city || '')}</small>${loanChip(r, 'loan-chip')}</span><span class="a"><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></span></div>`).join('')
+      ${atelier.length ? atelier.map((r) => `<div class="cl rp"><span class="d">${dShort(r.gotDate || r.date)}</span><span class="t">${esc(r.client || 'Client')} · ${esc(r.type)} ×${repQty(r)}<small>${esc(r.city || '')}${isDate(r.gotDate) && ago(r.gotDate) >= slowDays() ? `${r.city ? ' · ' : ''}<b class="slow-d">⚠️ depuis ${plural(ago(r.gotDate), 'jour')}</b>` : ''}</small>${loanChip(r, 'loan-chip')} ${j2Chip(r, 'loan-chip')}</span><span class="a"><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></span></div>`).join('')
         + (atelier.length > 1 ? `<div class="btns" style="margin-top:8px"><button class="btn sm" data-act="rep-ready-all">Tout est réparé</button></div>` : '') : '<p class="muted" style="margin:0">Rien à réparer pour l’instant.</p>'}
     </section>
     <section class="card"><div class="card-h"><h2 class="sec">Messages utiles</h2></div>
@@ -4188,6 +4334,7 @@ function whenOpts() {
 function openDemande() {
   const T = repTypes(), sv = services(), last = (sv[0] && sv[0].name) || [...T.keys()].find((t) => /drift/i.test(t)) || [...T.keys()].pop();
   openSheet({ kind: 'dem', title: 'Nouvelle demande', body: `
+    <div class="btns" style="margin:0"><button class="chip" data-act="xp-add">⚡ Il vient à l’atelier ? Client express</button></div>
     <div class="field"><label for="d-paste">Colle ici le message du client</label><textarea id="d-paste" class="inp" rows="4" placeholder="Ex. : Yanis, 06 12 34 56 78, 12 rue des Alpes 38400 Saint-Martin-d’Hères, 2 manettes qui driftent"></textarea>
       <div class="btns" style="margin-top:6px"><button class="btn sm" data-act="dem-pastebtn">${ic('copy')} Coller depuis le presse-papiers</button><label class="btn sm primary" for="d-shot">${ic('cam')} Lire une capture d'écran</label><input id="d-shot" type="file" accept="image/*" multiple hidden></div>
       <p class="hint" id="d-shot-st" style="margin:4px 0 0" hidden></p>
@@ -4198,6 +4345,7 @@ function openDemande() {
       <div class="field"><label for="d-qty">Nombre</label><span class="selw" style="display:block"><select id="d-qty" class="inp">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}">${n}</option>`).join('')}</select></span></div></div>
     ${placeBox('d')}
     <div class="row2"><div class="field"><label for="d-type">Prestation</label><input id="d-type" class="inp" list="dl-rep2" autocomplete="off" value="${esc(last)}"><datalist id="dl-rep2">${[...new Set([...sv.map((s) => s.name), ...T.keys()])].map((t) => `<option value="${esc(t)}">`).join('')}</datalist></div>${moneyF('d-total', 'Prix total', tourPrice(1))}</div>
+    <div class="field" id="d-j2-f" ${isDriftType(last) ? '' : 'hidden'}><label for="d-j2">Les 2 joysticks à changer sur</label><span class="selw" style="display:block"><select id="d-j2" class="inp">${j2Opts(6, 0)}</select></span><small class="hint">${eur(j2Price())} la manette où les 2 joysticks driftent (au lieu de ${eur(num(tourCfg().p1))}).</small></div>
     <div class="field"><span class="lbl">Passage</span>${radios('d-when', whenOpts(), whenOpts()[0][0], whenOpts().length > 4 ? 'opts seg3' : 'opts seg2')}</div>
     <div class="field"><label for="d-fix">Heure fixe <span class="opt-l">(facultatif)</span></label><input id="d-fix" class="inp" type="time" step="300">${errSlot('d-fix')}<small class="hint" id="d-fixinfo">${FIX_HINT}</small></div>
     ${textF('d-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. urgent, manette blanche, mineur : n° parent')}
@@ -4235,15 +4383,15 @@ function demFill() {
   if (p.note) { const n = $('#d-note'); if (n && !n.value) n.value = p.note; }
   const gs = p.type ? { name: p.type } : guessService(val('d-paste')), ty = $('#d-type');
   if (gs && ty && !ty.dataset.touched) ty.value = gs.name;
-  const q = $('#d-qty'); if (q && !q.dataset.touched) { q.value = String(p.qty); const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(p.qty, val('d-type'))); }
+  const q = $('#d-qty'); if (q && !q.dataset.touched) { q.value = String(p.qty); const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(p.qty, val('d-type'), Number(val('d-j2')) || 0)); }
   if (val('d-addr') && val('d-addr') + '|' + val('d-city') !== before) { if (PLACE.d) PLACE.d.geo = null; if (p.meet && PLACE.d) { PLACE.d.meet = true; const m = $('input[name="d-meet"][value="meet"]'); if (m) m.checked = true; } clearTimeout(demFill.t); demFill.t = setTimeout(() => placeFind('d', true), 700); }
 }
 async function demSave(a) {
   clearErrs();
   const qty = Number(val('d-qty')) || 1, T = repTypes(), type = val('d-type').trim() || 'Joystick drift (manette PS5)';
-  const total = parseNum(val('d-total')) ?? tourPrice(qty, type);
+  const j2 = isDriftType(type) ? Math.min(qty, Number(val('d-j2')) || 0) : 0, total = parseNum(val('d-total')) ?? tourPrice(qty, type, j2);
   const r = { type, qty, unitPrice: num(T.get(type)) || num(tourCfg().p1), total, partsCost: 0, client: val('d-name').trim(), phone: val('d-phone').trim(), address: val('d-addr').trim(), city: val('d-city').trim(), note: val('d-note').trim(),
-    picked: false, gotDate: '', done: false, result: '', returned: false, returnDate: '', paid: false, paidDate: '', planDate: /^demain/.test(radioVal('d-when')) ? addDays(today(), 1) : today(), planSlot: (radioVal('d-when').match(/midi|aprem/) || [''])[0] };
+    ...(j2 ? { j2 } : {}), picked: false, gotDate: '', done: false, result: '', returned: false, returnDate: '', paid: false, paidDate: '', planDate: /^demain/.test(radioVal('d-when')) ? addDays(today(), 1) : today(), planSlot: (radioVal('d-when').match(/midi|aprem/) || [''])[0] };
   Object.assign(r, placeVal('d'));
   r.date = r.planDate;
   if (!r.client && !r.phone) return fieldErr('d-name', 'Indique au moins le prénom ou le numéro.');
@@ -4346,6 +4494,7 @@ function openTourCfg() {
     </div>
     <div class="row2"><div class="field"><label for="t-stop">Minutes sur place par arrêt</label><input id="t-stop" class="inp" inputmode="numeric" value="${esc(String(c.stop))}"><small class="hint">Le temps de donner ou récupérer et d’encaisser. La route est comptée à part.</small></div>${textF('t-delai', 'Délai annoncé', c.delai)}</div>
     <div class="row2">${moneyF('t-p1', 'Drift : 1 manette', c.p1)}${moneyF('t-p2', 'Drift : 2 manettes', c.p2)}</div>
+    ${moneyF('t-pj2', 'Drift : une manette avec les 2 joysticks', j2Price(), 'Le bouton « 🕹️🕹️ Les 2 joysticks » met ce prix pour cette manette')}
     ${textF('t-gar', 'Garantie', c.garantie)}
     <div class="field"><label for="t-serv">Tes prestations et prix (une par ligne, « Nom : prix »)</label><textarea id="t-serv" class="inp" rows="5">${esc(c.services || '')}</textarea><small class="hint">Leurs prix sont repris dans les réponses aux nouveaux clients et dans la liste « Prestation » des demandes.</small></div>
     <div class="fs"><p class="fs-t">Messages aux clients</p>
@@ -4355,6 +4504,20 @@ function openTourCfg() {
       <div class="field"><textarea id="t-msg" class="inp" rows="5" data-k="confirm">${esc(((c.msgs || {}).confirm || '').trim() || MSG_DEF.confirm)}</textarea>
         <small class="hint">Les mots entre accolades se remplissent seuls : {salut} {prenom} {objet} {Objet} {la} {est} {reparee} {prete} {lieu} (« devant chez toi » ou le lieu de RDV) {quand} (« ce soir »…) {plage} {creneau} (heure précise) {prix} {garantie} {repare} (« Le port HDMI de ta PS5 est réparé ✅ »…). Change de message dans la liste : celui que tu viens de modifier est gardé.</small>
         <div class="btns"><button class="btn sm" data-act="msg-reset">Remettre le texte d'origine</button></div></div>
+    </div>
+    <div class="fs"><p class="fs-t">Atelier</p>
+      <div class="field"><label for="t-slow">Alerte quand un objet est à l’atelier depuis (jours)</label><input id="t-slow" class="inp" inputmode="numeric" value="${esc(String(slowDays()))}"><small class="hint">Pas encore réparé au bout de ce nombre de jours : il s’affiche en rouge en haut de la Tournée et de l’Accueil, avec les messages d’excuse.</small></div>
+    </div>
+    <div class="fs"><p class="fs-t">⏰ Réveil des clients express (iPhone)</p>
+      <p class="hint" style="margin:0">L’appli ne peut pas régler l’Horloge toute seule : elle passe par un raccourci de l’app Raccourcis, à créer une seule fois.</p>
+      <ol class="hint xp-steps">
+        <li>Ouvre l’app <b>Raccourcis</b> et touche <b>+</b>.</li>
+        <li>Touche le nom en haut et écris exactement : <b>${XP_SHORTCUT}</b></li>
+        <li>Ajoute l’action qui lit une date dans un texte : cherche <b>dates</b> et choisis <b>Obtenir les dates de l’entrée</b>. Touche le mot en bleu et choisis <b>Entrée du raccourci</b>.</li>
+        <li>Ajoute l’action <b>Créer une alarme</b> (cherche <b>alarme</b>). Touche l’heure et choisis <b>Dates</b>. Touche la flèche pour voir plus d’options et écris le libellé : <b>${XP_ALARM_TXT}</b></li>
+        <li>Touche <b>OK</b>. Reviens ici et touche « Tester le réveil » : un réveil est créé dans 2 minutes (tu pourras le supprimer).</li>
+      </ol>
+      <div class="btns"><button class="btn sm" data-act="xp-alarm-test">⏰ Tester le réveil</button></div>
     </div>
     <div class="fs"><p class="fs-t">Formulaire de réservation</p>
       ${textF('t-form', 'Lien de ton formulaire', c.formUrl || '', 'https://docs.google.com/forms/…')}
@@ -4413,6 +4576,7 @@ const TOUR_ACT = {
     // Un seul message pour tout ce que ce client donne ou récupère à cet arrêt ; on retient l'heure annoncée (pour voir un retard)
     const D = tourDay(), K = roundKey(D, tourSlot(D)), st = tourStops(D), s = st.find((x) => x.r.id === r.id), items = s ? cliItems(st, s, k).filter((x) => k !== 'ready' || x.r.result !== 'ko') : [];
     sendMsg(tourMsg(k, r, s, items.map((x) => x.r)), r.phone);
+    if (/^slow/.test(k)) { const m = LS.get('slowSent', {}) || {}; m[r.id] = today(); LS.set('slowSent', m); setTimeout(renderTournee, 400); return; }
     if (k === 'ready') { markReady(items.length ? items.map((x) => x.r.id) : [r.id]); setTimeout(renderTournee, 400); return; }
     if (s && (k === 'late' || k === s.kind)) {
       const m = LS.get('tourSent', {}) || {};
@@ -4476,7 +4640,7 @@ const TOUR_ACT = {
       wdFrom: val('t-wd-from').trim() || TOUR_DEF.wdFrom, wdTo: val('t-wd-to').trim() || TOUR_DEF.wdTo, wdStart: val('t-wd-start') || TOUR_DEF.wdStart, wdEnd: val('t-wd-end') || TOUR_DEF.wdEnd,
       wd2: !!($('#t-wd2') || {}).checked, midStart: val('t-mid-start') || TOUR_DEF.midStart, midEnd: val('t-mid-end') || TOUR_DEF.midEnd, apStart: val('t-ap-start') || TOUR_DEF.apStart, apEnd: val('t-ap-end') || TOUR_DEF.apEnd,
       send: radioVal('t-send') || 'sms', ocrLeft: !!($('#t-ocrleft') || {}).checked, msgs: (() => { const ta = $('#t-msg'); if (ta) MSG_DRAFT[ta.dataset.k] = ta.value; const o = {}; Object.keys(MSG_DEF).forEach((k) => { const v = (MSG_DRAFT[k] || '').trim(); if (v && v !== MSG_DEF[k]) o[k] = v; }); return o; })(),
-      p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie, services: $('#t-serv').value.trim() || TOUR_DEF.services };
+      p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, pj2: parseNum(val('t-pj2')) || TOUR_DEF.pj2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie, services: $('#t-serv').value.trim() || TOUR_DEF.services, slowDays: Math.min(60, Math.max(1, parseInt(val('t-slow'), 10) || TOUR_DEF.slowDays)) };
     const fl = parseDec(val('t-fuel-l')), fpx = parseDec(val('t-fuel-px'));
     if (fl == null || fl < 2 || fl > 25) { fieldErr('t-fuel-l', 'Entre 2 et 25 L/100 km, ex. 6,2'); return; }
     if (fpx != null && (fpx < 0.5 || fpx > 5)) { fieldErr('t-fuel-px', 'Un prix au litre, ex. 2,089 (ou vide pour le prix du jour)'); return; }
@@ -4513,7 +4677,7 @@ const TOUR_ACT = {
     await repFast(r.id, { done: true, result: 'ok', date: today(), returned: false, ...plan }, tell ? null : msg);
   },
   'rep-ready-all': async () => {
-    const ids = S.repairs.filter((r) => r.picked !== false && !repDone(r)).map((r) => r.id); if (!ids.length) return;
+    const ids = S.repairs.filter((r) => r.picked !== false && !repDone(r) && !r.xp).map((r) => r.id); if (!ids.length) return;
     const patch = { done: true, result: 'ok', date: today(), returned: false, ...readyPlan() };
     S.repairs.forEach((r) => { if (ids.includes(r.id)) Object.assign(r, patch); }); render();
     toast(`${plural(ids.length, 'prestation')} réparée${ids.length > 1 ? 's' : ''} : ajoutées aux retours`);
@@ -4722,7 +4886,18 @@ const ACT = {
   'day-month': (a) => { const n = addMonths(S.dayMonth || thisMonth(), +a.dataset.d); if (n <= thisMonth()) { S.dayMonth = n; renderStats(); } },
   'rep-period': (a) => { S.repPeriod = a.dataset.v; LS.set('repPeriod', S.repPeriod); renderStats(); },
   'rep-add': () => openRep(null),
-  'rep-edit': (a) => openRep(a.dataset.id),
+  'rep-edit': (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r && r.xp && r.picked === false) openXp(r.id); else openRep(a.dataset.id); },
+  'rep-full': (a) => openRep(a.dataset.id),
+  'xp-add': () => openXp(null),
+  'rep-j2': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; if (repQty(r) > 1) { openJ2(r); return; } await setJ2(r, j2Of(r) ? 0 : 1); },
+  'j2-save': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; const n = Math.min(repQty(r), parseInt(radioVal('j2-n'), 10) || 0); closeSheet(); if (n !== j2Of(r)) await setJ2(r, n); },
+  'xp-save': (a) => xpSave(a),
+  'xp-alarm': (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r || xpAlarmMin(r) == null) return; xpAlarmGo(r); setTimeout(() => { if (SHEET && SHEET.kind === 'xpal') closeSheet(); if (S.view === 'tournee') renderTournee(); }, 800); },
+  'xp-alarm-test': () => { location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(XP_SHORTCUT)}&input=text&text=${encodeURIComponent(hhmm((nowMin() + 2) % 1440))}`; },
+  'xp-done': async (a) => {
+    const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; const T = today();
+    await repFast(r.id, { picked: true, gotDate: isDate(r.gotDate) ? r.gotDate : T, done: true, result: r.result || 'ok', date: T, returned: true, returnDate: T, paid: true, paidDate: T, planDate: '', ...loanBack(r) }, (x) => `Express réparé et payé : +${eur(repNet(x))}${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`);
+  },
   'rep-copy': (a) => openRep(null, a.dataset.id),
   'rep-save': async (a) => {
     clearErrs();
@@ -4931,7 +5106,8 @@ function bind() {
     if (e.target.id === 'fx-t') fixInfo();
     { const m = e.target.id.match(/^(d|r)-(addr|city)$/); if (m && PLACE[m[1]]) { PLACE[m[1]].geo = null; placeShow(m[1]); if (m[2] === 'city') e.target.dataset.touched = '1'; clearTimeout(placeFind.t); placeFind.t = setTimeout(() => placeFind(m[1], true), 900); } }
     { const m = e.target.id.match(/^(d|r)-meettxt$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meetTxt = e.target.value; delete e.target.dataset.auto; } }
-    if (/^d-(name|phone|addr|city|total)$/.test(e.target.id)) e.target.dataset.touched = '1';
+    if (/^d-(name|phone|addr|city|total)$/.test(e.target.id) || e.target.id === 'x-total') e.target.dataset.touched = '1';
+    if (e.target.id === 'x-time') xpSync();
     if (e.target.id === 'r-total') e.target.dataset.touched = '1'; if (/^r-(qty|price|parts|total)$/.test(e.target.id)) repPreview(); if (e.target.id === 'ad-title') adCount(); });
   document.addEventListener('change', (e) => {
     { const m = (e.target.name || '').match(/^(d|r)-meet$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meet = e.target.value === 'meet'; PLACE[m[1]].autoMeet = false; placeShow(m[1]); } }
@@ -4943,8 +5119,10 @@ function bind() {
     if (e.target.id === 't-msgk') { const ta = $('#t-msg'), k = e.target.value; MSG_DRAFT[ta.dataset.k] = ta.value; ta.dataset.k = k; ta.value = (MSG_DRAFT[k] || '').trim() || MSG_DEF[k]; }
     if (e.target.id === 'r-type') { const p = repTypes().get(e.target.value.trim()); if (p != null) { $('#r-price').value = numIn(p); } repPreview(); }
     if (e.target.id === 'r-qty') repPreview();
-    if (e.target.id === 'd-qty') { e.target.dataset.touched = '1'; const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(e.target.value) || 1, val('d-type'))); }
-    if (e.target.id === 'd-type') { e.target.dataset.touched = '1'; const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(val('d-qty')) || 1, e.target.value.trim())); }
+    if (e.target.id === 'x-now' || e.target.id === 'x-time') xpSync();
+    if (e.target.id === 'x-qty' || e.target.id === 'x-type' || e.target.id === 'x-j2') { const f = $('#x-j2-f'); if (f) f.hidden = !isDriftType(val('x-type')); const t = $('#x-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(val('x-qty')) || 1, val('x-type').trim(), Number(val('x-j2')) || 0)); }
+    if (e.target.id === 'd-qty' || e.target.id === 'd-j2') { if (e.target.id === 'd-qty') e.target.dataset.touched = '1'; const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(val('d-qty')) || 1, val('d-type'), Number(val('d-j2')) || 0)); }
+    if (e.target.id === 'd-type') { e.target.dataset.touched = '1'; const f = $('#d-j2-f'); if (f) f.hidden = !isDriftType(e.target.value.trim()); const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(val('d-qty')) || 1, e.target.value.trim(), Number(val('d-j2')) || 0)); }
     if (e.target.id === 'r-picked') repSections();
     if (['r-done', 'r-ret', 'r-paid'].includes(e.target.id)) repSections();
     if (e.target.id === 'ad-ref') {
