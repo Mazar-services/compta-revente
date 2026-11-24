@@ -239,7 +239,7 @@ textarea.ad-t{min-height:0;font-weight:700} textarea.ad-d{min-height:300px;font-
 .stop{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px 14px;display:grid;gap:8px}
 .stop.pk{border-left:5px solid var(--warn)} .stop.rt{border-left:5px solid var(--good)}
 .stop.fx{box-shadow:inset 0 0 0 2px var(--accent-soft)} .st-fix{background:var(--accent-soft);color:var(--accent)}
-.stop-w{margin:0;font-size:13px;font-weight:700;color:var(--bad);line-height:1.4} .stop-i{margin:0;font-size:12.5px;color:var(--ink-2)}
+.stop-w{margin:0;font-size:13px;font-weight:700;color:var(--bad);line-height:1.4} .stop-loan{margin:0;font-size:13px;font-weight:700;color:var(--accent);line-height:1.4} .loan-chip{margin-top:4px;height:28px;padding:0 10px;font-size:12px;max-width:100%} .stop-i{margin:0;font-size:12.5px;color:var(--ink-2)}
 .stop-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap} .stop-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--surface);font-weight:800;font-size:13px}
 .stop-t{font-size:16px;font-variant-numeric:tabular-nums} .stop-m{font-size:14px;line-height:1.45} .stop-m a{color:var(--accent);text-decoration:none}
 .stop-a{display:flex;flex-wrap:wrap;gap:6px} .stop-a .grow{flex:1 1 auto}
@@ -671,7 +671,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'c8cd3d082dcd';
+const APP_VERSION = '5c433adc6486';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2381,7 +2381,7 @@ function reparoHtml() {
   const types = by((r) => lbl.get(norm(r.type || '?'))).sort((a, b) => b[1].net - a[1].net);
   const months = by((r) => repPaidOn(r).slice(0, 7)).sort((a, b) => b[0].localeCompare(a[0]));
   const table = (rows, first, lab) => `<div class="tbl-wrap"><table><thead><tr><th>${first}</th><th>Nb</th><th>Encaissé</th><th>Gain</th></tr></thead><tbody>${rows.map(([k, x]) => `<tr><td>${esc(lab(k))}</td><td>${x.n}</td><td>${eur(x.ca)}</td><td><b class="${x.net < 0 ? 'neg' : 'pos'}">${eurS(x.net)}</b></td></tr>`).join('')}</tbody></table></div>`;
-  const steps = (r) => [isDate(r.gotDate) ? `récupéré ${dShort(r.gotDate)}` : '', repDone(r) && isDate(r.date) ? `${r.result === 'ko' ? 'échec' : 'réparé'} ${dShort(r.date)}` : '', r.returned !== false && isDate(r.returnDate) ? `rendu ${dShort(r.returnDate)}` : '', repPaid(r) && isDate(r.paidDate) ? `payé ${dShort(r.paidDate)}` : ''].filter(Boolean).join(' → ');
+  const steps = (r) => [[isDate(r.gotDate) ? `récupéré ${dShort(r.gotDate)}` : '', repDone(r) && isDate(r.date) ? `${r.result === 'ko' ? 'échec' : 'réparé'} ${dShort(r.date)}` : '', r.returned !== false && isDate(r.returnDate) ? `rendu ${dShort(r.returnDate)}` : '', repPaid(r) && isDate(r.paidDate) ? `payé ${dShort(r.paidDate)}` : ''].filter(Boolean).join(' → '), r.loan ? '🎮 a ta manette de prêt' : ''].filter(Boolean).join(' · ');
   const row = (r) => { const st = repStage(r); return `<div class="cl rp">
       <span class="d">${dShort(r.date || r.gotDate)}</span>
       <span class="t">${esc(r.type)}${repQty(r) > 1 ? ` <b>×${repQty(r)}</b>` : ''} <span class="pill rp-${st.k}">${st.t}</span><small>${steps(r) ? steps(r) + ' · ' : ''}${eur(num(r.unitPrice))} l’unité${repTotal(r) < repQty(r) * num(r.unitPrice) - 0.004 ? ` · payé ${eur(repTotal(r))} (remise ${eur(repQty(r) * num(r.unitPrice) - repTotal(r))})` : ''}${num(r.partsCost) ? ` · pièces ${eur(num(r.partsCost))}` : ''}${r.client ? ' · ' + esc(r.client) : ''}${r.note ? ' · ' + esc(r.note) : ''}</small>
@@ -4086,6 +4086,19 @@ function sendMsg(text, phone, pre) {
   if (p && tourCfg().send !== 'copy') setTimeout(() => { location.href = `sms:${p}${/iPhone|iPad|Mac/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(text)}`; }, 250);
 }
 
+/* ---------- Manette de prêt : à qui tu l'as prêtée ---------- */
+// « loan » sur la prestation : le client a ta manette de prêt (« loanDate » : depuis quand). Effacé quand tu touches « Rendu ».
+const loanOut = () => S.repairs.filter((r) => r.loan).sort((x, y) => (x.loanDate || '').localeCompare(y.loanDate || ''));
+const loanChip = (r, cls = '') => `<button class="chip ${cls}" data-act="rep-loan" data-id="${esc(r.id)}" aria-pressed="${!!r.loan}">${r.loan ? '☑' : '☐'} 🎮 Manette de prêt${cls ? '' : ' donnée'}</button>`;
+function loanCard() {
+  const L = loanOut(); if (!L.length) return '';
+  return `<section class="card"><div class="card-h"><h2 class="sec">🎮 Manette${L.length > 1 ? 's' : ''} de prêt</h2><span class="muted" style="font-size:12.5px">${L.length > 1 ? `${L.length} prêtées` : 'prêtée'}</span></div>
+    ${L.map((r) => `<div class="cl rp"><span class="d">${isDate(r.loanDate) ? dShort(r.loanDate) : ''}</span><span class="t">Chez <b>${esc(r.client || 'un client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<small>${esc([r.city, repStage(r).t].filter(Boolean).join(' · '))}</small></span><span class="a"><button class="btn sm" data-act="rep-loan" data-id="${esc(r.id)}">Rendue</button></span></div>`).join('')}
+    <p class="hint" style="margin:6px 0 0">Quand tu touches « Rendu » pour ce client, l’appli te rappelle de la reprendre et l’enlève d’ici.</p></section>`;
+}
+// Rendu : la manette de prêt revient (rappel dans le message)
+const loanBack = (r) => (r && r.loan ? { loan: false } : {});
+const loanMsg = (had) => (had ? ' · 🎮 Reprends ta manette de prêt' : '');
 function renderTournee() {
   const el = $('#v-tournee');
   if (S.status !== 'ok') { el.innerHTML = stateBlock(); return; }
@@ -4109,6 +4122,8 @@ function renderTournee() {
       <div class="stop-m"><b>${esc(r.client || 'Client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<br>
         ${adr ? `<a href="${esc(wazeUrl(r))}" target="_blank" rel="noopener">${r.geo ? '📍 ' : ''}${esc(adr)}</a>${r.meet ? ` <small class="muted">· RDV : ${esc(lieuTxt(r))}</small>` : ''}${r.geo ? '' : ` <button class="chip warn" data-act="geo-fix" data-id="${esc(r.id)}">📍 Trouver ce lieu</button>`}` : '<span class="neg">Adresse manquante : touche Modifier</span>'}${cityRank(r.city) === 50 && r.city ? ' <small class="muted">(commune hors trajet : placée à la fin)</small>' : ''}
         <small class="muted"> · ${esc(r.type)}${r.note ? ' · ' + esc(r.note) : ''}</small></div>
+      ${!pick && r.loan ? '<p class="stop-loan">🎮 Il a ta manette de prêt : reprends-la en lui rendant la sienne.</p>' : ''}
+      <div class="stop-mv">${loanChip(r)}</div>
       <div class="stop-a">
         ${s.lateBy > 0 ? `<button class="btn sm danger" data-act="tour-msg" data-k="late" data-id="${esc(r.id)}">Prévenir du retard</button>` : `<button class="btn sm" data-act="tour-msg" data-k="${s.kind}" data-id="${esc(r.id)}">${s.sent ? 'Heure envoyée ✓' : 'Envoyer l’heure'}</button>`}
         <a class="btn sm" href="${esc(wazeUrl(r))}" target="_blank" rel="noopener">🚗 Waze</a>
@@ -4151,8 +4166,9 @@ function renderTournee() {
     </section>
     ${stops.map(card).join('')}
     ${fuelCard()}
+    ${loanCard()}
     <section class="card"><div class="card-h"><h2 class="sec">Atelier</h2><span class="muted" style="font-size:12.5px">${sum(atelier, repQty)} à réparer</span></div>
-      ${atelier.length ? atelier.map((r) => `<div class="cl rp"><span class="d">${dShort(r.gotDate || r.date)}</span><span class="t">${esc(r.client || 'Client')} · ${esc(r.type)} ×${repQty(r)}<small>${esc(r.city || '')}</small></span><span class="a"><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></span></div>`).join('')
+      ${atelier.length ? atelier.map((r) => `<div class="cl rp"><span class="d">${dShort(r.gotDate || r.date)}</span><span class="t">${esc(r.client || 'Client')} · ${esc(r.type)} ×${repQty(r)}<small>${esc(r.city || '')}</small>${loanChip(r, 'loan-chip')}</span><span class="a"><button class="btn sm primary" data-act="rep-ready" data-id="${esc(r.id)}">Réparé</button></span></div>`).join('')
         + (atelier.length > 1 ? `<div class="btns" style="margin-top:8px"><button class="btn sm" data-act="rep-ready-all">Tout est réparé</button></div>` : '') : '<p class="muted" style="margin:0">Rien à réparer pour l’instant.</p>'}
     </section>
     <section class="card"><div class="card-h"><h2 class="sec">Messages utiles</h2></div>
@@ -4482,6 +4498,11 @@ const TOUR_ACT = {
     copyText(formScript(c.ntfy), `Script copié · ton sujet ntfy : ${c.ntfy}`);
   },
   'tour-topic': () => copyText(tourCfg().ntfy, 'Sujet ntfy copié'),
+  'rep-loan': async (a) => {
+    const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return;
+    const on = !r.loan;
+    await repFast(r.id, on ? { loan: true, loanDate: today() } : { loan: false }, on ? `🎮 Manette de prêt chez ${r.client || 'ce client'}` : '🎮 Manette de prêt récupérée');
+  },
   'rep-pick': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r) await stopDone(r.id, () => repFast(r.id, { picked: true, gotDate: today(), date: today(), planDate: '', planSlot: '', fix: null }, `${r.client || 'Client'} : c’est récupéré, direction l’atelier`)); },
   'rep-ready': async (a) => {
     const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return;
@@ -4499,7 +4520,7 @@ const TOUR_ACT = {
     // Un seul enregistrement pour tout le lot
     if (!(await write(() => commit((d) => { d.repairs.forEach((r) => { if (ids.includes(r.id)) Object.assign(r, patch); }); }, `Réparo · ${ids.length} réparées`)))) { await pull().catch(() => {}); render(); }
   },
-  'rep-retpay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r) await stopDone(r.id, () => repFast(r.id, { returned: true, returnDate: today(), paid: true, paidDate: today() }, (x) => `Rendu et payé : +${eur(repNet(x))}${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`)); },
+  'rep-retpay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; const had = !!r.loan; await stopDone(r.id, () => repFast(r.id, { returned: true, returnDate: today(), paid: true, paidDate: today(), ...loanBack(r) }, (x) => `Rendu et payé : +${eur(repNet(x))}${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}${loanMsg(had)}`)); },
 };
 
 /* ---------- Réglages et export ---------- */
@@ -4638,6 +4659,7 @@ function openRep(id, copyOf) {
       <div id="r-sec-ret" class="sub">${dateF('r-retDate', 'Rendu le', isDate(v.returnDate) ? v.returnDate : today())}</div></div></div>
       ${sw('r-paid', paid, 'Argent reçu', 'L’argent entre dans la caisse à cette date')}
       <div id="r-sec-paid" class="sub">${dateF('r-paidDate', 'Payé le', isDate(v.paidDate) ? v.paidDate : r && repPaid(r) ? v.date : today())}</div>
+      ${sw('r-loan', !!v.loan && !src, '🎮 Manette de prêt donnée', 'Le client a ta manette de prêt : décoche quand il te l’a rendue')}
     </div>
     <div class="row2">${moneyF('r-parts', 'Pièces achetées <span class="opt-l">(facultatif)</span>', num(v.partsCost) || null)}${textF('r-client', 'Client <span class="opt-l">(facultatif)</span>', v.client || '', 'Prénom, pseudo…')}</div>
     <div class="row2">${textF('r-phone', 'Téléphone <span class="opt-l">(facultatif)</span>', v.phone || '', '06 …', 'inputmode="tel"')}${textF('r-city', 'Commune <span class="opt-l">(facultatif)</span>', v.city || '', 'ex. Meylan')}</div>
@@ -4710,6 +4732,7 @@ const ACT = {
     const r = { type: val('r-type').trim(), qty: Number(val('r-qty')) || 1, unitPrice: parseNum(val('r-price')), total: parseNum(val('r-total')), partsCost: parseNum(val('r-parts')) || 0, client: val('r-client').trim(), note: val('r-note').trim(),
       phone: val('r-phone').trim(), address: val('r-addr').trim(), city: val('r-city').trim(), picked, ...placeVal('r'),
       gotDate: picked ? val('r-got') : '', done, result: done ? radioVal('r-res') || 'ok' : '', returned: ret, returnDate: ret ? val('r-retDate') : '', paid, paidDate: paid ? val('r-paidDate') : '' };
+    const loan = $('#r-loan').checked; if (loan || (old && old.loan)) { r.loan = loan; if (loan) r.loanDate = old && old.loan && isDate(old.loanDate) ? old.loanDate : today(); }
     r.date = done ? val('r-date') : picked ? r.gotDate : (old && isDate(old.planDate) ? old.planDate : today());
     if (!picked && !(old && isDate(old.planDate))) r.planDate = planDateNow();
     if (!r.type) return fieldErr('r-type', 'Indique le type de prestation.');
@@ -4728,7 +4751,7 @@ const ACT = {
     if (ok) { closeSheet(); toast(`Réparo : ${repStage(r).t}${paid && repInCash() ? ` · +${eur(repNet(r))} · caisse ${eur(capital().dispo)}` : ''}`); }
   },
   'rep-done': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r) await repFast(r.id, { done: true, result: 'ok', date: today(), returned: false, ...readyPlan() }, 'Réparé : le gain sera compté quand tu toucheras « Payé »'); },
-  'rep-ret': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r) await stopDone(r.id, () => repFast(r.id, { returned: true, returnDate: today() }, (x) => (repPaid(x) ? 'Rendu au client' : 'Rendu : touche « Payé » quand tu as l’argent'))); },
+  'rep-ret': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; const had = !!r.loan; await stopDone(r.id, () => repFast(r.id, { returned: true, returnDate: today(), ...loanBack(r) }, (x) => (repPaid(x) ? 'Rendu au client' : 'Rendu : touche « Payé » quand tu as l’argent') + loanMsg(had))); },
   'rep-pay': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (r) await repFast(r.id, { paid: true, paidDate: today() }, (x) => `Payé : +${eur(repNet(x))} de bénéfice${repInCash() ? ` · caisse ${eur(capital().dispo)}` : ''}`); },
   'rep-del': async (a) => {
     const id = a.dataset.id;
