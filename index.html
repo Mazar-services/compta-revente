@@ -741,7 +741,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'fa53bd82040c';
+const APP_VERSION = 'a4c3e9011e3a';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -5454,10 +5454,12 @@ function bAccounts() {
   const B = S.bank; if (!B) return [];
   return (B.sessions || []).flatMap((s) => (s.accounts || []).map((a) => {
     const bal = (B.balances || {})[a.key] || {};
-    return { bank: bBank(s.bank), name: a.name, num: a.num, key: a.key, amount: bal.amount, at: bal.at, status: s.status, until: s.until };
+    return { bank: bBank(s.bank), name: a.name, num: a.num, key: a.key, amount: bal.amount, cur: bal.cur || a.cur || 'EUR', at: bal.at, status: s.status, until: s.until };
   }));
 }
-const bTotal = () => sum(bAccounts(), (a) => num(a.amount));
+// Total en euros seulement : un compte en livres ou en dollars est affiché à part, jamais additionné
+const bTotal = () => sum(bAccounts().filter((a) => a.cur === 'EUR'), (a) => num(a.amount));
+const bAmt = (a) => (a.amount == null ? '—' : a.cur === 'EUR' ? eur(a.amount) : `${nf2.format(a.amount)}${NB}${esc(a.cur)}`);
 const bLinked = (bank) => (S.bank && S.bank.sessions || []).find((s) => bBank(s.bank) === bank);
 const bConfigured = () => !!S.bank && !S.bank.none && !(S.bank.last && /pas encore configuré/.test(S.bank.last.msg || '') && !(S.bank.sessions || []).length);
 const bAgo = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return !isFinite(m) ? '' : m < 1 ? 'à l’instant' : m < 60 ? `il y a ${m}${NB}min` : m < 1440 ? `il y a ${Math.round(m / 60)}${NB}h` : `il y a ${plural(Math.round(m / 1440), 'jour')}`; };
@@ -5591,7 +5593,7 @@ function bankHomeHtml() {
     const soon = (B.sessions || []).filter((s) => s.status === 'ok' && s.until && Date.parse(s.until) - now < 14 * 864e5 && Date.parse(s.until) >= now);
     out.push(`<section class="card bk-acc" aria-label="Soldes">
       <div class="bk-total"><span>Sur tes comptes</span><b>${eur(bTotal())}</b></div>
-      ${A.map((a) => `<div class="bk-a"><span class="bk-logo ${a.bank === 'Revolut' ? 'r' : 'b'}" aria-hidden="true">${esc(a.bank.slice(0, 1))}</span><span class="t">${esc(a.bank)}<small>${esc(a.name || 'Compte')}${a.num ? ` · ${esc(a.num)}` : ''}${a.status === 'expired' ? ' · accord expiré' : ''}</small></span><b>${a.amount == null ? '—' : eur(a.amount)}</b></div>`).join('')}
+      ${A.map((a) => `<div class="bk-a"><span class="bk-logo ${a.bank === 'Revolut' ? 'r' : 'b'}" aria-hidden="true">${esc(a.bank.slice(0, 1))}</span><span class="t">${esc(a.bank)}<small>${esc(a.name || 'Compte')}${a.num ? ` · ${esc(a.num)}` : ''}${a.status === 'expired' ? ' · accord expiré' : ''}</small></span><b>${bAmt(a)}</b></div>`).join('')}
       <p class="bk-when">${B.fetched ? `Lu ${bAgo(B.fetched)} (${bHour(B.fetched)})` : 'Pas encore lu'} · lecture auto 4 fois par jour</p>
       ${L.ok === false && L.msg ? `<div class="bk-err">${esc(L.msg)}</div>` : ''}
       ${exp.map((s) => `<div class="bk-err">Accord ${esc(bBank(s.bank))} expiré : redonne-le pour continuer à voir tes opérations.</div>`).join('')}
@@ -5822,7 +5824,7 @@ function bankStrip() {
   const A = bAccounts(); if (!A.length) return '';
   const rows = bRows(), n = rows.filter((r) => r.cat === 'atrier').length, m = thisMonth();
   const over = rows.length ? bCatLines(rows, m, bMonth(rows, m), bAvg(rows, m)).filter((x) => x.st === 'over') : [];
-  return `<button class="strip bank ${over.length ? 'slow' : ''}" data-act="view" data-view="banque"><span>🏦 En banque <b>${eur(bTotal())}</b></span><span>${A.map((a) => `${esc(a.bank)} ${a.amount == null ? '—' : eur(a.amount)}`).join(' · ')}</span>${n ? `<span><b>${n}</b> à trier</span>` : ''}${over.length ? `<span>🚨 budget dépassé : <b>${over.map((x) => esc(BCAT[x.k].s || BCAT[x.k].l)).join(', ')}</b></span>` : ''}${ic('right')}</button>`;
+  return `<button class="strip bank ${over.length ? 'slow' : ''}" data-act="view" data-view="banque"><span>🏦 En banque <b>${eur(bTotal())}</b></span><span>${A.filter((a) => a.cur === 'EUR').map((a) => `${esc(a.bank)} ${bAmt(a)}`).join(' · ')}</span>${n ? `<span><b>${n}</b> à trier</span>` : ''}${over.length ? `<span>🚨 budget dépassé : <b>${over.map((x) => esc(BCAT[x.k].s || BCAT[x.k].l)).join(', ')}</b></span>` : ''}${ic('right')}</button>`;
 }
 
 Object.assign(ACT, TOUR_ACT, FUEL_ACT, BANK_ACT);
