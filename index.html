@@ -638,6 +638,31 @@ tr.click{cursor:pointer}
 .bk-io{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
 .bk-io span{display:grid;gap:2px;font-size:11.5px;font-weight:700;color:var(--muted);min-width:0} .bk-io b{font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums} .bk-io b.in{color:var(--good)} .bk-io b.out{color:var(--bad)}
 .bk-ins{list-style:none;margin:0;padding:0;display:grid;gap:10px} .bk-ins li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px;font-size:14px;line-height:1.45} .bk-ins li > span:first-child{font-size:17px;line-height:1.3}
+button.bk-a{width:100%;background:none;border:0;border-top:1px solid var(--line);text-align:left;font:inherit;color:inherit;cursor:pointer}
+.bk-logo.l{background:#EC5A13}
+.bk-pos{color:var(--good);font-variant-numeric:tabular-nums;font-size:16px}
+.bk-tx .a.sk{color:var(--muted);font-weight:700}
+.bk-ch{position:relative;height:120px;margin:8px 0 4px;touch-action:pan-y;cursor:crosshair}
+.bk-ch svg{display:block;width:100%;height:100%;overflow:visible}
+.bk-ch .ar{fill:var(--accent-soft)} .bk-ch .ln{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round} .bk-ch .z{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3;opacity:.6}
+.bk-cx{position:absolute;top:0;bottom:0;width:1px;background:var(--ink-2);opacity:.35;pointer-events:none}
+.bk-pt{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--surface);pointer-events:none}
+.bk-tt{position:absolute;top:0;width:120px;padding:6px 9px;border-radius:10px;background:var(--surface);border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.14);font-size:12px;pointer-events:none}
+.bk-tt b{display:block;font-size:14px;font-variant-numeric:tabular-nums} .bk-tt small{color:var(--muted);font-weight:600}
+.bk-ax{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;font-weight:600;color:var(--muted)} .bk-ax span:nth-child(2){text-align:center}
+.bk-pr{display:grid;gap:8px;padding:10px 0;border-top:1px solid var(--line)} .bk-pr:first-of-type{border-top:0}
+.bk-pr .t b{display:block;font-size:14.5px} .bk-pr .t small{display:block;color:var(--muted);font-size:12px;font-weight:600}
+.bk-pb{display:flex;gap:6px;flex-wrap:wrap}
+.bk-pp{border-top:1px solid var(--line)} .bk-pp:first-of-type{border-top:0}
+.bk-pph{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;background:none;border:0;padding:10px 0;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.bk-pph .t{min-width:0} .bk-pph .t b{display:block;font-size:14.5px} .bk-pph .t small{display:block;color:var(--muted);font-size:12px;font-weight:600} .bk-pph .t small b{color:var(--ink);font-size:inherit;display:inline}
+.bk-story{margin:0 0 14px}
+.bk-search{margin:0 0 10px}
+.bk-lw{list-style:none;margin:6px 0 14px;padding:0}
+.bk-lw li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:14px} .bk-lw li:first-child{border-top:0}
+.bk-lw li > span{min-width:0;font-weight:700} .bk-lw small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.bk-lw b{white-space:nowrap;font-variant-numeric:tabular-nums} .bk-lw b.in{color:var(--good)} .bk-lw li.q > span{color:var(--warn)}
+.bk-fix{margin-top:4px} .bk-fix summary{cursor:pointer;font-weight:800;color:var(--accent);font-size:13.5px;padding:6px 0} .bk-fix .btns{margin-top:8px}
 .bud{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;width:100%;padding:11px 0;background:none;border:0;border-top:1px solid var(--line);text-align:left;font:inherit;color:inherit;cursor:pointer}
 .bud:first-of-type{border-top:0}
 .bud-t{font-weight:800;font-size:14px;min-width:0} .bud-t em{font-style:normal;font-size:10px;font-weight:800;color:var(--accent);background:var(--accent-soft);border-radius:99px;padding:1px 6px;vertical-align:2px;text-transform:uppercase}
@@ -741,7 +766,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'cca3be9cea62';
+const APP_VERSION = '6919cc77e714';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -814,6 +839,10 @@ const CAT_ORDER = ['ps5', 'manette', 'jeu', 'pokemon', 'console', 'accessoire', 
 const HW = ['ps5', 'console', 'manette', 'accessoire'];
 const STATUS = { stock: 'En stock', annonce: 'En annonce', reserve: 'Réservé', vendu: 'Vendu', livraison: 'En livraison' };
 const BUY_MODES = [['livraison', 'Livraison (à distance)'], ['main_propre', 'Main propre']];
+// Achat Leboncoin : payé par carte, avec le porte-monnaie Leboncoin, ou un peu des deux
+const PAY_WITH = [['banque', 'Carte / banque'], ['lbc', 'Porte-monnaie Leboncoin'], ['mix', 'Les deux']];
+const payWal = (i) => (i.payWith === 'banque' ? 0 : i.payWith === 'lbc' ? num(i.buyPrice) : i.payWith === 'mix' ? Math.min(num(i.buyPrice), num(i.payWallet)) : null);
+const payTxt = (i) => (i.payWith === 'mix' ? `Porte-monnaie Leboncoin ${eur(payWal(i))} + carte ${eur(num(i.buyPrice) - payWal(i))}` : (PAY_WITH.find((m) => m[0] === i.payWith) || [])[1] || '');
 const OPEN = ['stock', 'annonce', 'reserve'];
 const CONDS = [['neuf', 'Neuf / scellé'], ['comme_neuf', 'Comme neuf'], ['tres_bon', 'Très bon état'], ['bon', 'Bon état'], ['abime', 'Abîmé / à réparer']];
 const CONTENTS = ['Boîte', 'Manette', 'Câbles', 'Socle', 'Facture', 'Jeu(x)', 'Garantie'];
@@ -1622,6 +1651,7 @@ function detailBody(i) {
   const specs = [
     ['Catégorie', (CATS[i.category] || CATS.autre).label],
     ['Mode d’achat', (BUY_MODES.find((m) => m[0] === i.buyMode) || [])[1]],
+    ['Payé avec', payTxt(i)],
     ['État', condLabel(i.condition)],
     ['N° de série', i.serial],
     ['Contenu', (i.contents || []).join(', ')],
@@ -1755,6 +1785,11 @@ function openForm(mode, item, prefill) {
       <div class="field"><span class="lbl">Mode d’achat</span>${radios('f-mode', BUY_MODES, src.buyMode || '')}</div>
       ${moneyF('f-buyCosts', 'Frais d’achat', src.buyCosts, 'Essence, livraison, nettoyage, réparation…')}
       <div class="field"><span class="lbl">Acheté sur</span>${radios('f-src', SOURCES.map((s) => [s, s]), src.buySource || 'Leboncoin')}</div>
+      <div id="f-lbcpay" class="stack" style="gap:12px">
+        <div class="field"><span class="lbl">Payé avec</span>${radios('f-payw', PAY_WITH, src.payWith || '')}<small class="hint">Achat Leboncoin en livraison. Pas choisi : l’appli le devine avec ta banque.</small></div>
+        <div id="f-paysplit" class="row2">${moneyF('f-payBank', 'Par carte / banque', src.payWith === 'mix' ? num(src.buyPrice) - num(src.payWallet) : null)}${moneyF('f-payLbc', 'Avec le porte-monnaie', src.payWith === 'mix' ? src.payWallet : null)}</div>
+        <p class="hint" id="f-payinfo" aria-live="polite"></p>
+      </div>
       ${textF('f-seller', 'Vendeur <span class="opt-l">(pseudo)</span>', src.sellerName, '')}
     </div>
     <div class="fs"><p class="fs-t">Suivi</p>
@@ -1787,7 +1822,9 @@ function openForm(mode, item, prefill) {
   openSheet({ kind: 'form', title, body, foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="save-form">${mode === 'edit' ? 'Enregistrer' : 'Ajouter au stock'}</button>`, onClose: cleanupForm });
   const b = $('#sheet-body');
   b.addEventListener('input', formPreview);
+  b.addEventListener('input', (e) => { if (['f-payLbc', 'f-payBank', 'f-buyPrice'].includes(e.target.id)) payForm(e.target.id); });
   b.addEventListener('change', (e) => {
+    if (['f-src', 'f-payw', 'f-mode'].includes(e.target.name)) payForm(e.target.name);
     if (e.target.name === 'f-cat') onCatChange();
     if (e.target.name === 'f-chan') { $('#f-pay').hidden = !isShipSale(radioVal('f-chan')); if (isShipSale(radioVal('f-chan')) && !(F.item && F.item.status === 'vendu')) $('#f-paid').checked = false; }
     if (['f-recv', 'f-listed', 'f-sold', 'f-ship'].includes(e.target.id) || e.target.name === 'f-mode') onTrackChange(false, e.target.id || e.target.name);
@@ -1797,8 +1834,26 @@ function openForm(mode, item, prefill) {
     if (e.target.id === 'f-file') { const files = Array.from(e.target.files || []); e.target.value = ''; addPhotos(files); }
     formPreview();
   });
-  onCatChange(); onTrackChange(true); renderPhotos(); formPreview();
+  onCatChange(); onTrackChange(true); renderPhotos(); formPreview(); payForm('');
   if (mode !== 'edit' && !src.model) setTimeout(() => { const m = $('#f-model'); if (m && window.matchMedia('(min-width:700px)').matches) m.focus(); }, 80);
+}
+// Achat Leboncoin : carte, porte-monnaie ou les deux (les deux montants se complètent tout seuls)
+function payForm(changed) {
+  const w = $('#f-lbcpay'); if (!w) return;
+  const lbc = radioVal('f-src') === 'Leboncoin' && radioVal('f-mode') === 'livraison', pw = radioVal('f-payw'), mix = pw === 'mix', p = parseNum(val('f-buyPrice'));
+  w.hidden = !lbc; $('#f-paysplit').hidden = !mix;
+  if (mix && p != null) {
+    const fill = (id, x) => { $('#' + id).value = x == null ? '' : numIn(Math.max(0, Math.round((p - x) * 100) / 100)); };
+    if (changed === 'f-payBank') fill('f-payLbc', parseNum(val('f-payBank')));
+    else if (changed === 'f-payLbc' || (changed === 'f-buyPrice' && parseNum(val('f-payLbc')) != null)) fill('f-payBank', parseNum(val('f-payLbc')));
+  }
+  const info = $('#f-payinfo'), lw = lbc && typeof lbcWallet === 'function' ? lbcWallet() : null;
+  const part = pw === 'lbc' ? p : mix ? parseNum(val('f-payLbc')) : null;
+  if (!info) return;
+  if (!lw || !part || (F && F.item)) { info.textContent = lw && lbc ? `Dans ton porte-monnaie Leboncoin : ${eur(lw.v)}` : ''; info.classList.remove('bad'); return; }
+  const left = Math.round((lw.v - part) * 100) / 100;
+  info.textContent = left >= -0.5 ? `Porte-monnaie Leboncoin : ${eur(lw.v)} → ${eur(Math.max(0, left))} après cet achat` : `Attention : ton porte-monnaie Leboncoin n’a que ${eur(lw.v)} d’après l’appli`;
+  info.classList.toggle('bad', left < -0.5);
 }
 function onCatChange() {
   const c = radioVal('f-cat') || 'ps5';
@@ -1936,9 +1991,15 @@ async function saveForm(btn) {
     sellDate: val('f-sellDate'), sellPrice: parseNum(val('f-sellPrice')), sellFees: parseNum(val('f-sellFees')) || 0,
     sellChannel: radioVal('f-chan'), buyerName: val('f-buyer'), sellNotes: $('#f-snotes').value.trim(), notes: val('f-notes'),
   };
+  v.payWith = v.buySource === 'Leboncoin' && v.buyMode === 'livraison' ? radioVal('f-payw') : '';
+  v.payWallet = v.payWith === 'mix' ? parseNum(val('f-payLbc')) : null;
   if (!v.model) return fieldErr('f-model', 'Indique l’article (ex. PS5 Slim Standard).');
   if (!isDate(v.buyDate)) return fieldErr('f-buyDate', 'Date d’achat requise.');
   if (v.buyPrice == null || v.buyPrice < 0) return fieldErr('f-buyPrice', 'Prix d’achat requis.');
+  if (v.payWith === 'mix') {
+    if (v.payWallet == null || v.payWallet <= 0) return fieldErr('f-payLbc', 'Combien as-tu payé avec le porte-monnaie ?');
+    if (v.payWallet >= v.buyPrice) return fieldErr('f-payLbc', 'C’est tout le prix : choisis plutôt « Porte-monnaie Leboncoin ».');
+  }
   if (v.listUrl === null) return fieldErr('f-listUrl', 'Colle le lien complet de l’annonce (https://…).');
   if (v.received && !isDate(v.receiveDate)) return fieldErr('f-recvDate', 'Indique la date de réception.');
   if (v.received && v.receiveDate < v.buyDate) return fieldErr('f-recvDate', 'La réception ne peut pas précéder l’achat.');
@@ -5334,34 +5395,45 @@ const BCAT = {
   transport: { l: 'Voiture et transport', e: '🚗' },
   abo: { l: 'Abonnements et téléphone', e: '📱' },
   shopping: { l: 'Shopping et soins', e: '🛍️' },
-  loisirs: { l: 'Loisirs et jeux', e: '🎟️' },
+  loisirs: { l: 'Loisirs, jeux et voyages', s: 'Loisirs', e: '🎟️' },
   sante: { l: 'Santé', e: '💊' },
   maison: { l: 'Logement, factures, impôts', e: '🏠' },
   frais: { l: 'Frais bancaires', e: '🏦' },
   especes: { l: 'Retraits d’espèces', e: '💶' },
+  virperso: { l: 'Virements à des personnes', s: 'Virement', e: '👤' },
   dons: { l: 'Dons et cadeaux', e: '🎁' },
   autre: { l: 'Autres dépenses', e: '🧾' },
   clients: { l: 'Paiements de clients', s: 'Client', e: '🤝', in: 1 },
-  salaire: { l: 'Salaire', e: '💼', in: 1 },
+  ventes: { l: 'Ventes (Leboncoin, revente)', s: 'Vente', e: '🏷️', in: 1 },
+  salaire: { l: 'Salaire et missions', s: 'Salaire', e: '💼', in: 1 },
   rembourse: { l: 'Remboursements', s: 'Remboursement', e: '↩️', in: 1 },
   entree: { l: 'Autres entrées', e: '➕', in: 1 },
   interne: { l: 'Entre tes comptes', s: 'Entre mes comptes', e: '🔁', skip: 1 },
+  proche: { l: 'Arrangement avec un proche', s: 'Proche', e: '👪', skip: 1 },
+  retour: { l: 'Argent rendu (aller-retour)', s: 'Rendu', e: '🔄', skip: 1 },
+  annule: { l: 'Achat annulé et remboursé', s: 'Annulé', e: '🚫', skip: 1 },
+  depot: { l: 'Espèces déposées', s: 'Dépôt', e: '🏧', in: 1, skip: 1 },
   atrier: { l: 'À trier', e: '❓' },
 };
 const BOUT = Object.keys(BCAT).filter((k) => !BCAT[k].in && !BCAT[k].skip && k !== 'atrier');
-const BIN = Object.keys(BCAT).filter((k) => BCAT[k].in);
+const BIN = Object.keys(BCAT).filter((k) => BCAT[k].in && !BCAT[k].skip);
+// Avant tout le reste : frais de la banque, assurance pro, outils pro
+const BPRIO = [
+  ['frais', /\b(frais (irregularites|incidents|de rejet|prlv|de tenue|bancaires?)|minimum forfaitaire|utilisation du decouvert|commission d intervention|agios|interets debiteurs)\b/],
+  ['pro', /\b(hiscox|google ?workspa\w*|workspace)\b/],
+];
 // Mots du commerçant ou du libellé → catégorie (dans cet ordre ; minuscules sans accents)
 const BRULES = [
   ['maison', /\b(edf|engie|electricite|ekwateur|gaz de|veolia|loyer|opac|actis|sdh|pluralis|foncia|nexity|assurances?|axa|maif|macif|matmut|mma|groupama|allianz|generali|direct assurance|olivier assurance|leocare|impots?|dgfip|tresor public|amendes?|antai|taxe)\b/],
-  ['pieces', /\b(utopya|mobilax|phonepartsworld|phone parts|mobile ?sentrix|ifixit|ipartsbuy|aliexpress|alibaba|banggood|lcd ?phone|thermal ?grizzly|conrad|rs components|farnell|mouser|kubii|gotronic)\b/],
+  ['pieces', /\b(utopya|utopia|maxeli|mobilax|phonepartsworld|phone parts|mobile ?sentrix|ifixit|ipartsbuy|aliexpress|alibaba|banggood|lcd ?phone|thermal ?grizzly|conrad|rs components|farnell|mouser|kubii|gotronic)\b/],
   ['revente', /\b(leboncoin|vinted|back ?market|rakuten|cash ?converters|easy ?cash|cash ?express|game ?cash|cex|webuy)\b/],
   ['pro', /\b(la ?poste|colissimo|mondial ?relay|relais ?colis|chronopost|ups|dhl|inpost|shop2shop|vistaprint|helloprint|exaprint|pixartprinting|tiktok|facebk|meta ads|canva|capcut|anthropic|claude ai|github|ovh|hostinger)\b/],
   ['essence', /\b(totalenergies|total access|esso|shell|avia|agip|dyneff|carburants?|station u|bp)\b/],
   ['courses', /\b(carrefour|lidl|aldi|auchan|e ?leclerc|leclerc|intermarche|super ?u|hyper ?u|u express|systeme u|casino|monoprix|franprix|netto|grand frais|picard|biocoop|spar|vival|coccinelle|la vie claire|cora|g20|proxi|boucherie|primeur|epicerie|halal|supermarche|hypermarche)\b/],
-  ['resto', /\b(mc ?donald s?|mcdo|burger king|kfc|quick|o ?tacos|tacos|subway|dominos?|pizza|pizzeria|kebab|uber ?eats|deliveroo|just ?eat|starbucks|boulangerie|brioche doree|columbus|five guys|sushi|snack|restaurant|resto|brasserie|cafe|chicken|bagel|patisserie|creperie|grill|fast food|wok|bistrot|traiteur)\b/],
-  ['transport', /\b(sncf|ouigo|semitag|m ?tag|m reso|peage|autoroutes?|aprr|sanef|indigo|effia|saemes|parking|stationnement|easypark|paybyphone|flowbird|uber|bolt|heetch|blablacar|flixbus|lime|norauto|feu vert|speedy|midas|point s|controle technique|dekra|securitest|autosur|lavage|euromaster|carglass)\b/],
+  ['resto', /\b(mc ?donald s?|mcdo|burger king|kfc|quick|o ?tacos|tacos|subway|dominos?|pizza|pizzeria|kebab|uber ?eats|deliveroo|just ?eat|starbucks|boulangerie|marie blachere|brioche doree|columbus|five guys|sushi|snack|restaurant|resto|brasserie|cafe|chicken|bagel|patisserie|creperie|grill|fast food|wok|bistrot|traiteur|delices?|odelice)\b/],
+  ['transport', /\b(sncf|ouigo|semitag|m ?tag|m reso|peage|autoroutes?|aprr|area|escota|vinci autoroutes|cofiroute|sanef|indigo|effia|saemes|parking|stationnement|easypark|paybyphone|flowbird|uber|bolt|heetch|blablacar|flixbus|lime|garage|norauto|feu vert|speedy|midas|point s|controle technique|dekra|securitest|autosur|lavage|euromaster|carglass)\b/],
   ['abo', /\b(netflix|spotify|deezer|disney|canal|amazon prime|prime video|apple com|itunes|icloud|google (play|one|storage)|youtube|free mobile|free telecom|freebox|sfr|orange|bouygues|b ?you|sosh|lebara|lycamobile|syma|chatgpt|openai|dazn|bein|crunchyroll|audible)\b/],
-  ['loisirs', /\b(steam|playstation|psn|sony interactive|nintendo|xbox|epic games|fortnite|riot|blizzard|pathe|gaumont|ugc|cinema|basic ?fit|fitness|keepcool|bowling|laser|karting|escape|ticketmaster|seetickets|musee|piscine|twitch)\b/],
+  ['loisirs', /\b(steam|playstation|psn|sony interactive|nintendo|xbox|epic games|fortnite|riot|blizzard|pathe|gaumont|ugc|cinema|basic ?fit|fitness|keepcool|bowling|laser|karting|escape|ticketmaster|seetickets|musee|piscine|twitch|govoyages|booking|airbnb|ryanair|easyjet|transavia|volotea|opodo|expedia|hotel)\b/],
   ['sante', /\b(pharmacie|doctolib|medecin|docteur|dentiste|dentaire|kine|osteo|opticien|optique|laboratoire|clinique|hopital|chu|mutuelle)\b/],
   ['frais', /\b(cotisation|frais bancaires?|commission|agios|interets debiteurs|revolut (premium|plus|metal|ultra))\b/],
   ['especes', /\b(retrait|dab|atm|cash withdrawal|distributeur)\b/],
@@ -5377,17 +5449,23 @@ const BMCC = [
   ['pro', [2741, 4214, 4215, 7311, 7333, 7338, 7372, 7379, 9402]], ['pieces', [5045, 5065, 5085]], ['dons', [8398, 8641, 8651, 8661]], ['frais', [6012]],
   ['shopping', [5200, 5211, 5231, 5251, 5261, 5309, 5310, 5311, 5331, 5399, 5611, 5621, 5631, 5641, 5651, 5655, 5661, 5681, 5691, 5697, 5698, 5699, 5712, 5714, 5718, 5719, 5722, 5732, 5733, 5734, 5735, 5931, 5932, 5941, 5942, 5943, 5944, 5947, 5948, 5949, 5964, 5965, 5966, 5967, 5969, 5977, 5992, 5993, 5995, 5999, 7230, 7297, 7298]],
 ];
+const BSAL = /\b(salaire|paie|remuneration|logistique|adecco|randstad|manpower|synergie|start people|proman|interim|shopopop|stuart)\b/;
+const BCLI = /\b(wero|lydia|paylib|sumup|zettle|reparo|reparation|manettes?|ps5|ps4|joysticks?|hdmi|iphone|ecran|batterie|console|drift)\b/;
 // Commerçants où chaque achat peut être différent : la règle « toujours » n'est pas proposée par défaut
 const BAMBIG = /\b(amazon|amzn|paypal|ebay|cdiscount|leboncoin|vinted|lydia|wero|sumup|aliexpress|fnac|darty|boulanger|action|carrefour|leclerc|auchan|brico|castorama|leroy merlin)\b/;
 const BGEN = new Set(['boulangerie', 'restaurant', 'pharmacie', 'station', 'sarl', 'sas', 'eurl', 'magasin', 'tabac', 'garage', 'super', 'hyper', 'uber', 'apple', 'google', 'paypal', 'sumup', 'zettle', 'carte', 'boucherie', 'epicerie', 'parking', 'relais', 'total', 'amazon', 'www', 'retrait']);
 const bLow = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const bText = (t) => bLow(`${t.name || ''} ${t.info || ''}`).replace(/[^a-z0-9&]+/g, ' ').replace(/\s+/g, ' ').trim();
-// « CARTE 23/11/26 CARREFOUR CITY CB*1234 » → « CARREFOUR CITY »
-const bClean = (s) => String(s || '').replace(/\b(PAIEMENT|ACHAT)\s+(PAR\s+)?(CARTE|CB)\b/gi, ' ').replace(/^\s*(CARTE|CB|PRLV( SEPA)?|VIR(EMENT)?( SEPA| INST(ANTANE)?)?( RECU| EMIS)?)\b/i, ' ')
-  .replace(/\b\d{2}\/\d{2}(\/\d{2,4})?\b/g, ' ').replace(/\bCB\s?\*?\s?\d{4}\b/gi, ' ').replace(/\bX\d{4}\b/gi, ' ').replace(/\s+/g, ' ').trim();
-const bName = (t) => (t.name || '').trim() || bClean(t.info).slice(0, 48) || (t.amount < 0 ? 'Dépense' : 'Entrée');
+const bTitle = (s) => String(s || '').toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (x, a, c) => a + c.toUpperCase());
+// « CARTE 23/11/26 CARREFOUR CITY CB*1234 », « ACHAT CB LIDL 09.10.26 CARTE NUMERO 641 », « QUICK\ECHIROLLES\ FR » → le commerçant seul
+const bClean = (s) => String(s || '').replace(/\\[^\\]*\\\s*[A-Z]{2}\s*$/, ' ').replace(/\b(PAIEMENT|ACHAT)\s+(PAR\s+)?(CARTE|CB)\b/gi, ' ')
+  .replace(/^\s*(AVOIR|CREDIT CARTE BANCAIRE|CARTE( X?\d{4})?|CB|PRLV( SEPA)?|VIR(EMENT)?( SEPA| INST(ANTANE)?)?( RECU| EMIS)?)\b/i, ' ')
+  .replace(/\b\d{2}[/.]\d{2}([/.]\d{2,4})?\b/g, ' ').replace(/\bCB\s?\*?\s?\d{4}\b/gi, ' ').replace(/\bX\d{4}\b/gi, ' ').replace(/\bCARTE (NUMERO|NO|N°)\s*\d+\b/gi, ' ')
+  .replace(/\bEUR\s+\d+[,.]\d{2}\b/gi, ' ').replace(/\bA \d{2}H\d{2}\b/g, ' ').replace(/\s+/g, ' ').trim();
+// Ville dans « QUICK\ECHIROLLES\ FR »
+const bTownB = (s) => { const m = String(s || '').match(/\\([^\\]{2,})\\\s*[A-Z]{2}\s*$/); return m ? bTitle(m[1].trim()) : ''; };
 function bKey(t) {
-  const w = bLow(bName(t)).replace(/[^a-z0-9&]+/g, ' ').split(' ').filter((x) => x && !/^\d+$/.test(x));
+  const w = bLow((t.name || '').trim() || bClean(t.info)).replace(/[^a-z0-9&]+/g, ' ').split(' ').filter((x) => x && !/^\d+$/.test(x));
   if (!w.length) return '';
   return w[0].length >= 4 && !BGEN.has(w[0]) ? w[0] : w.slice(0, 2).join(' ');
 }
@@ -5399,75 +5477,382 @@ function bMcc(m) {
   const R = BMCC.find(([, list]) => list.some((x) => (Array.isArray(x) ? m >= x[0] && m <= x[1] : m === x)));
   return R ? R[0] : '';
 }
-function bAuto(t, own) {
-  const s = bText(t), out = t.amount < 0, rev = /revolut/i.test(t.bank || ''), m = +t.mcc || 0;
-  if (t.oih && own.has(t.oih)) return 'interne';
-  // Virement vers ou depuis une de tes autres banques (le nom de l'autre banque est dans le libellé)
-  const me = bBank(t.bank);
-  if (Object.keys(BKRE).some((b) => b !== me && BKRE[b].test(s)) || (rev && !out && /\b(top ?up|rechargement|recharge)\b/.test(s))) return 'interne';
+
+// ---- Qui est en face : toi (tes comptes), une personne, un commerçant ----
+// Mots du virement qui ne disent rien de la personne
+const BSTOP = new Set(('vir virement virements inst instantane instant sepa recu emis de des du d a au aux la le les l depuis envoye envoyee envoi vers from to by payment paiement '
+  + 'm mr mme mlle monsieur madame ei et sur pour no numero wero transfer transfert top up topup boursobank boursorama bourso revolut banque postale bp lbp cb carte').split(' '));
+// Les mots d'un nom (sans les références ni les codes)
+const bToks = (s) => bLow(s).replace(/\b(ref|reference|motif)\b.*$/, ' ').replace(/[^a-z0-9]+/g, ' ').split(' ').filter((w) => w.length >= 2 && !/\d/.test(w) && !BSTOP.has(w));
+// Ton nom : les mots présents dans les noms de plusieurs de tes comptes (ton prénom, ton nom de famille)
+function bOwn() {
+  const accs = (S.bank && S.bank.sessions || []).flatMap((s) => s.accounts || []), k = accs.map((a) => a.name || '').join('|');
+  if (bOwn.k === k) return bOwn.v;
+  const f = new Map(); accs.forEach((a) => new Set(bToks(a.name || '')).forEach((w) => f.set(w, (f.get(w) || 0) + 1)));
+  const skip = new Set(['bancaire', 'visa', 'welcome', 'compte', 'courant', 'cheques', 'premier', 'gold', 'ultim', 'metal', 'euro', 'euros', 'joint', 'principal', 'standard', 'business', 'pro', 'perso']);
+  bOwn.k = k; bOwn.v = [...f].filter(([w, n]) => n >= (accs.length > 1 ? 2 : 1) && w.length >= 3 && !skip.has(w)).map(([w]) => w);
+  return bOwn.v;
+}
+const bIsOwn = (w, own) => own.some((o) => o === w || (w.length >= 3 && o.startsWith(w)));
+const bIsXfer = (t) => /^(TRANSFER|TOPUP)$/i.test(t.kind || '') || /^\s*(vir|virement)\b/i.test(t.info || '') || /^\s*(vir|virement)\b/i.test(t.name || '');
+// Même personne ? « JEAN-PAUL DURAND » = « DURAND JEAN-PAUL » = « JEAN PAULDURAND » ; « PIERRE DURAND » ≠
+function bSame(a, b) {
+  if (!a || !b || !a.length || !b.length) return false;
+  const [x, y] = a.length <= b.length ? [a, b] : [b, a], j = y.join('');
+  const hit = x.filter((w) => j.includes(w)).length;
+  if (x.length === 1) return x[0].length >= 4 && hit === 1;
+  // « JEAN PAULDURAND » / « DURAND JEAN-PAUL » : on regarde aussi dans l'autre sens (mots collés)
+  const jx = x.join('');
+  return hit >= 2 || y.filter((w) => w.length >= 3 && jx.includes(w)).length >= 2;
+}
+// Proches enregistrés (compta.json : bankPeople) : les virements avec eux ne comptent pas dans le budget
+const bPeople = () => ((DATA && Array.isArray(DATA.bankPeople)) ? DATA.bankPeople : []).filter((p) => p && !p.no && Array.isArray(p.t) && p.t.length);
+const bNotPeople = () => ((DATA && Array.isArray(DATA.bankPeople)) ? DATA.bankPeople : []).filter((p) => p && p.no && Array.isArray(p.t));
+const bFirst = (n) => String(n || '').split(/[\s-]/)[0] || n;
+
+// ---- Tes comptes : banque, compte perso / pro / épargne, cartes rattachées ----
+function bAcctMap() {
+  const B = S.bank, sig = S.bankSig + '|' + ((B && B.sessions || []).length);
+  if (bAcctMap.k === sig && bAcctMap.v) return bAcctMap.v;
+  const M = new Map();
+  (B && B.sessions || []).forEach((s) => (s.accounts || []).forEach((a) => {
+    const card = /^CARD$/i.test(a.type || '') || /^\s*carte\b/i.test(a.name || '');
+    const save = !card && (/^(SVGS|LLSV|ONDP|MOMA)$/i.test(a.type || '') || /\b(livret|epargne|ldd|lep|pel|cel)\b/.test(bLow(a.name)));
+    const pro = /^ORGA$/i.test(a.usage || '') || /^\s*(ei|sarl|sas|sasu|eurl)\b/i.test(a.name || '');
+    M.set(a.key, { key: a.key, bank: bBank(s.bank), num: a.num || '', type: a.type || '', name: a.name || '', ih: a.ih || '', card, save, pro, status: s.status, until: s.until, cur: a.cur });
+  }));
+  const L = [...M.values()];
+  L.filter((a) => !a.card).forEach((a) => {
+    const n = L.filter((x) => !x.card && x.bank === a.bank).length, base = a.bank === 'La Banque Postale' ? 'Banque Postale' : a.bank;
+    a.label = a.save ? 'Épargne' : a.pro ? 'Compte pro' : 'Compte perso';
+    a.short = n > 1 ? `${base} ${a.save ? 'épargne' : a.pro ? 'pro' : 'perso'}` : base;
+  });
+  // Une carte est rattachée au compte de la même banque (pro avec pro, perso avec perso)
+  L.filter((a) => a.card).forEach((c) => {
+    const p = L.find((x) => !x.card && x.bank === c.bank && x.pro === c.pro) || L.find((x) => !x.card && x.bank === c.bank);
+    c.parent = p ? p.key : ''; c.label = 'Carte'; c.short = p ? p.short : c.bank;
+  });
+  bAcctMap.k = sig; bAcctMap.v = M;
+  return M;
+}
+
+function bAuto(r) {
+  const s = bText(r), out = r.amount < 0, m = +r.mcc || 0, nm = bLow(r.nm);
+  if (r.xfer) {
+    if (out) return 'virperso';
+    if (BSAL.test(s)) return 'salaire';
+    if (/\b(leboncoin|lbc france)\b/.test(s)) return 'ventes';
+    if (BCLI.test(s)) return 'clients';
+    return 'entree';
+  }
   if (out) {
-    if ([5541, 5542, 5983].includes(m)) return 'essence';
+    for (const [c, re] of BPRIO) if (re.test(s)) return c;
+    if ([5541, 5542, 5983].includes(m) || /^total\b/.test(nm)) return 'essence';
     if ([6010, 6011].includes(m)) return 'especes';
     for (const [c, re] of BRULES) if (re.test(s)) return c;
     return bMcc(m) || 'atrier';
   }
-  if (/\b(salaire|paie|remuneration|logistique|adecco|randstad|manpower|synergie|start people|proman|interim)\b/.test(s)) return 'salaire';
-  if (m || /\b(rembours\w*|refund|avoir|annulation)\b/.test(s)) return 'rembourse';
-  if (/\b(wero|lydia|paylib|sumup|reparo|reparation|manettes?|ps5|ps4|joysticks?|hdmi|iphone|ecran|batterie|console|drift)\b/.test(s)) return 'clients';
+  if (BSAL.test(s)) return 'salaire';
+  if (/\b(leboncoin|lbc france)\b/.test(s) && /\b(payout|virement|vir)\b/.test(s)) return 'ventes';
+  if (m || /\b(rembours\w*|refund|avoir|annulation|credit carte)\b/.test(s)) return 'rembourse';
+  if (BCLI.test(s)) return 'clients';
   return 'entree';
 }
 const bFrom = () => (isDate(S.settings.bankFrom) ? S.settings.bankFrom : '');
 const bOn = () => S.settings.bankCash !== false && !!bFrom() && !!(S.bank && (S.bank.sessions || []).length);
 // Pièces payées par carte : comptées à l'achat (banque). Sur une réparation payée après la date de départ, elles ne sont pas retirées une 2e fois.
 const bPartsBack = (r) => (bOn() && !r._rest && repPaidOn(r) >= bFrom() ? num(r.partsCost) : 0);
-let BMEMO = { k: '', rows: [] };
+const bNear = (a, b) => Math.abs(Math.abs(a) - Math.abs(b)) <= Math.max(0.5, Math.abs(a) * 0.01);
+const bByDate = (x, y) => x.date.localeCompare(y.date) || x.id.localeCompare(y.id);
+// Petits groupes (2 ou 3 virements) dont la somme fait le montant cherché
+function bCombo(list, target) {
+  const L = list.slice(0, 12);
+  for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
+    if (bNear(target, Math.abs(L[i].amount) + Math.abs(L[j].amount))) return [L[i], L[j]];
+    for (let k = j + 1; k < L.length; k++) if (bNear(target, Math.abs(L[i].amount) + Math.abs(L[j].amount) + Math.abs(L[k].amount))) return [L[i], L[j], L[k]];
+  }
+  return null;
+}
+let BMEMO = { k: '', rows: [], cl: [] };
 function bRows() {
   const B = S.bank; if (!B || !Array.isArray(B.tx) || !B.tx.length) return [];
-  const tags = (DATA && DATA.bankTags) || [], rules = (DATA && DATA.bankRules) || [];
-  const k = [S.bankSig, SHA, tags.length, rules.length, S.allItems.length, bFrom(), S.settings.bankCash].join('|');
+  const tags = (DATA && DATA.bankTags) || [], rules = (DATA && DATA.bankRules) || [], ppl = bPeople(), nop = bNotPeople();
+  const k = [S.bankSig, SHA, tags.length, rules.length, ((DATA && DATA.bankPeople) || []).length, S.allItems.length, (S.repairs || []).length, bFrom(), S.settings.bankCash].join('|');
   if (BMEMO.k === k) return BMEMO.rows;
-  const own = new Set((B.sessions || []).flatMap((s) => (s.accounts || []).map((a) => a.ih)).filter(Boolean));
+  const M = bAcctMap(), own = bOwn();
+  const ownIh = new Set([...M.values()].map((a) => a.ih).filter(Boolean));
   const T = new Map(tags.map((x) => [x.id, x])), R = new Map(rules.map((x) => [x.k, x]));
-  const rows = B.tx.filter((t) => t && isDate(t.date) && isFinite(t.amount)).map((t) => {
-    const key = bKey(t), tag = T.get(t.id), rule = key && R.get(key);
-    let cat, how = 'auto';
-    if (tag && BCAT[tag.cat]) { cat = tag.cat; how = 'tag'; }
-    else if (rule && BCAT[rule.cat] && (BCAT[rule.cat].skip || !!BCAT[rule.cat].in === t.amount > 0)) { cat = rule.cat; how = 'rule'; }
-    else cat = bAuto(t, own);
-    return { ...t, nm: bName(t), key, cat, how, noted: !!(tag && tag.noted), town: bTown(t.place) };
+  let rows = B.tx.filter((t) => t && isDate(t.date) && isFinite(t.amount) && Math.abs(t.amount) >= 0.005).map((t) => {
+    const A = M.get(t.acc) || { bank: bBank(t.bank), short: bBank(t.bank) }, xfer = bIsXfer(t);
+    const r = { ...t, A, xfer, town: bTown(t.place) || bTownB(t.info), tag: T.get(t.id) };
+    if (xfer) {
+      const all = [...new Set(bToks(/revolut/i.test(t.bank || '') && t.name ? t.name : `${t.name || ''} ${t.info || ''}`))], p = all.filter((w) => !bIsOwn(w, own));
+      r.self = !!own.length && all.length > 0 && !p.length;
+      if (!r.self && p.length) r.party = p;
+    }
+    if (t.oih && ownIh.has(t.oih)) { r.self = true; r.party = null; }
+    r.nm = r.party ? (/revolut/i.test(t.bank || '') && t.name ? bTitle(t.name) : bTitle(r.party.join(' '))) : (t.name || '').trim() || bClean(t.info).slice(0, 48) || (t.amount < 0 ? 'Dépense' : 'Entrée');
+    r.key = r.party || r.self ? '' : bKey(t);
+    return r;
   });
-  // Déjà noté dans la compta : achat d'article (même montant à 3 % près, ±5 jours) ou frais d'envoi d'une vente (±7 jours)
+  // 1. Les cartes Bourso recopient chaque paiement du compte : on ne garde que celui du compte
+  const cards = rows.filter((r) => r.A.card);
+  if (cards.length) {
+    const claimed = new Set(), drop = new Set();
+    cards.sort(bByDate).forEach((c) => {
+      const m = rows.filter((r) => !r.A.card && r.A.bank === c.A.bank && !claimed.has(r.id) && Math.abs(r.amount - c.amount) < 0.005 && Math.abs(dayDiff(r.date, c.date)) <= 3)
+        .sort((x, y) => (y.acc === c.A.parent) - (x.acc === c.A.parent) || Math.abs(dayDiff(x.date, c.date)) - Math.abs(dayDiff(y.date, c.date)))[0];
+      if (m) { claimed.add(m.id); drop.add(c.id); }
+    });
+    rows = rows.filter((r) => !drop.has(r.id));
+  }
+  const set = (r, cat) => { if (!r.cat) { r.cat = cat; r.how = 'auto'; } };
+  const free = (r) => !r.cat;
+  // 2. Ton choix d'abord
+  rows.forEach((r) => { if (r.tag && BCAT[r.tag.cat]) { r.cat = r.tag.cat; r.how = 'tag'; } });
+  // 3. Entre tes comptes : même montant sorti d'un compte et arrivé sur un autre (0 à 4 jours), avec ton nom ou le nom de ta banque dans le libellé
+  rows.forEach((r) => { const s = bText(r), me = r.A.bank; r.other = !r.party && Object.keys(BKRE).some((b) => b !== me && BKRE[b].test(s)); r.topup = /revolut/i.test(r.bank || '') && r.amount > 0 && !r.party && /\b(top ?up|rechargement|recharge)\b/.test(s); });
+  const hint = (r) => r.self || r.other || r.topup, okI = (r) => free(r) || r.cat === 'interne';
+  const usedI = new Set();
+  rows.filter((o) => o.amount < 0 && okI(o) && (o.xfer || o.other) && !o.A.card).sort(bByDate).forEach((o) => {
+    const c = rows.filter((i) => i.amount > 0 && !usedI.has(i.id) && okI(i) && i.acc !== o.acc && !i.A.card && Math.abs(i.amount + o.amount) < 0.005 && Math.abs(dayDiff(o.date, i.date)) <= 4 && (hint(o) || hint(i)))
+      .sort((x, y) => Math.abs(dayDiff(o.date, x.date)) - Math.abs(dayDiff(o.date, y.date)))[0];
+    if (c) { usedI.add(c.id); o.pair = c; c.pair = o; set(o, 'interne'); set(c, 'interne'); }
+  });
+  rows.forEach((r) => { if (free(r) && hint(r)) set(r, 'interne'); });
+  // 4. Achat annulé puis remboursé (même commerçant, même montant)
+  rows.filter((i) => free(i) && i.amount > 0 && !i.xfer && i.key && /\b(avoir|rembours\w*|refund|annulation)\b/.test(bText(i))).sort(bByDate).forEach((i) => {
+    const o = rows.filter((x) => free(x) && x.amount < 0 && x.key === i.key && Math.abs(x.amount + i.amount) < 0.005 && dayDiff(x.date, i.date) >= 0 && dayDiff(x.date, i.date) <= 60)
+      .sort((x, y) => dayDiff(x.date, i.date) - dayDiff(y.date, i.date))[0];
+    if (o) { o.pair = i; i.pair = o; set(o, 'annule'); set(i, 'annule'); }
+  });
+  // 5. Espèces déposées sur un compte : c'est ton argent, pas un revenu
+  rows.forEach((r) => { if (free(r) && r.amount > 0 && !r.xfer && /\b(versement (effectue|carte|dab|d especes|especes)|versement dab|depot (d )?especes|remise d especes)\b/.test(bText(r))) set(r, 'depot'); });
+  // 6. Personnes : un aller-retour (même montant envoyé puis rendu, ou l'inverse, à 20 jours près) ne compte pas ; avec un proche, le reste est « à confirmer »
+  const CL = [];
+  rows.filter((r) => r.party).sort(bByDate).forEach((r) => { let c = CL.find((x) => bSame(x.t, r.party)); if (!c) { c = { t: r.party.slice(), rows: [] }; CL.push(c); } c.rows.push(r); r.cl = c; });
+  CL.forEach((c) => {
+    c.t = [...new Set(c.rows.flatMap((r) => r.party))].slice(0, 8);
+    const best = c.rows.slice().sort((x, y) => (/revolut/i.test(y.bank) - /revolut/i.test(x.bank)) || y.party.length - x.party.length)[0];
+    c.nm = best.nm; c.pp = ppl.find((p) => bSame(p.t, c.t)) || null; c.no = !c.pp && nop.some((p) => bSame(p.t, c.t));
+    if (c.pp) c.nm = c.pp.n || c.nm;
+    const can = (r) => free(r) || (r.tag && r.tag.cat === 'proche' && !r.tag.cash);
+    const O = c.rows.filter((r) => r.amount < 0 && can(r)), I = c.rows.filter((r) => r.amount > 0 && can(r)), used = new Set();
+    const close = (r) => (x, y) => Math.abs(dayDiff(r.date, x.date)) - Math.abs(dayDiff(r.date, y.date));
+    O.forEach((o) => { const i = I.filter((x) => !used.has(x.id) && bNear(o.amount, x.amount) && Math.abs(dayDiff(o.date, x.date)) <= 20).sort(close(o))[0]; if (i) { used.add(i.id); used.add(o.id); o.pair = i; i.pair = o; } });
+    if (c.pp) {
+      // Avec un proche : plusieurs petits virements rendus d'un coup (ou l'inverse)
+      [[I, O], [O, I]].forEach(([one, many]) => one.filter((x) => !used.has(x.id)).forEach((x) => {
+        const g = bCombo(many.filter((y) => !used.has(y.id) && Math.abs(dayDiff(x.date, y.date)) <= 20).sort(close(x)), Math.abs(x.amount));
+        if (g) { used.add(x.id); g.forEach((y) => { used.add(y.id); y.pair = x; }); x.pair = g[0]; x.group = g; }
+      }));
+    }
+    c.rows.forEach((r) => {
+      if (r.pair && can(r)) { r.cat = 'retour'; r.how = r.how || 'auto'; }
+      else if (c.pp && free(r)) set(r, 'proche');
+      r.state = r.cat === 'retour' ? 'pair' : r.cat === 'proche' ? (r.tag && r.tag.cash ? 'cash' : 'open') : '';
+    });
+  });
+  // 7. Tes règles, puis le tri automatique
+  rows.forEach((r) => {
+    if (r.cat) return;
+    const rule = r.key && R.get(r.key);
+    if (rule && BCAT[rule.cat] && (BCAT[rule.cat].skip || !!BCAT[rule.cat].in === r.amount > 0)) { r.cat = rule.cat; r.how = 'rule'; return; }
+    r.cat = bAuto(r); r.how = 'auto';
+    if (r.A.pro && r.amount < 0 && r.cat === 'atrier') r.cat = 'pro'; // compte pro : par défaut une dépense pro
+  });
+  // Même employeur que ton salaire → salaire (le libellé ne dit pas toujours « salaire »)
+  const sal = new Set(rows.filter((r) => r.cat === 'salaire' && r.cl).map((r) => r.cl));
+  rows.forEach((r) => { if (r.how === 'auto' && r.cat === 'entree' && r.cl && sal.has(r.cl) && r.amount >= 100) r.cat = 'salaire'; });
+  // 8. Paiement d'un client : même montant qu'une réparation payée (±3 jours), ou qu'une vente
+  const reps = repPayRows().filter((x) => repTotal(x) > 0 && isDate(repPaidOn(x))), usedR = new Set(), usedS = new Set();
+  rows.filter((r) => r.amount > 0 && r.how === 'auto' && ['entree', 'clients'].includes(r.cat)).sort(bByDate).forEach((r) => {
+    const c = reps.filter((x) => !usedR.has(x) && Math.abs(repTotal(x) - r.amount) < 0.005 && Math.abs(dayDiff(repPaidOn(x), r.date)) <= 3)
+      .map((x) => ({ x, nm: r.party && bSame(bToks(x.client || ''), r.party) ? 1 : 0, dd: Math.abs(dayDiff(repPaidOn(x), r.date)) })).sort((a, b) => b.nm - a.nm || a.dd - b.dd)[0];
+    if (c && (c.nm || r.party || r.cat === 'clients')) { usedR.add(c.x); r.cat = 'clients'; r.rep = c.x._src || c.x; return; }
+    const it = S.allItems.filter((i) => isSold(i) && !usedS.has(i.id) && Math.abs(num(i.sellPrice) - r.amount) < 0.005 && paidOn(i) && Math.abs(dayDiff(paidOn(i), r.date)) <= 3)[0];
+    if (it) { usedS.add(it.id); r.cat = 'ventes'; r.sale = it; }
+  });
+  // Achat Leboncoin payé en partie avec le porte-monnaie : la carte n'a payé que le reste
+  const bPartCard = (i, r, a) => { const pw = payWal(i); if (pw != null) return pw > 0 && Math.abs(num(i.buyPrice) - pw - a) <= 1;
+    return /leboncoin/i.test(i.buySource || '') && /\bleboncoin\b/.test(bText(r)) && a < num(i.buyPrice) && Math.abs(dayDiff(i.buyDate, bOpDate(r))) <= 3; };
+  // 9. Déjà noté dans la compta : achat d'article (même montant à 3 % près, ±5 jours) ou frais d'envoi d'une vente (±7 jours)
   const used = new Set();
-  rows.filter((r) => r.amount < 0 && (r.cat === 'revente' || r.cat === 'pro')).sort((x, y) => x.date.localeCompare(y.date)).forEach((r) => {
+  rows.filter((r) => r.amount < 0 && (r.cat === 'revente' || r.cat === 'pro')).sort(bByDate).forEach((r) => {
     const a = -r.amount;
     const c = (r.cat === 'revente'
-      ? S.allItems.filter((i) => isDate(i.buyDate) && Math.abs(dayDiff(i.buyDate, r.date)) <= 5 && (Math.abs(cost(i) - a) <= Math.max(1, a * 0.03) || Math.abs(num(i.buyPrice) - a) <= 1)).map((i) => ({ id: i.id, ref: i.ref, dd: Math.abs(dayDiff(i.buyDate, r.date)) }))
+      ? S.allItems.filter((i) => isDate(i.buyDate) && Math.abs(dayDiff(i.buyDate, r.date)) <= 5 && (Math.abs(cost(i) - a) <= Math.max(1, a * 0.03) || Math.abs(num(i.buyPrice) - a) <= 1 || bPartCard(i, r, a))).map((i) => ({ id: i.id, ref: i.ref, dd: Math.abs(dayDiff(i.buyDate, r.date)) + (isCancelled(i) ? 0.5 : 0) }))
       : S.allItems.filter((i) => isSold(i) && num(i.sellFees) > 0 && Math.abs(dayDiff(i.sellDate, r.date)) <= 7 && Math.abs(num(i.sellFees) - a) <= 0.5).map((i) => ({ id: i.id, ref: i.ref, dd: Math.abs(dayDiff(i.sellDate, r.date)) })))
       .filter((x) => !used.has(x.id)).sort((x, y) => x.dd - y.dd)[0];
     if (c) { used.add(c.id); r.match = c; }
   });
   const on = bOn(), from = bFrom();
-  rows.forEach((r) => { r.cash = on && r.amount < 0 && !!BCAT[r.cat].pro && !r.match && !r.noted && r.date >= from && (r.cur || 'EUR') === 'EUR'; });
+  rows.forEach((r) => {
+    r.noted = !!(r.tag && r.tag.noted);
+    r.cash = on && r.amount < 0 && !!BCAT[r.cat].pro && !r.match && !r.noted && r.date >= from && (r.cur || 'EUR') === 'EUR';
+    if (r.cat === 'interne' && r.pair && r.pair.A) r.nm = r.amount < 0 ? `Vers ${r.pair.A.short}` : `Depuis ${r.pair.A.short}`;
+    else if (r.cat === 'interne' && r.self && !r.nm) r.nm = 'Virement à toi-même';
+  });
   rows.sort((x, y) => y.date.localeCompare(x.date) || (x.st === 'PDNG' ? -1 : 0));
-  BMEMO = { k, rows };
+  BMEMO = { k, rows, cl: CL };
   return rows;
 }
+const bClusters = () => (bRows(), BMEMO.cl || []);
 const bankOut = () => sum(bRows().filter((r) => r.cash), (r) => -r.amount);
 function bAccounts() {
   const B = S.bank; if (!B) return [];
-  return (B.sessions || []).flatMap((s) => (s.accounts || []).map((a) => {
+  const L = [...bAcctMap().values()];
+  return L.filter((a) => !a.card).map((a) => {
     const bal = (B.balances || {})[a.key] || {};
-    return { bank: bBank(s.bank), name: a.name, num: a.num, key: a.key, amount: bal.amount, cur: bal.cur || a.cur || 'EUR', at: bal.at, status: s.status, until: s.until };
-  }));
+    const cards = L.filter((c) => c.card && c.parent === a.key).map((c) => { const cb = (B.balances || {})[c.key] || {}; return { num: c.num, key: c.key, amount: num(cb.amount) }; });
+    return { ...a, amount: bal.amount, cur: bal.cur || (a.cur && a.cur !== 'XXX' ? a.cur : 'EUR'), at: bal.at, cards };
+  });
 }
-// Total en euros seulement : un compte en livres ou en dollars est affiché à part, jamais additionné
-const bTotal = () => sum(bAccounts().filter((a) => a.cur === 'EUR'), (a) => num(a.amount));
+// Total en euros seulement : un compte en livres ou en dollars est affiché à part, jamais additionné. Une carte à débit différé compte ce qu'elle doit.
+const bTotal = () => sum(bAccounts().filter((a) => a.cur === 'EUR'), (a) => num(a.amount) + sum(a.cards, (c) => c.amount));
 const bAmt = (a) => (a.amount == null ? '—' : a.cur === 'EUR' ? eur(a.amount) : `${nf2.format(a.amount)}${NB}${esc(a.cur)}`);
 const bLinked = (bank) => (S.bank && S.bank.sessions || []).find((s) => bBank(s.bank) === bank);
 const bConfigured = () => !!S.bank && !S.bank.none && !(S.bank.last && /pas encore configuré/.test(S.bank.last.msg || '') && !(S.bank.sessions || []).length);
 const bAgo = (iso) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return !isFinite(m) ? '' : m < 1 ? 'à l’instant' : m < 60 ? `il y a ${m}${NB}min` : m < 1440 ? `il y a ${Math.round(m / 60)}${NB}h` : `il y a ${plural(Math.round(m / 1440), 'jour')}`; };
 const bHour = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : `${dShort(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`)} à ${d.getHours()}${NB}h${pad(d.getMinutes())}`; };
 const bEur = (v) => (v < 0 ? '−' + eur(-v) : '+' + eur(v));
+const bLogo = (bank) => `<span class="bk-logo ${bank === 'Revolut' ? 'r' : bank === 'BoursoBank' ? 'b' : bank === 'Leboncoin' ? 'l' : 'p'}" aria-hidden="true">${esc(String(bank).slice(0, 1))}</span>`;
+
+// ---- Proches : ce qui est rendu, ce qui reste à confirmer ----
+function bProches() {
+  return bClusters().filter((c) => c.pp).map((c) => {
+    const rows = c.rows.slice().sort((x, y) => y.date.localeCompare(x.date));
+    const open = rows.filter((r) => r.cat === 'proche' && r.state === 'open'), cash = rows.filter((r) => r.state === 'cash'), paired = rows.filter((r) => r.cat === 'retour');
+    const bal = sum(open, (r) => -r.amount);
+    return { c, nm: c.nm, first: bFirst(c.nm), rows, open, cash, paired, bal, sent: sum(rows.filter((r) => r.amount < 0), (r) => -r.amount), got: sum(rows.filter((r) => r.amount > 0), (r) => r.amount) };
+  }).sort((a, b) => b.open.length - a.open.length || b.rows.length - a.rows.length);
+}
+// Personnes avec qui l'argent part et revient : proposées comme proches
+function bSuggest() {
+  return bClusters().filter((c) => !c.pp && !c.no && c.rows.some((r) => r.amount < 0) && c.rows.some((r) => r.amount > 0) && sum(c.rows, (r) => Math.abs(r.amount)) >= 30)
+    .map((c) => ({ c, out: c.rows.filter((r) => r.amount < 0), inn: c.rows.filter((r) => r.amount > 0) }))
+    .sort((a, b) => b.c.rows.length - a.c.rows.length || sum(b.c.rows, (r) => Math.abs(r.amount)) - sum(a.c.rows, (r) => Math.abs(r.amount))).slice(0, 5);
+}
+const bBalTxt = (p) => (p.bal > 0.5 ? `Pas encore rendu : <b>${eur(p.bal)}</b> (${esc(p.first)} te doit)` : p.bal < -0.5 ? `Tu dois <b>${eur(-p.bal)}</b> à ${esc(p.first)}` : 'Tout est réglé ✓');
+
+// ---- Porte-monnaie Leboncoin : recalculé tout seul, sans rien taper ----
+// Entre : tes ventes Leboncoin payées, les achats annulés remboursés. Sort : chaque « leboncoin payout » vu sur ta banque,
+// et la part d'un achat Leboncoin que ta carte n'a pas payée (prix noté dans l'appli − paiement carte vu sur la banque).
+// Si plus d'argent sort que ce que l'appli connaît, l'écart vient d'une vente : celle au même montant si elle existe, sinon « vente non notée ».
+const BLBC = /\b(leboncoin|lbc france)\b/;
+function bOpDate(r) {
+  const m = /\b(\d{2})[/.](\d{2})[/.](\d{2})\b/.exec(r.info || '');
+  const d = m ? `20${m[3]}-${m[2]}-${m[1]}` : '';
+  return isDate(d) && Math.abs(dayDiff(d, r.date)) <= 10 ? d : r.date;
+}
+const bItemNm = (i) => `${(i.model || 'Article').trim()}${i.ref ? ` (${i.ref})` : ''}`;
+function lbcWallet() {
+  const rows = bRows(); if (!rows.length) return null;
+  const k = `${rows.length}|${S.allItems.length}|${S.allItems.reduce((m, i) => (i.updatedAt > m ? i.updatedAt : m), '')}|${JSON.stringify(S.settings.lbcWallet || '')}|${today()}`;
+  if (lbcWallet.k === k) return lbcWallet.v;
+  const S0 = rows.reduce((m, r) => (r.date < m ? r.date : m), today()), T = today();
+  const items = S.allItems.filter((i) => !i.example), ev = [], used = new Set();
+  const lbcSale = (i) => isSold(i) && /^LBC\b/i.test(i.sellChannel || '') && isPaid(i);
+  // 1. Ventes en livraison payées : l'argent arrive sur le porte-monnaie
+  items.filter((i) => lbcSale(i) && platformOf(i.sellChannel) === 'Leboncoin' && paidOn(i) >= S0).forEach((i) => {
+    used.add(i); ev.push({ d: paidOn(i), a: num(i.sellPrice) - num(i.sellFees), k: 'vente', i });
+  });
+  // 2. Virements du porte-monnaie vers ta banque
+  rows.filter((r) => r.amount > 0 && r.cat !== 'annule' && /\b(payout|lbc france)\b/.test(bText(r)))
+    .forEach((r) => ev.push({ d: r.date, a: -r.amount, k: 'payout', r }));
+  // 3. Achats Leboncoin : la part que ta carte n'a pas payée vient du porte-monnaie
+  const cards = rows.filter((r) => r.amount < 0 && !r.xfer && BLBC.test(bText(r))).map((r) => ({ r, d: bOpDate(r), a: -r.amount }));
+  const buys = items.filter((i) => /leboncoin/i.test(i.buySource || '') && i.buyMode !== 'main_propre' && isDate(i.buyDate) && i.buyDate >= S0 && i.buyDate <= T && num(i.buyPrice) > 0);
+  const want = (i) => num(i.buyPrice) - (payWal(i) || 0), pairs = []; // ce que la carte a dû payer
+  buys.forEach((i) => { if (i.payWith === 'lbc') return; cards.forEach((c) => { const dd = Math.abs(dayDiff(c.d, i.buyDate)); if (dd <= 3 && c.a <= num(i.buyPrice) + 60) pairs.push({ i, c, s: dd * 1000 + Math.abs(want(i) - c.a) }); }); });
+  pairs.sort((x, y) => x.s - y.s);
+  const card = new Map(), cUsed = new Set();
+  pairs.forEach((p) => { if (card.has(p.i) || cUsed.has(p.c)) return; card.set(p.i, p.c); cUsed.add(p.c); });
+  buys.forEach((i) => {
+    const c = card.get(i), pw = payWal(i);
+    // Rien de coché : on laisse 3 jours à la banque pour montrer le paiement carte avant de supposer le porte-monnaie
+    if (pw == null && !c && (i.buyMode !== 'livraison' || dayDiff(i.buyDate, T) < 3)) return;
+    if (pw == null && !c && isCancelled(i) && !refundPending(i) && dayDiff(i.buyDate, [i.refundDate, i.cancelDate, i.buyDate].find(isDate)) <= 1) return; // annulé tout de suite : jamais payé
+    const w = Math.round((pw != null ? pw : num(i.buyPrice) - (c ? c.a : 0)) * 100) / 100; if (w < 0.5) return;
+    ev.push({ d: i.buyDate, a: -w, k: 'achat', i, c: pw != null ? Math.round((num(i.buyPrice) - w) * 100) / 100 : c ? c.a : 0, set: pw != null });
+    if (isCancelled(i) && !refundPending(i)) ev.push({ d: [i.refundDate, i.cancelDate, i.buyDate].find(isDate), a: w, k: 'rembourse', i });
+  });
+  // Ton correctif (facultatif) : le solde que tu as vu dans ton appli Leboncoin
+  const W = S.settings.lbcWallet, fix = W && isFinite(+W.v) && isDate(W.at) ? { d: W.at, a: 0, k: 'fix', v: +W.v } : null;
+  if (fix) ev.push(fix);
+  const ord = { vente: 0, rembourse: 0, trouve: 0, inconnu: 0, achat: 1, payout: 1, fix: 2 };
+  ev.sort((x, y) => x.d.localeCompare(y.d) || ord[x.k] - ord[y.k]);
+  // 4. On rejoue tout dans l'ordre ; un trou = argent arrivé que l'appli ne voyait pas
+  let bal = 0; const add = [];
+  for (let j = 0; j < ev.length; j++) {
+    const e = ev[j];
+    if (e.k === 'fix') { e.a = Math.round((e.v - bal) * 100) / 100; bal = e.v; e.bal = bal; continue; }
+    bal += e.a;
+    if (bal < -0.5) {
+      let b2 = bal, peak = bal, pk = j;
+      for (let m = j + 1; m < ev.length && ev[m].k !== 'fix'; m++) { b2 += ev[m].a; if (b2 >= -0.5) break; if (b2 < peak) { peak = b2; pk = m; } }
+      const D = Math.round(-peak * 100) / 100, end = ev[pk].d;
+      const cand = items.filter((i) => lbcSale(i) && !used.has(i) && i.sellDate <= end && dayDiff(i.sellDate, e.d) <= 45).sort((x, y) => y.sellDate.localeCompare(x.sellDate))
+        .map((i) => ({ i, amount: num(i.sellPrice) - num(i.sellFees) }));
+      const one = cand.find((c) => bNear(D, c.amount)), hit = one ? [one] : bCombo(cand, D);
+      if (hit) hit.forEach((c) => { used.add(c.i); add.push({ d: c.i.sellDate, a: c.amount, k: 'trouve', i: c.i, j }); });
+      else add.push({ d: e.d, a: D, k: 'inconnu', at: e, j });
+      bal += D;
+    }
+    e.bal = Math.round(bal * 100) / 100;
+  }
+  const all = ev.concat(add).filter((e) => e.k !== 'fix' || Math.abs(e.a) >= 0.01).sort((x, y) => y.d.localeCompare(x.d) || ord[y.k] - ord[x.k]);
+  if (!all.length && !fix) { lbcWallet.k = k; lbcWallet.v = null; return null; } // jamais vendu ni acheté sur Leboncoin : pas de ligne
+  // D'où vient l'argent qui y est aujourd'hui : les entrées depuis la dernière fois où il était vide
+  let z = -1; ev.forEach((e, j) => { if (e.bal != null && e.bal <= 0.5) z = j; });
+  const now = ev.slice(z + 1).filter((e) => e.a > 0 && e.k !== 'fix').concat(add.filter((e) => e.j > z)).sort((x, y) => y.d.localeCompare(x.d));
+  const v = { v: Math.max(0, Math.round(bal * 100) / 100), ev: all, now, from: S0, fix: fix && fix.v != null ? W : null, unknown: add.filter((e) => e.k === 'inconnu'), last: all[0] ? all[0].d : '' };
+  lbcWallet.k = k; lbcWallet.v = v;
+  return v;
+}
+function lbcEvTxt(e) {
+  const i = e.i;
+  if (e.k === 'vente') return [`${bItemNm(i)} vendu`, `payé le ${dShort(e.d)}`];
+  if (e.k === 'trouve') return [`${bItemNm(i)} vendu`, `vendu le ${dShort(e.d)} · payé par Leboncoin (déduit de tes achats)`];
+  if (e.k === 'payout') return [`Versé sur ${e.r.A ? e.r.A.short || e.r.A.bank : 'ta banque'}`, `le ${dShort(e.d)}`];
+  if (e.k === 'achat') return [`Achat ${bItemNm(i)}`, `${dShort(e.d)} · ${eur(num(i.buyPrice))}${e.c ? `, dont ${eur(e.c)} par carte` : ', payé avec le porte-monnaie'}`];
+  if (e.k === 'rembourse') return [`Achat annulé remboursé : ${bItemNm(i)}`, `le ${dShort(e.d)}`];
+  if (e.k === 'inconnu') return ['Vente non notée dans l’appli', `déduit du ${e.at && e.at.k === 'payout' ? 'virement' : 'paiement'} du ${dShort(e.d)}`];
+  return ['Ton correctif', `solde vu dans Leboncoin le ${dShort(e.d)} : ${eur(e.v)}`];
+}
+// ---- Courbe de ton argent : solde reconstitué jour par jour à partir du solde d'aujourd'hui ----
+function bSeries(keys, n = 90) {
+  const rows = bRows(), A = bAccounts().filter((a) => keys.includes(a.key) && a.cur === 'EUR'); if (!A.length) return [];
+  let bal = sum(A, (a) => num(a.amount)); const by = new Map();
+  rows.filter((r) => keys.includes(r.acc) && (r.cur || 'EUR') === 'EUR').forEach((r) => by.set(r.date, (by.get(r.date) || 0) + r.amount));
+  const first = rows.filter((r) => keys.includes(r.acc)).reduce((m, r) => (r.date < m ? r.date : m), today()), pts = [];
+  for (let d = today(), i = 0; i <= n && d >= first; i++, d = addDays(d, -1)) { pts.push({ d, v: Math.round(bal * 100) / 100 }); bal -= by.get(d) || 0; }
+  return pts.reverse();
+}
+function bChart(pts, id, label) {
+  if (pts.length < 3) return '';
+  const W = 320, H = 120, vs = pts.map((p) => p.v), lo = Math.min(0, ...vs), hi = Math.max(1, ...vs), rg = hi - lo || 1;
+  const x = (i) => (i / (pts.length - 1)) * W, y = (v) => 6 + (H - 12) * (1 - (v - lo) / rg);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
+  const mi = vs.indexOf(Math.min(...vs)), ma = vs.indexOf(Math.max(...vs));
+  (S.bankSeries = S.bankSeries || {})[id] = pts;
+  return `<div class="bk-ch" data-ch="${id}" role="img" aria-label="${esc(label)} : de ${eur(pts[0].v)} le ${dShort(pts[0].d)} à ${eur(vs[vs.length - 1])} aujourd’hui">
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path class="ar" d="${line}L${W},${H}L0,${H}Z"/>${lo < 0 ? `<line class="z" x1="0" x2="${W}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}" vector-effect="non-scaling-stroke"/>` : ''}<path class="ln" d="${line}" vector-effect="non-scaling-stroke"/></svg>
+    <i class="bk-cx" hidden></i><i class="bk-pt" hidden></i><div class="bk-tt" hidden></div></div>
+    <div class="bk-ax"><span>${dShort(pts[0].d)}</span><span>Plus bas ${eur(vs[mi])} (${dShort(pts[mi].d)}) · plus haut ${eur(vs[ma])} (${dShort(pts[ma].d)})</span><span>auj.</span></div>`;
+}
+function bChartHover(e) {
+  const ch = e.target.closest && e.target.closest('.bk-ch');
+  if (!ch) { if (S.bkTip) { $$('.bk-ch .bk-tt, .bk-ch .bk-cx, .bk-ch .bk-pt').forEach((x) => { x.hidden = true; }); S.bkTip = false; } return; }
+  const pts = (S.bankSeries || {})[ch.dataset.ch]; if (!pts || pts.length < 2) return;
+  const b = ch.getBoundingClientRect(), f = Math.min(1, Math.max(0, (e.clientX - b.left) / b.width)), i = Math.round(f * (pts.length - 1)), p = pts[i];
+  const vs = pts.map((q) => q.v), lo = Math.min(0, ...vs), hi = Math.max(1, ...vs), rg = hi - lo || 1, px = (i / (pts.length - 1)) * b.width, py = (6 + (120 - 12) * (1 - (p.v - lo) / rg)) / 120 * b.height;
+  const cx = ch.querySelector('.bk-cx'), pt = ch.querySelector('.bk-pt'), tt = ch.querySelector('.bk-tt');
+  cx.hidden = pt.hidden = tt.hidden = false; S.bkTip = true;
+  cx.style.left = px + 'px'; pt.style.left = px + 'px'; pt.style.top = py + 'px';
+  tt.innerHTML = `<b>${eur(p.v)}</b><small>${esc(cap1(WEEK[weekday(p.d)]))} ${dShort(p.d)}</small>`;
+  tt.style.left = Math.min(Math.max(0, px - 60), b.width - 120) + 'px';
+}
 
 // ---- Lecture du fichier du robot, demandes au robot ----
 function bankCache(b) { LS.set('bank', { ...b, tx: (b.tx || []).filter((t) => t.date >= addDays(today(), -120)) }); }
@@ -5541,15 +5926,32 @@ function bankLink(bank) {
   if (!bFrom()) write(() => commit((d) => { d.settings.bankFrom = today(); }, 'Banque : caisse suivie à partir d’aujourd’hui')).then(go);
   else go();
 }
+
 function bankTag(id, cat, opt = {}) {
   const r = bRows().find((x) => x.id === id); if (!r || !BCAT[cat]) return;
   const always = opt.always && r.key;
   return write(() => commit((d) => {
     d.bankTags = (Array.isArray(d.bankTags) ? d.bankTags : []).filter((x) => x.id !== id);
-    const tag = { id, cat, at: today() }; if (opt.noted) tag.noted = true;
+    const tag = { id, cat, at: today() }; if (opt.noted) tag.noted = true; if (opt.cash) tag.cash = opt.cash;
     d.bankTags.push(tag);
     if (always) { d.bankRules = (Array.isArray(d.bankRules) ? d.bankRules : []).filter((x) => x.k !== r.key); d.bankRules.push({ k: r.key, cat }); }
-  }, `Banque · ${r.nm} → ${BCAT[cat].l}${always ? ' (toujours)' : ''}`));
+  }, opt.msg || `Banque · ${r.nm} → ${BCAT[cat].l}${always ? ' (toujours)' : ''}`));
+}
+function bankUntag(id) {
+  const r = bRows().find((x) => x.id === id); if (!r) return;
+  return write(() => commit((d) => { d.bankTags = (Array.isArray(d.bankTags) ? d.bankTags : []).filter((x) => x.id !== id); }, `Banque · ${r.nm} : choix annulé`));
+}
+// Un proche (oui) ou pas (non) : rangé dans compta.json, jamais dans le code
+function bankPeopleSet(c, yes) {
+  if (!c) return;
+  return write(() => commit((d) => {
+    d.bankPeople = (Array.isArray(d.bankPeople) ? d.bankPeople : []).filter((p) => !(p && Array.isArray(p.t) && bSame(p.t, c.t)));
+    d.bankPeople.push(yes ? { id: newId(), n: c.nm, t: c.t, at: today() } : { id: newId(), n: c.nm, t: c.t, no: true, at: today() });
+  }, yes ? `Banque · ${c.nm} : proche (arrangements)` : `Banque · ${c.nm} : pas un proche`));
+}
+function bankPeopleDel(id) {
+  const p = ((DATA && DATA.bankPeople) || []).find((x) => x.id === id); if (!p) return;
+  return write(() => commit((d) => { d.bankPeople = (d.bankPeople || []).filter((x) => x.id !== id); }, `Banque · ${p.n} : plus un proche`));
 }
 
 // ---- Écran Banque ----
@@ -5594,24 +5996,49 @@ function bankHomeHtml() {
   if (A.length) {
     const exp = (B.sessions || []).filter((s) => s.status === 'expired' || (s.until && Date.parse(s.until) < now));
     const soon = (B.sessions || []).filter((s) => s.status === 'ok' && s.until && Date.parse(s.until) - now < 14 * 864e5 && Date.parse(s.until) >= now);
+    const lw = lbcWallet(), tot = bTotal() + (lw ? lw.v : 0);
     out.push(`<section class="card bk-acc" aria-label="Soldes">
-      <div class="bk-total"><span>Sur tes comptes</span><b>${eur(bTotal())}</b></div>
-      ${A.map((a) => `<div class="bk-a"><span class="bk-logo ${a.bank === 'Revolut' ? 'r' : a.bank === 'BoursoBank' ? 'b' : 'p'}" aria-hidden="true">${esc(a.bank.slice(0, 1))}</span><span class="t">${esc(a.bank)}<small>${esc(a.name || 'Compte')}${a.num ? ` · ${esc(a.num)}` : ''}${a.status === 'expired' ? ' · accord expiré' : ''}</small></span><b>${bAmt(a)}</b></div>`).join('')}
-      <p class="bk-when">${B.fetched ? `Lu ${bAgo(B.fetched)} (${bHour(B.fetched)})` : 'Pas encore lu'} · lecture auto 4 fois par jour</p>
+      <div class="bk-total"><span>${lw ? 'Tout ton argent' : 'Sur tes comptes'}</span><b>${eur(tot)}</b></div>
+      ${A.map((a) => `<button class="bk-a" data-act="bank-acct" data-k="${esc(a.key)}">${bLogo(a.bank)}<span class="t">${esc(a.bank)}<small>${esc(a.label)}${a.num ? ` ${esc(a.num)}` : ''}${a.cards.length ? ` · carte ${a.cards.map((c) => esc(c.num)).join(', ')}` : ''}${a.status === 'expired' ? ' · accord expiré' : ''}</small></span><b>${bAmt(a)}</b></button>`).join('')}
+      ${lw ? `<button class="bk-a" data-act="bank-lbc">${bLogo('Leboncoin')}<span class="t">Leboncoin<small>Porte-monnaie · calculé tout seul</small></span><b>${eur(lw.v)}</b></button>` : ''}
+      <p class="bk-when">${B.fetched ? `Lu ${bAgo(B.fetched)} (${bHour(B.fetched)})` : 'Pas encore lu'} · lecture auto 4 fois par jour · touche un compte pour son détail</p>
       ${L.ok === false && L.msg ? `<div class="bk-err">${esc(L.msg)}</div>` : ''}
       ${exp.map((s) => `<div class="bk-err">Accord ${esc(bBank(s.bank))} expiré : redonne-le pour continuer à voir tes opérations.</div>`).join('')}
       ${soon.map((s) => `<div class="bk-warn">Accord ${esc(bBank(s.bank))} valable jusqu’au ${dShort(s.until.slice(0, 10))} : redonne-le avant.</div>`).join('')}
       <div class="btns"><button class="btn sm" data-act="bank-refresh" ${W ? 'disabled' : ''}>Actualiser maintenant</button></div>
     </section>`);
+    const pts = bSeries(A.filter((a) => a.cur === 'EUR').map((a) => a.key));
+    if (pts.length >= 7) {
+      const d30 = pts.length > 30 ? pts[pts.length - 1].v - pts[pts.length - 31].v : null;
+      out.push(`<section class="card"><div class="bk-sec"><h2 class="h2">Ton argent en banque</h2>${d30 != null ? `<b class="${d30 >= 0 ? 'bk-pos' : 'bk-neg'}">${d30 >= 0 ? '+' : '−'}${eur(Math.abs(d30))}</b>` : ''}</div>
+        ${d30 != null ? `<p class="bk-when" style="margin-top:0">${d30 >= 0 ? 'De plus' : 'De moins'} qu’il y a 30 jours, sur tes ${plural(A.filter((a) => a.cur === 'EUR').length, 'compte')}.</p>` : ''}
+        ${bChart(pts, 'all', 'Ton argent en banque')}</section>`);
+    }
   }
   if (linkBtns) out.push(`<div class="bk-links">${linkBtns}</div>`);
   if (rows.length) {
+    out.push(bankProchesHtml());
     const todo = rows.filter((r) => r.cat === 'atrier');
-    out.push(bankCashHtml(rows));
     out.push(`<section class="card"><div class="bk-sec"><h2 class="h2">${todo.length ? `À trier (${todo.length})` : 'Tout est trié'}</h2>${todo.length > 6 ? `<button class="btn sm" data-act="bank-cat-ops" data-c="atrier">Tout voir</button>` : ''}</div>
       ${todo.length ? `<p class="muted" style="margin:0 0 4px">Un geste suffit : l’appli retient le commerçant pour les prochaines fois.</p>${todo.slice(0, 6).map((r) => bTxRow(r, true)).join('')}` : '<p class="muted" style="margin:0">Chaque opération a sa catégorie. Tu peux toujours en changer une en la touchant.</p>'}</section>`);
     out.push(bankMonthMini(rows));
+    out.push(bankCashHtml(rows));
   }
+  return out.join('');
+}
+// Proches : qui doit quoi, ce qu'il reste à confirmer ; et les personnes proposées
+function bankProchesHtml(full) {
+  const P = bProches(), G = bSuggest(), out = [];
+  if (G.length) out.push(`<section class="card bk-sug"><h2 class="h2">Allers-retours repérés</h2>
+    <p class="muted" style="margin:0 0 8px">Avec ces personnes, l’argent part et revient. Si c’est un proche avec qui tu t’arranges, ses virements ne compteront plus dans ton budget : seul l’écart que tu confirmes comptera.</p>
+    ${G.map((g, i) => `<div class="bk-pr"><span class="t"><b>${esc(g.c.nm)}</b><small>${plural(g.out.length, 'envoi')} (${eur(sum(g.out, (r) => -r.amount))}) · ${plural(g.inn.length, 'reçu')} (${eur(sum(g.inn, (r) => r.amount))})</small></span>
+      <span class="bk-pb"><button class="chip" data-act="bank-pp-yes" data-i="${i}">👪 C’est un proche</button><button class="chip" data-act="bank-pp-no" data-i="${i}">Non</button></span></div>`).join('')}</section>`);
+  if (P.length) out.push(`<section class="card"><div class="bk-sec"><h2 class="h2">Tes proches</h2></div>
+    <p class="muted" style="margin:0 0 6px;font-size:13px">L’argent rendu par virement s’annule tout seul. Pour le reste, dis-moi s’il a été rendu en espèces.</p>
+    ${P.map((p) => `<div class="bk-pp">
+      <button class="bk-pph" data-act="bank-person" data-pid="${esc(p.c.pp.id)}"><span class="t"><b>👪 ${esc(p.nm)}</b><small>${bBalTxt(p)}</small><small>${plural(p.rows.length, 'virement')} sur 3 mois · ${p.paired.length} rendu${p.paired.length > 1 ? 's' : ''} par virement${p.cash.length ? ` · ${p.cash.length} en espèces` : ''}</small></span>${ic('right')}</button>
+      ${p.open.length ? `<p class="bk-when" style="margin:6px 0 0"><b>${plural(p.open.length, 'virement')} à confirmer</b></p>${p.open.slice(0, full ? 99 : 3).map((r) => bTxRow(r, true)).join('')}${!full && p.open.length > 3 ? `<button class="btn sm" data-act="bank-person" data-pid="${esc(p.c.pp.id)}" style="margin-top:6px">Voir les ${p.open.length}</button>` : ''}` : ''}
+    </div>`).join('')}</section>`);
   return out.join('');
 }
 function bankCashHtml(rows) {
@@ -5625,18 +6052,23 @@ function bankCashHtml(rows) {
   </section>`;
 }
 function bTxRow(r, quick) {
-  const c = BCAT[r.cat], sub = [r.town || (r.place ? r.place : ''), quick ? '' : c.l, `${bBank(r.bank)}`, dShort(r.date)].filter(Boolean).join(' · ');
-  const pills = `${r.st && r.st !== 'BOOK' ? '<span class="pill st-attente">en attente</span>' : ''}${r.match ? `<span class="pill bk-ok">déjà noté ${esc(r.match.ref || '')}</span>` : ''}${r.cash ? '<span class="pill bk-c">caisse</span>' : ''}`;
-  const q = quick ? (r.amount < 0 ? ['pieces', 'revente', 'courses', 'resto', 'essence'] : ['clients', 'salaire', 'rembourse', 'interne']) : [];
-  return `<div class="bk-tx-w"><button class="bk-tx" data-act="bank-tx" data-id="${esc(r.id)}"><span class="e" aria-hidden="true">${c.e}</span><span class="t"><b>${esc(r.nm)}</b><small>${esc(sub)}</small>${pills ? `<span class="bk-pills">${pills}</span>` : ''}</span><span class="a ${r.amount > 0 ? 'in' : ''}">${bEur(r.amount)}</span></button>
-    ${q.length ? `<div class="bk-q">${q.map((k) => `<button class="chip" data-act="bank-quick" data-id="${esc(r.id)}" data-c="${k}">${BCAT[k].e} ${esc(BCAT[k].s || BCAT[k].l)}</button>`).join('')}<button class="chip" data-act="bank-tx" data-id="${esc(r.id)}">Autre…</button></div>` : ''}</div>`;
+  const c = BCAT[r.cat], sub = [r.town || '', quick && r.cat === 'atrier' ? '' : c.l, r.A.short || bBank(r.bank), dShort(r.date)].filter(Boolean).join(' · ');
+  const pills = `${r.st && r.st !== 'BOOK' ? '<span class="pill st-attente">en attente</span>' : ''}${r.match ? `<span class="pill bk-ok">déjà noté ${esc(r.match.ref || '')}</span>` : ''}${r.rep ? `<span class="pill bk-ok">réparation ${esc(r.rep.client || '')}</span>` : ''}${r.sale ? `<span class="pill bk-ok">vente ${esc(r.sale.ref || '')}</span>` : ''}${r.cash ? '<span class="pill bk-c">caisse</span>' : ''}${r.state === 'open' ? '<span class="pill bk-c">à confirmer</span>' : r.state === 'cash' ? '<span class="pill bk-ok">rendu en espèces</span>' : r.cat === 'retour' && r.pair ? `<span class="pill bk-ok">${r.amount < 0 ? 'rendu' : 'rendu par toi'} le ${dShort(r.pair.date)}</span>` : ''}`;
+  let q = '';
+  if (quick && r.state === 'open') q = r.amount < 0
+    ? `<button class="chip" data-act="bank-pp-cash" data-id="${esc(r.id)}">💶 Rendu en espèces</button><button class="chip" data-act="bank-pp-keep" data-id="${esc(r.id)}">Pas rendu</button>`
+    : `<button class="chip" data-act="bank-pp-cash" data-id="${esc(r.id)}">💶 Je lui avais donné en espèces</button><button class="chip" data-act="bank-pp-keep" data-id="${esc(r.id)}">C’est pour moi</button>`;
+  else if (quick && r.cat === 'atrier') q = (r.amount < 0 ? ['pieces', 'revente', 'courses', 'resto', 'essence'] : ['clients', 'ventes', 'rembourse', 'interne']).map((k) => `<button class="chip" data-act="bank-quick" data-id="${esc(r.id)}" data-c="${k}">${BCAT[k].e} ${esc(BCAT[k].s || BCAT[k].l)}</button>`).join('') + `<button class="chip" data-act="bank-tx" data-id="${esc(r.id)}">Autre…</button>`;
+  return `<div class="bk-tx-w"><button class="bk-tx" data-act="bank-tx" data-id="${esc(r.id)}"><span class="e" aria-hidden="true">${c.e}</span><span class="t"><b>${esc(r.nm)}</b><small>${esc(sub)}</small>${pills ? `<span class="bk-pills">${pills}</span>` : ''}</span><span class="a ${r.amount > 0 ? 'in' : ''} ${c.skip ? 'sk' : ''}">${bEur(r.amount)}</span></button>
+    ${q ? `<div class="bk-q">${q}</div>` : ''}</div>`;
 }
 // ---- Statistiques ----
 function bMonth(rows, m) {
   const R = rows.filter((r) => r.date.startsWith(m) && !BCAT[r.cat].skip && (r.cur || 'EUR') === 'EUR');
   const out = R.filter((r) => r.amount < 0), inn = R.filter((r) => r.amount > 0);
   const by = new Map(); out.forEach((r) => { const x = by.get(r.cat) || { c: r.cat, v: 0, n: 0 }; x.v -= r.amount; x.n++; by.set(r.cat, x); });
-  return { R, out, inn, spent: sum(out, (r) => -r.amount), got: sum(inn, (r) => r.amount), pro: sum(out.filter((r) => BCAT[r.cat].pro), (r) => -r.amount), cats: [...by.values()].sort((a, b) => b.v - a.v) };
+  const bi = new Map(); inn.forEach((r) => { const x = bi.get(r.cat) || { c: r.cat, v: 0, n: 0 }; x.v += r.amount; x.n++; bi.set(r.cat, x); });
+  return { R, out, inn, spent: sum(out, (r) => -r.amount), got: sum(inn, (r) => r.amount), pro: sum(out.filter((r) => BCAT[r.cat].pro), (r) => -r.amount), cats: [...by.values()].sort((a, b) => b.v - a.v), ins: [...bi.values()].sort((a, b) => b.v - a.v) };
 }
 const bDays = (m) => (m === thisMonth() ? +today().slice(8, 10) : new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate());
 function bankMonthMini(rows) {
@@ -5644,10 +6076,10 @@ function bankMonthMini(rows) {
   if (!X.R.length) return '';
   const lines = bCatLines(rows, m, X, bAvg(rows, m)).filter((x) => !BCAT[x.k].pro && x.k !== 'atrier').slice(0, 3);
   return `<section class="card"><div class="bk-sec"><h2 class="h2">${cap1(monthName(m))}</h2><button class="btn sm" data-act="bank-tab" data-v="stats">Mon budget</button></div>
-    <p class="bk-when" style="margin-top:0">Dépensé <b>${eur(X.spent)}</b> · entré <b>${eur(X.got)}</b> · ${eur(X.spent / bDays(m))} par jour</p>
+    <p class="bk-when" style="margin-top:0">Dépenses perso <b>${eur(X.spent - X.pro)}</b> · pro <b>${eur(X.pro)}</b> · entré <b>${eur(X.got)}</b></p>
     ${lines.map((x) => bLine(x, true)).join('')}</section>`;
 }
-const bBar = (c, max, tot) => `<button class="hbar bk-hb" data-act="bank-cat-ops" data-c="${c.c}"><span class="hb-l">${BCAT[c.c].e} ${esc(BCAT[c.c].l)}<small>${plural(c.n, 'fois', 'fois')}${tot ? ` · ${Math.round(c.v / tot * 100)}${NB}%` : ''}${c.d != null && Math.abs(c.d) >= 1 ? ` · ${c.d > 0 ? '+' : '−'}${eur(Math.abs(c.d))} vs mois d’avant` : ''}</small></span><span class="hb-t"><span class="hb-f ${BCAT[c.c].pro ? 'pro' : ''}" style="width:${(c.v / max * 100).toFixed(1)}%"></span></span><span class="hb-v">${eur(c.v)}</span></button>`;
+const bBar = (c, max, tot) => `<button class="hbar bk-hb" data-act="bank-cat-ops" data-c="${c.c}"><span class="hb-l">${BCAT[c.c].e} ${esc(BCAT[c.c].l)}<small>${plural(c.n, 'fois', 'fois')}${tot ? ` · ${Math.round(c.v / tot * 100)}${NB}%` : ''}</small></span><span class="hb-t"><span class="hb-f ${BCAT[c.c].pro ? 'pro' : ''}" style="width:${(c.v / max * 100).toFixed(1)}%"></span></span><span class="hb-v">${eur(c.v)}</span></button>`;
 function bankMonthNav() {
   const m = S.bankMonth || thisMonth();
   return `<div class="monthnav"><button class="iconbtn" data-act="bank-month" data-d="-1" aria-label="Mois précédent">${ic('left')}</button><div class="mn-c"><h2 class="h2" style="margin:0">${monthLabel(m)}</h2></div><button class="iconbtn" data-act="bank-month" data-d="1" aria-label="Mois suivant" ${m >= thisMonth() ? 'disabled' : ''}>${ic('right')}</button></div>`;
@@ -5689,27 +6121,34 @@ const bLine = (x, cur) => `<button class="bud ${x.st}" data-act="bank-bud" data-
 </button>`;
 // « À retenir » : ce qui aide vraiment à dépenser moins
 function bInsights(rows, m, X, AV, lines) {
-  const L = [], cur = m === thisMonth(), days = bDays(m), perso = X.out.filter((r) => !BCAT[r.cat].pro && r.cat !== 'interne');
+  const L = [], cur = m === thisMonth(), days = bDays(m), perso = X.out.filter((r) => !BCAT[r.cat].pro);
   const over = lines.filter((x) => x.st === 'over'), fast = lines.filter((x) => x.st === 'fast');
   if (over.length) L.push(['🚨', `Budget dépassé : ${over.map((x) => `<b>${esc(BCAT[x.k].l)}</b> (+${eur(x.v - x.b)})`).join(', ')}.`]);
   if (fast.length) L.push(['⚠️', `Tu vas trop vite sur ${fast.map((x) => `<b>${esc(BCAT[x.k].l)}</b>`).join(', ')} : à ce rythme tu finis le mois à ${fast.map((x) => eur(x.v / days * bDim(m))).join(', ')}.`]);
   const up = lines.filter((x) => !x.b && x.a >= 10 && !BCAT[x.k].pro && x.k !== 'atrier').map((x) => ({ ...x, d: x.v - (cur ? x.a * x.pace : x.a) })).filter((x) => x.d >= Math.max(15, x.a * 0.25)).sort((p, q) => q.d - p.d)[0];
   if (up) L.push(['📈', `<b>${esc(BCAT[up.k].l)}</b> : ${eur(up.v)} ce mois, soit ${eur(up.d)} de plus que d’habitude${cur ? ' à cette date' : ''}.`]);
+  const po = bProches().filter((p) => p.open.length);
+  if (po.length) L.push(['👪', po.map((p) => `<b>${plural(p.open.length, 'virement')} avec ${esc(p.first)}</b> à confirmer (${bBalTxt(p).replace(/<\/?b>/g, '')})`).join(' · ') + ' : pas comptés dans ton budget tant que tu ne dis rien.']);
   const small = perso.filter((r) => -r.amount < 10 && r.cat !== 'especes');
   if (small.length >= 5) L.push(['🪙', `<b>${small.length} petites dépenses</b> de moins de 10 € : ${eur(sum(small, (r) => -r.amount))} au total. Une par une on ne les sent pas, ensemble elles pèsent.`]);
-  const g = new Map(); perso.filter((r) => !['maison', 'abo', 'frais'].includes(r.cat)).forEach((r) => { const x = g.get(r.key || r.nm) || { nm: r.nm, n: 0, v: 0 }; x.n++; x.v -= r.amount; g.set(r.key || r.nm, x); });
+  const g = new Map(); perso.filter((r) => !['maison', 'abo', 'frais', 'virperso', 'especes'].includes(r.cat) && r.key).forEach((r) => { const x = g.get(r.key) || { nm: r.nm, n: 0, v: 0 }; x.n++; x.v -= r.amount; g.set(r.key, x); });
   const fq = [...g.values()].filter((x) => x.n >= 4).sort((a, b) => b.n - a.n || b.v - a.v)[0];
   if (fq) L.push(['🔁', `<b>${fq.n} passages chez ${esc(fq.nm)}</b> : ${eur(fq.v)}. Sur un an, à ce rythme, ça fait environ ${eur(Math.round((cur ? fq.v / days * 365 : fq.v * 12) / 10) * 10)}.`]);
-  const since = addDays(today(), -90), wd = [0, 0, 0, 0, 0, 0, 0];
-  rows.filter((r) => r.amount < 0 && r.date >= since && !BCAT[r.cat].pro && !['interne', 'maison', 'abo', 'frais', 'especes'].includes(r.cat)).forEach((r) => { wd[weekday(r.date)] -= r.amount; });
+  // Frais bancaires des 3 derniers mois, par banque
+  const since = addDays(today(), -90), fb = new Map();
+  rows.filter((r) => r.cat === 'frais' && r.amount < 0 && r.date >= since).forEach((r) => fb.set(r.A.bank, (fb.get(r.A.bank) || 0) - r.amount));
+  const fees = [...fb].sort((a, b) => b[1] - a[1]);
+  if (fees.length && fees[0][1] >= 5) L.push(['🏦', `<b>${eur(sum(fees, (x) => x[1]))} de frais bancaires</b> en 3 mois${fees.map(([b, v]) => ` · ${esc(b)} ${eur(v)}`).join('')}. Sur un an, environ ${eur(Math.round(sum(fees, (x) => x[1]) * 4))} : c’est de l’argent perdu.`]);
+  const wd = [0, 0, 0, 0, 0, 0, 0];
+  rows.filter((r) => r.amount < 0 && r.date >= since && !BCAT[r.cat].pro && !BCAT[r.cat].skip && !['maison', 'abo', 'frais', 'especes', 'virperso'].includes(r.cat)).forEach((r) => { wd[weekday(r.date)] -= r.amount; });
   const wt = sum(wd, (x) => x), wmax = wd.indexOf(Math.max(...wd));
   if (wt > 100 && wd[wmax] / wt > 0.22) L.push(['📅', `C’est le <b>${WEEK[wmax]}</b> que tu dépenses le plus : ${Math.round(wd[wmax] / wt * 100)}${NB}% de tes dépenses du quotidien (3 derniers mois).`]);
   const cash = X.cats.find((c) => c.c === 'especes');
   if (cash && cash.v >= 20) L.push(['💶', `${eur(cash.v)} retirés en espèces : ce que tu paies en liquide n’apparaît pas dans le détail.`]);
   const no = days - new Set(perso.map((r) => r.date)).size;
   if (days >= 7) L.push(['🌱', `<b>${plural(no, 'jour')} sans aucune dépense perso</b> sur ${days}${no >= days / 3 ? ' : bien joué' : ''}.`]);
-  const repIn = sum(repPayRows().filter((r) => repPaidOn(r).startsWith(m)), repTotal), parts = sum(X.out.filter((r) => r.cat === 'pieces'), (r) => -r.amount);
-  if (repIn || parts) L.push(['🔧', `Réparo : ${eur(repIn)} encaissés, ${eur(parts)} de pièces et outils payés par carte ce mois.`]);
+  const cli = X.inn.filter((r) => r.cat === 'clients'), parts = sum(X.out.filter((r) => r.cat === 'pieces'), (r) => -r.amount), repIn = sum(repPayRows().filter((r) => repPaidOn(r).startsWith(m)), repTotal);
+  if (repIn || parts || cli.length) L.push(['🔧', `Réparo : ${eur(repIn)} encaissés dans ta compta, dont ${eur(sum(cli, (r) => r.amount))} arrivés par la banque (${plural(cli.length, 'paiement')}). ${eur(parts)} de pièces et outils payés par carte ce mois.`]);
   return L;
 }
 function bankStatsHtml() {
@@ -5720,10 +6159,10 @@ function bankStatsHtml() {
   const P = X.spent - X.pro, proj = cur ? P / days * dim : null, ref = AV.perso != null ? AV.perso : (Y.spent - Y.pro) || null;
   const dlt = ref ? ((cur ? proj : P) - ref) / ref : null, net = X.got - X.spent;
   const grp = (f) => { const g = new Map(); X.out.forEach((r) => { const k = f(r); if (!k) return; const x = g.get(k) || { k, v: 0, n: 0, nm: r.nm }; x.v -= r.amount; x.n++; g.set(k, x); }); return [...g.values()].sort((a, b) => b.v - a.v); };
-  const mer = grp((r) => (BCAT[r.cat].pro || r.cat === 'especes' ? '' : r.key || r.nm)).slice(0, 8), towns = grp((r) => r.town).slice(0, 6), big = X.out.slice().sort((a, b) => a.amount - b.amount).slice(0, 5);
-  const mm = Math.max(1, ...mer.map((x) => x.v)), tm = Math.max(1, ...towns.map((x) => x.v));
+  const mer = grp((r) => (BCAT[r.cat].pro || r.cat === 'especes' ? '' : r.key || (r.cl ? 'p:' + r.nm : ''))).slice(0, 8), towns = grp((r) => r.town).slice(0, 6), big = X.out.slice().sort((a, b) => a.amount - b.amount).slice(0, 5);
+  const mm = Math.max(1, ...mer.map((x) => x.v)), tm = Math.max(1, ...towns.map((x) => x.v)), im = Math.max(1, ...X.ins.map((x) => x.v));
   const months = monthRange(addMonths(m, -5), m).map((ym) => { const Z = bMonth(rows, ym); return { ym, v: Z.spent, p: Z.pro, g: Z.got }; }), em = Math.max(1, ...months.map((x) => x.v));
-  const hasBud = lines.some((x) => x.b);
+  const hasBud = lines.some((x) => x.b), skipped = rows.filter((r) => r.date.startsWith(m) && BCAT[r.cat].skip), po = bProches().filter((p) => p.open.length);
   return `${bankMonthNav()}
     <section class="card bk-hero">
       <div class="eyebrow">Tes dépenses perso · ${monthName(m)}</div>
@@ -5731,13 +6170,15 @@ function bankStatsHtml() {
       <p class="bk-hs">${eur(P / days)} par jour${cur ? ` · à ce rythme <b>${eur(proj)}</b> fin ${monthName(m)}` : ''}</p>
       ${dlt != null && isFinite(dlt) ? `<p class="bk-hs ${dlt > 0.05 ? 'up' : dlt < -0.05 ? 'down' : ''}">${Math.abs(dlt) < 0.05 ? 'Comme d’habitude' : `${dlt > 0 ? '+' : '−'}${Math.round(Math.abs(dlt) * 100)}${NB}%`} ${Math.abs(dlt) < 0.05 ? 'par rapport à' : dlt > 0 ? 'de plus que' : 'de moins que'} ${AV.perso != null ? `ta moyenne (${eur(AV.perso)} par mois)` : `${monthName(addMonths(m, -1))} (${eur(ref)})`}${cur ? ' si tu continues comme ça' : ''}</p>` : ''}
       <div class="bk-io"><span>Entré<b class="in">+${eur(X.got)}</b></span><span>Pro (Réparo, revente)<b>${eur(X.pro)}</b></span><span>${net >= 0 ? 'Mis de côté' : 'Plus sorti qu’entré'}<b class="${net >= 0 ? 'in' : 'out'}">${net >= 0 ? '+' : '−'}${eur(Math.abs(net))}</b></span></div>
+      ${skipped.length ? `<p class="bk-when" style="margin:10px 0 0">Pas comptés : ${plural(skipped.filter((r) => r.cat === 'interne').length, 'virement')} entre tes comptes${skipped.some((r) => r.cat === 'retour') ? `, ${plural(skipped.filter((r) => r.cat === 'retour').length, 'aller-retour', 'allers-retours')} rendu${skipped.filter((r) => r.cat === 'retour').length > 1 ? 's' : ''}` : ''}${skipped.some((r) => r.cat === 'proche') ? `, ${plural(skipped.filter((r) => r.cat === 'proche').length, 'arrangement')} avec tes proches` : ''}${skipped.some((r) => r.cat === 'annule') ? ', des achats annulés' : ''}${skipped.some((r) => r.cat === 'depot') ? ', tes dépôts d’espèces' : ''}.${po.length ? ` <button class="lnk" data-act="bank-tab" data-v="apercu">${plural(sum(po, (p) => p.open.length), 'virement')} avec tes proches à confirmer</button>` : ''}</p>` : ''}
     </section>
     ${ins.length ? `<section class="card"><h2 class="h2">À retenir</h2><ul class="bk-ins">${ins.map(([e, t]) => `<li><span aria-hidden="true">${e}</span><span>${t}</span></li>`).join('')}</ul></section>` : ''}
     <section class="card"><div class="bk-sec"><h2 class="h2">Par catégorie</h2></div>
       <p class="muted" style="margin:0 0 6px;font-size:13px">${hasBud ? 'Touche une catégorie pour changer son budget.' : `Touche une catégorie pour lui donner un budget par mois${AV.n ? ' (je te propose ta moyenne)' : ''}.`}</p>
       ${lines.length ? lines.map((x) => bLine(x, cur)).join('') : '<p class="muted" style="margin:0">Aucune dépense ce mois-ci.</p>'}</section>
+    ${X.ins.length ? `<section class="card"><h2 class="h2">Ce qui est entré</h2><div class="hbars">${X.ins.map((c) => `<button class="hbar bk-hb" data-act="bank-cat-ops" data-c="${c.c}"><span class="hb-l">${BCAT[c.c].e} ${esc(BCAT[c.c].l)}<small>${plural(c.n, 'fois', 'fois')}</small></span><span class="hb-t"><span class="hb-f in" style="width:${(c.v / im * 100).toFixed(1)}%"></span></span><span class="hb-v">${eur(c.v)}</span></button>`).join('')}</div><p class="foot">Total ${eur(X.got)} · sans tes virements entre comptes, ni l’argent rendu par tes proches.</p></section>` : ''}
     <section class="card"><h2 class="h2">Sur 6 mois</h2><div class="wk bk-ev">${months.map((x) => `<div class="col"><span class="n">${x.v ? nf0.format(x.v) : ''}</span><span class="b" style="height:${(x.v / em * 100).toFixed(1)}%"><i style="height:${x.v ? (x.p / x.v * 100).toFixed(1) : 0}%"></i></span><span class="l">${MSHORT[+x.ym.slice(5, 7) - 1]}</span></div>`).join('')}</div><p class="foot"><span class="bk-key"></span> part pro (Réparo + revente) · les virements entre tes comptes ne comptent pas</p></section>
-    ${mer.length ? `<section class="card"><h2 class="h2">Chez qui</h2><p class="muted" style="margin:0 0 8px;font-size:13px">Tes dépenses perso, du plus gros au plus petit.</p><div class="hbars">${mer.map((x) => `<div class="hbar"><span class="hb-l">${esc(x.nm)}<small>${plural(x.n, 'fois', 'fois')}</small></span><span class="hb-t"><span class="hb-f" style="width:${(x.v / mm * 100).toFixed(1)}%"></span></span><span class="hb-v">${eur(x.v)}</span></div>`).join('')}</div></section>` : ''}
+    ${mer.length ? `<section class="card"><h2 class="h2">Chez qui</h2><p class="muted" style="margin:0 0 8px;font-size:13px">Tes dépenses perso, du plus gros au plus petit. Touche pour le détail.</p><div class="hbars">${mer.map((x) => `<button class="hbar bk-hb" data-act="bank-search" data-q="${esc(x.nm)}"><span class="hb-l">${esc(x.nm)}<small>${plural(x.n, 'fois', 'fois')}</small></span><span class="hb-t"><span class="hb-f" style="width:${(x.v / mm * 100).toFixed(1)}%"></span></span><span class="hb-v">${eur(x.v)}</span></button>`).join('')}</div></section>` : ''}
     ${bankSubsHtml(rows, m)}
     ${towns.length ? `<section class="card"><h2 class="h2">Dans quelles villes</h2><div class="hbars">${towns.map((x) => `<div class="hbar"><span class="hb-l">${esc(x.k)}<small>${plural(x.n, 'achat')}</small></span><span class="hb-t"><span class="hb-f" style="width:${(x.v / tm * 100).toFixed(1)}%"></span></span><span class="hb-v">${eur(x.v)}</span></div>`).join('')}</div><p class="foot">Seulement quand ta banque donne la ville du commerçant.</p></section>` : ''}
     ${big.length ? `<section class="card"><h2 class="h2">Plus grosses dépenses</h2>${big.map((r) => bTxRow(r)).join('')}</section>` : ''}`;
@@ -5759,54 +6200,148 @@ async function bankBudSet(k, v) {
 // Abonnements : même commerçant, montant proche, au moins 3 des 4 derniers mois (ou 2 sur 2), une ou deux fois par mois
 function bankSubsHtml(rows, m) {
   const ms = monthRange(addMonths(m, -3), m), g = new Map();
-  rows.filter((r) => r.amount < 0 && ms.includes(r.date.slice(0, 7)) && !['courses', 'essence', 'resto', 'especes', 'interne', 'revente', 'atrier'].includes(r.cat) && r.key).forEach((r) => { const x = g.get(r.key) || { nm: r.nm, cat: r.cat, list: [] }; x.list.push(r); g.set(r.key, x); });
+  rows.filter((r) => r.amount < 0 && ms.includes(r.date.slice(0, 7)) && !BCAT[r.cat].skip && !['courses', 'essence', 'resto', 'especes', 'revente', 'virperso', 'atrier'].includes(r.cat) && r.key).forEach((r) => { const x = g.get(r.key) || { nm: r.nm, cat: r.cat, list: [] }; x.list.push(r); g.set(r.key, x); });
   const subs = [...g.values()].map((x) => { const per = new Map(); x.list.forEach((r) => per.set(r.date.slice(0, 7), (per.get(r.date.slice(0, 7)) || 0) - r.amount)); const v = [...per.values()], a = avg(v); return { ...x, n: per.size, a, ok: per.size >= Math.min(3, ms.length - 1) && x.list.length <= per.size * 2 && v.every((y) => Math.abs(y - a) <= Math.max(2, a * 0.15)) }; })
     .filter((x) => x.ok && x.n >= 2).sort((a, b) => b.a - a.a);
   if (!subs.length) return '';
-  return `<section class="card"><h2 class="h2">Abonnements repérés</h2>${subs.map((x) => `<div class="bk-sub"><span>${BCAT[x.cat].e} <b>${esc(x.nm)}</b></span><span>${eur(x.a)} / mois<small>${eur(x.a * 12)} par an</small></span></div>`).join('')}<p class="foot">Total : ${eur(sum(subs, (x) => x.a))} par mois. Vérifie que tu les utilises tous.</p></section>`;
+  return `<section class="card"><h2 class="h2">Abonnements repérés</h2>${subs.map((x) => `<div class="bk-sub"><span>${BCAT[x.cat].e} <b>${esc(x.nm)}</b></span><span>${eur(x.a)} / mois<small>${eur(x.a * 12)} par an</small></span></div>`).join('')}<p class="foot">Total : ${eur(sum(subs, (x) => x.a))} par mois, ${eur(sum(subs, (x) => x.a) * 12)} par an. Vérifie que tu les utilises tous.</p></section>`;
 }
-// ---- Opérations ----
+// ---- Opérations : par mois, par compte, par catégorie ; ou recherche dans tout ----
 function bankOpsHtml() {
   const rows = bRows(), m = S.bankMonth || thisMonth(), c = S.bankCat || 'all', acc = S.bankAcc || 'all';
-  const inM = rows.filter((r) => r.date.startsWith(m)), cats = [...new Set(inM.map((r) => r.cat))];
-  const L = inM.filter((r) => (c === 'all' || r.cat === c) && (acc === 'all' || bBank(r.bank) === acc));
-  const days = new Map(); L.forEach((r) => { if (!days.has(r.date)) days.set(r.date, []); days.get(r.date).push(r); });
+  const inM = rows.filter((r) => r.date.startsWith(m)), cats = [...new Set(inM.map((r) => r.cat))], A = bAccounts();
   const chip = (v, l, cur, act) => `<button class="chip" data-act="${act}" data-c="${esc(v)}" aria-pressed="${cur === v}">${l}</button>`;
-  return `${bankMonthNav()}
+  return `<div class="field bk-search"><label for="bk-q" class="vh">Chercher</label><input id="bk-q" class="inp" type="search" enterkeyhint="search" autocomplete="off" placeholder="Chercher : commerçant, personne, montant…" value="${esc(S.bankQ || '')}"></div>
+    <div id="bk-ops-nav" ${(S.bankQ || '').trim() ? 'hidden' : ''}>${bankMonthNav()}
     <div class="chips">${chip('all', 'Tout', c, 'bank-fcat')}${cats.sort((a, b) => (a === 'atrier' ? -1 : b === 'atrier' ? 1 : BCAT[a].l.localeCompare(BCAT[b].l))).map((k) => chip(k, `${BCAT[k].e} ${esc(BCAT[k].l)}`, c, 'bank-fcat')).join('')}</div>
-    ${bAccounts().length > 1 ? `<div class="chips">${chip('all', 'Les 2 comptes', acc, 'bank-facc')}${[...new Set(bAccounts().map((a) => a.bank))].map((b) => chip(b, esc(b), acc, 'bank-facc')).join('')}</div>` : ''}
-    <section class="card">${L.length ? [...days.entries()].map(([d, list]) => `<div class="bk-day"><span>${esc(cap1(WEEK[weekday(d)]))} ${dShort(d)}</span><span>${bEur(sum(list.filter((r) => !BCAT[r.cat].skip), (r) => r.amount))}</span></div>${list.map((r) => bTxRow(r, r.cat === 'atrier')).join('')}`).join('') : '<p class="muted" style="margin:0">Aucune opération.</p>'}</section>`;
+    ${A.length > 1 ? `<div class="chips">${chip('all', 'Tous les comptes', acc, 'bank-facc')}${A.map((a) => chip(a.key, esc(a.short), acc, 'bank-facc')).join('')}</div>` : ''}</div>
+    <div id="bk-ops-l">${bankOpsList()}</div>`;
 }
-// ---- Fiche d'une opération : tout ce que la banque donne + catégorie ----
+function bankOpsList() {
+  const rows = bRows(), q = bLow((S.bankQ || '').trim()), m = S.bankMonth || thisMonth(), c = S.bankCat || 'all', acc = S.bankAcc || 'all';
+  let L, head = '';
+  if (q) {
+    const n = parseNum(q.replace(/[€\s]/g, ''));
+    L = rows.filter((r) => bLow(`${r.nm} ${r.info || ''} ${r.name || ''} ${BCAT[r.cat].l} ${r.A.short || ''} ${r.town || ''}`).includes(q) || (n != null && n > 0 && Math.abs(Math.abs(r.amount) - n) < 0.005));
+    const o = L.filter((r) => r.amount < 0 && !BCAT[r.cat].skip), i = L.filter((r) => r.amount > 0 && !BCAT[r.cat].skip), d0 = L.length ? L[L.length - 1].date : '';
+    head = L.length ? `<p class="bk-when" style="margin:0 0 6px">${plural(L.length, 'opération')} trouvée${L.length > 1 ? 's' : ''}${d0 ? ` depuis le ${dShort(d0)}` : ''} · sorti <b>${eur(sum(o, (r) => -r.amount))}</b>${o.length > 1 ? ` (en moyenne ${eur(sum(o, (r) => -r.amount) / o.length)})` : ''}${i.length ? ` · entré <b>${eur(sum(i, (r) => r.amount))}</b>` : ''}</p>` : '';
+  } else L = rows.filter((r) => r.date.startsWith(m) && (c === 'all' || r.cat === c) && (acc === 'all' || r.acc === acc || (r.A.card && r.A.parent === acc)));
+  const days = new Map(); L.forEach((r) => { if (!days.has(r.date)) days.set(r.date, []); days.get(r.date).push(r); });
+  return `<section class="card">${head}${L.length ? [...days.entries()].map(([d, list]) => `<div class="bk-day"><span>${esc(cap1(WEEK[weekday(d)]))} ${dShort(d)}</span><span>${bEur(sum(list.filter((r) => !BCAT[r.cat].skip), (r) => r.amount))}</span></div>${list.map((r) => bTxRow(r, r.cat === 'atrier' || r.state === 'open')).join('')}`).join('') : `<p class="muted" style="margin:0">${q ? 'Rien trouvé.' : 'Aucune opération.'}</p>`}</section>`;
+}
+// ---- Fiche d'une opération : tout ce que la banque donne + ce que l'appli en comprend ----
+function bTxStory(r) {
+  const L = [], rows = bRows();
+  if (r.cat === 'interne' && r.pair) L.push(`🔁 ${r.amount < 0 ? `Arrivé sur <b>${esc(r.pair.A.short)}</b>` : `Parti de <b>${esc(r.pair.A.short)}</b>`} le ${dShort(r.pair.date)} : c’est ton argent qui change de compte, il ne compte ni en dépense ni en revenu.`);
+  else if (r.cat === 'interne') L.push('🔁 Virement entre tes comptes : il ne compte ni en dépense ni en revenu.');
+  if (r.cat === 'annule' && r.pair) L.push(`🚫 ${r.amount < 0 ? `Remboursé le ${dShort(r.pair.date)}` : `Remboursement de l’achat du ${dShort(r.pair.date)}`} : l’achat et le remboursement s’annulent.`);
+  if (r.cat === 'retour') { const g = r.group || (r.pair && r.pair.group) || [r.pair]; L.push(`🔄 ${r.amount < 0 ? 'Rendu' : 'Tu lui as rendu'} : ${g.filter(Boolean).map((x) => `${bEur(x.amount)} le ${dShort(x.date)} (${esc(x.A.short)})`).join(', ')}. Ça s’annule, rien ne compte dans ton budget.`); }
+  if (r.state === 'cash') L.push(`💶 ${r.amount < 0 ? 'Rendu en espèces' : 'Tu lui avais donné cette somme en espèces'} : ça ne compte pas dans ton budget.`);
+  if (r.state === 'open') L.push(`👪 Pas encore rendu par virement. ${r.amount < 0 ? 'S’il te l’a rendu en espèces, dis-le ; sinon c’est une dépense.' : 'Si tu lui avais donné cette somme en espèces, dis-le : ce n’est pas un gain.'}`);
+  if (r.cat === 'depot') L.push('🏧 Espèces déposées : c’est ton argent, pas un revenu.');
+  if (r.rep) L.push(`🔧 Paiement de la réparation de <b>${esc(r.rep.client || 'ton client')}</b>${r.rep.type ? ` (${esc(r.rep.type)})` : ''}, notée payée le ${dShort(repPaidOn(r.rep))}.`);
+  if (r.sale) L.push(`🏷️ Paiement de la vente <b>${esc(r.sale.ref || '')}</b> ${esc(r.sale.model || '')}.`);
+  if (r.cl) {
+    const o = r.cl.rows.filter((x) => x.amount < 0), i = r.cl.rows.filter((x) => x.amount > 0);
+    L.push(`👤 Avec <b>${esc(r.cl.nm)}</b> depuis le ${dShort(r.cl.rows[0].date)} : envoyé ${eur(sum(o, (x) => -x.amount))} (${plural(o.length, 'fois', 'fois')}), reçu ${eur(sum(i, (x) => x.amount))} (${plural(i.length, 'fois', 'fois')}).`);
+  } else if (r.key) {
+    const same = rows.filter((x) => x.key === r.key && x.amount < 0 && !BCAT[x.cat].skip);
+    if (same.length >= 2) L.push(`🧾 Chez <b>${esc(r.nm)}</b> : ${plural(same.length, 'achat')} depuis le ${dShort(same[same.length - 1].date)}, ${eur(sum(same, (x) => -x.amount))} au total, ${eur(sum(same, (x) => -x.amount) / same.length)} en moyenne.`);
+  }
+  return L;
+}
 function openBankTx(id) {
   const r = bRows().find((x) => x.id === id); if (!r) return;
   S.btx = { id, cat: r.cat };
   const f = (k, v) => (v ? `<dt>${k}</dt><dd>${v}</dd>` : '');
   const mcc = r.mcc ? `${esc(r.mcc)}${bMcc(r.mcc) ? ` (${esc(BCAT[bMcc(r.mcc)].l.toLowerCase())})` : ''}` : '';
-  const acc = bAccounts().find((a) => a.key === r.acc);
+  const st = bTxStory(r), pp = r.cl && r.cl.pp;
+  const acts = r.state === 'open' ? `<div class="btns">${r.amount < 0 ? `<button class="btn sm" data-act="bank-pp-cash" data-id="${esc(id)}">💶 Il me l’a rendu en espèces</button><button class="btn sm" data-act="bank-pp-keep" data-id="${esc(id)}">Pas rendu : c’est une dépense</button>` : `<button class="btn sm" data-act="bank-pp-cash" data-id="${esc(id)}">💶 Je lui avais donné en espèces</button><button class="btn sm" data-act="bank-pp-keep" data-id="${esc(id)}">C’est pour moi (une entrée)</button>`}</div>`
+    : r.tag && (r.tag.cash || (pp && ['virperso', 'entree'].includes(r.tag.cat))) ? `<div class="btns"><button class="btn sm" data-act="bank-untag" data-id="${esc(id)}">Annuler mon choix</button></div>`
+    : r.cl && !pp ? `<div class="btns"><button class="btn sm" data-act="bank-pp-yes-cl" data-id="${esc(id)}">👪 ${esc(bFirst(r.cl.nm))} est un proche (on s’arrange)</button></div>` : '';
   openSheet({ kind: 'btx', id, title: r.nm, body: `
     <p class="bk-amt ${r.amount > 0 ? 'in' : ''}">${bEur(r.amount)}${r.orig ? ` <small>(${esc(nf2.format(r.orig.amount))}${NB}${esc(r.orig.cur)})</small>` : ''}</p>
-    <dl class="bk-facts">${f('Date', dLong(r.date))}${f('Payé le', r.tdate ? dLong(r.tdate) : '')}${f('Valeur', r.vdate ? dLong(r.vdate) : '')}${f('Compte', esc(`${bBank(r.bank)}${acc && acc.num ? ' ' + acc.num : ''}`))}${f('Lieu', esc(r.place || ''))}${f('Type', esc(r.kind || ''))}${f('Code commerçant', mcc)}${f('Libellé', esc(r.info || ''))}${f('Compte de l’autre', esc(r.oiban || ''))}${f('Solde après', r.after != null ? eur(r.after) : '')}${f('Référence', esc(r.ref || ''))}${f('Note', esc(r.note || ''))}${f('Statut', r.st && r.st !== 'BOOK' ? 'En attente (carte pas encore débitée)' : '')}${f('Dans ta compta', r.match ? `déjà noté (${esc(r.match.ref || 'article')})` : r.cash ? 'retiré de ta caisse' : '')}</dl>
+    ${st.length ? `<ul class="bk-ins bk-story">${st.map((t) => `<li><span aria-hidden="true">${t.slice(0, 2)}</span><span>${t.slice(2).trim()}</span></li>`).join('')}</ul>` : ''}${acts}
+    <dl class="bk-facts">${f('Date', dLong(r.date))}${f('Payé le', r.tdate ? dLong(r.tdate) : '')}${f('Valeur', r.vdate ? dLong(r.vdate) : '')}${f('Compte', esc(`${r.A.bank || bBank(r.bank)} · ${r.A.label || 'compte'}${r.A.num ? ' ' + r.A.num : ''}`))}${f('Lieu', esc(r.place || r.town || ''))}${f('Type', esc(r.kind || ''))}${f('Code commerçant', mcc)}${f('Libellé', esc(r.info || ''))}${f('Compte de l’autre', esc(r.oiban || ''))}${f('Solde après', r.after != null ? eur(r.after) : '')}${f('Référence', esc(r.ref || ''))}${f('Note', esc(r.note || ''))}${f('Statut', r.st && r.st !== 'BOOK' ? 'En attente (carte pas encore débitée)' : '')}${f('Dans ta compta', r.match ? `déjà noté (${esc(r.match.ref || 'article')})` : r.cash ? 'retiré de ta caisse' : '')}</dl>
     <p class="fs-t">Catégorie${r.how === 'auto' && r.cat !== 'atrier' ? ' <small class="muted">(trouvée toute seule)</small>' : r.how === 'rule' ? ' <small class="muted">(ta règle)</small>' : ''}</p>
     <div class="bk-cats" id="bk-cats">${bCatBtns(r)}</div>
     ${r.key ? `<label class="sw"><span class="sw-t"><b>Toujours pour « ${esc(r.key.toUpperCase())} »</b><small>Les prochaines opérations de ce commerçant iront dans la même catégorie</small></span><input type="checkbox" id="bk-always" role="switch" ${BAMBIG.test(bText(r)) ? '' : 'checked'}><span class="sw-ui" aria-hidden="true"></span></label>` : ''}
     <div id="bk-noted-w" ${BCAT[r.cat].pro && r.amount < 0 ? '' : 'hidden'}><label class="sw"><span class="sw-t"><b>Déjà notée dans ma compta</b><small>Ne pas la retirer de la caisse (tu l’as déjà saisie ailleurs)</small></span><input type="checkbox" id="bk-noted" role="switch" ${r.noted ? 'checked' : ''}><span class="sw-ui" aria-hidden="true"></span></label></div>`,
     foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="bank-tx-save" data-id="${esc(id)}">Enregistrer</button>` });
 }
-const bCatBtns = (r) => (r.amount < 0 ? [...BOUT, 'interne'] : [...BIN, 'interne']).map((k) => `<button data-act="bank-pick" data-c="${k}" aria-pressed="${S.btx && S.btx.cat === k}">${BCAT[k].e} ${esc(BCAT[k].l)}${BCAT[k].pro ? ' <small>pro</small>' : ''}</button>`).join('');
+const bCatBtns = (r) => (r.amount < 0 ? [...BOUT, 'interne', 'proche'] : [...BIN, 'interne', 'proche', 'depot']).map((k) => `<button data-act="bank-pick" data-c="${k}" aria-pressed="${S.btx && S.btx.cat === k}">${BCAT[k].e} ${esc(BCAT[k].l)}${BCAT[k].pro ? ' <small>pro</small>' : ''}</button>`).join('');
+// ---- Fiche d'un compte : solde, courbe, entrées et sorties du mois, dernières opérations ----
+function openBankAcct(key) {
+  const a = bAccounts().find((x) => x.key === key); if (!a) return;
+  const rows = bRows().filter((r) => r.acc === key || (r.A.card && r.A.parent === key)), m = thisMonth(), inM = rows.filter((r) => r.date.startsWith(m));
+  const pts = a.cur === 'EUR' ? bSeries([key]) : [];
+  openSheet({ kind: 'bacct', id: key, title: `${a.bank} · ${a.label}`, body: `
+    <p class="bk-amt">${bAmt(a)} <small>${esc(a.num)}${a.cards.length ? ` · carte ${a.cards.map((c) => esc(c.num)).join(', ')}` : ''}</small></p>
+    ${pts.length >= 7 ? bChart(pts, 'acct', `Solde ${a.short}`) : ''}
+    <div class="bk-io" style="margin-bottom:12px"><span>Entré en ${monthName(m)}<b class="in">+${eur(sum(inM.filter((r) => r.amount > 0), (r) => r.amount))}</b></span><span>Sorti<b class="out">−${eur(sum(inM.filter((r) => r.amount < 0), (r) => -r.amount))}</b></span><span>Opérations<b>${inM.length}</b></span></div>
+    ${rows.slice(0, 8).map((r) => bTxRow(r)).join('') || '<p class="muted">Aucune opération.</p>'}
+    <div class="btns" style="margin-top:10px"><button class="btn sm" data-act="bank-acct-ops" data-k="${esc(key)}">Toutes ses opérations</button></div>`,
+    foot: `<button class="btn grow" data-act="close">Fermer</button>` });
+}
+// ---- Fiche d'un proche : tous les virements, rendus ou à confirmer ----
+function openBankPerson(pid) {
+  const p = bProches().find((x) => x.c.pp && x.c.pp.id === pid); if (!p) return;
+  openSheet({ kind: 'bpers', id: pid, title: `👪 ${p.nm}`, body: `
+    <p class="bk-hs" style="margin-top:0">${bBalTxt(p)}</p>
+    <div class="bk-io" style="margin-bottom:12px"><span>Envoyé<b class="out">−${eur(p.sent)}</b></span><span>Reçu<b class="in">+${eur(p.got)}</b></span><span>Rendus<b>${p.paired.length + p.cash.length}</b></span></div>
+    <p class="muted" style="margin:0 0 6px;font-size:13px">Sur les opérations lues (3 mois). Ce qui est rendu par virement s’annule tout seul ; les espèces, c’est toi qui me le dis.</p>
+    ${p.open.length ? `<p class="fs-t">À confirmer (${p.open.length})</p>${p.open.map((r) => bTxRow(r, true)).join('')}` : ''}
+    <p class="fs-t">Tout l’historique</p>${p.rows.filter((r) => r.state !== 'open').map((r) => bTxRow(r)).join('') || '<p class="muted">Rien d’autre.</p>'}
+    <div class="btns" style="margin-top:12px"><button class="btn sm danger" data-act="bank-pp-del" data-pid="${esc(pid)}">Ce n’est plus un proche</button></div>`,
+    foot: `<button class="btn grow" data-act="close">Fermer</button>` });
+}
+function openLbc() {
+  const lw = lbcWallet(); if (!lw) return;
+  const row = (e) => { const [t, s] = lbcEvTxt(e); return `<li class="${e.k === 'inconnu' ? 'q' : ''}"><span>${esc(t)}<small>${esc(s)}</small></span><b class="${e.a > 0 ? 'in' : ''}">${e.a > 0 ? '+' : '−'}${eur(Math.abs(e.a))}</b></li>`; };
+  const unk = lw.unknown;
+  openSheet({ kind: 'blbc', title: 'Porte-monnaie Leboncoin', body: `
+    <div class="bk-total"><span>Estimé aujourd’hui</span><b>${eur(lw.v)}</b></div>
+    <p class="muted">Calculé tout seul, sans te connecter à Leboncoin. Ce qui entre : tes ventes Leboncoin payées et tes achats annulés remboursés. Ce qui sort : les virements « leboncoin payout » vers ta banque, et la part de tes achats Leboncoin que ta carte n’a pas payée.</p>
+    ${lw.now.length ? `<p class="fs-t">D’où vient cet argent</p><ul class="bk-lw">${lw.now.map(row).join('')}</ul>` : ''}
+    ${unk.length ? `<div class="bk-warn">Leboncoin t’a versé de l’argent sans vente notée dans l’appli : ${unk.map((e) => `${eur(e.a)} (${dShort(e.d)})`).join(', ')}. Si tu as vendu quelque chose, ajoute la vente dans Revente.</div>` : ''}
+    <p class="fs-t">Tous les mouvements depuis le ${dShort(lw.from)}</p><ul class="bk-lw">${lw.ev.map(row).join('') || '<li><span class="muted">Rien pour l’instant.</span></li>'}</ul>
+    <details class="bk-fix"${lw.fix ? ' open' : ''}><summary>Le montant n’est pas celui de ton appli Leboncoin ?</summary>
+      ${moneyF('lbc-v', 'Solde affiché dans Leboncoin aujourd’hui', '', 'Une seule fois : l’appli repart de ce montant et continue toute seule.')}
+      <div class="btns"><button class="btn primary sm" data-act="bank-lbc-save">Corriger</button>${lw.fix ? `<button class="btn sm" data-act="bank-lbc-del">Enlever mon correctif (${eur(+lw.fix.v)} le ${dShort(lw.fix.at)})</button>` : ''}</div></details>`,
+    foot: `<button class="btn grow" data-act="close">Fermer</button>` });
+}
 function bankFromSheet() {
   openSheet({ kind: 'bfrom', title: 'Date de départ de la caisse', body: `<p class="muted" style="margin-top:0">Les dépenses pro vues sur ta banque sont retirées de ta caisse à partir de cette date. Avant, rien ne change.</p>${dateF('bk-from', 'À partir du', bFrom() || today())}`,
     foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="bank-from-save">Enregistrer</button>` });
 }
+const bankGo = (fn) => { closeSheet(); fn(); if (S.view !== 'banque') setView('banque'); else { render(); window.scrollTo(0, 0); } };
 const BANK_ACT = {
-  'bank-tab': (a) => { S.bankTab = a.dataset.v; if (S.view !== 'banque') setView('banque'); else { render(); window.scrollTo(0, 0); } },
+  'bank-tab': (a) => { closeSheet(); S.bankTab = a.dataset.v; if (S.view !== 'banque') setView('banque'); else { render(); window.scrollTo(0, 0); } },
   'bank-reload': () => bankPull(true),
   'bank-refresh': () => bankSend({ action: 'refresh' }, 'refresh', 'Banque : actualiser'),
   'bank-link': (a) => bankLink(a.dataset.b),
   'bank-month': (a) => { const n = addMonths(S.bankMonth || thisMonth(), +a.dataset.d); if (n <= thisMonth()) { S.bankMonth = n; render(); } },
   'bank-fcat': (a) => { S.bankCat = a.dataset.c; render(); },
   'bank-facc': (a) => { S.bankAcc = a.dataset.c; render(); },
-  'bank-cat-ops': (a) => { closeSheet(); S.bankCat = a.dataset.c; S.bankTab = 'ops'; if (a.dataset.c === 'atrier') S.bankMonth = thisMonth(); if (S.view !== 'banque') setView('banque'); else { render(); window.scrollTo(0, 0); } },
+  'bank-cat-ops': (a) => bankGo(() => { S.bankCat = a.dataset.c; S.bankTab = 'ops'; S.bankQ = ''; if (a.dataset.c === 'atrier') S.bankMonth = thisMonth(); }),
+  'bank-search': (a) => bankGo(() => { S.bankTab = 'ops'; S.bankQ = a.dataset.q || ''; }),
+  'bank-acct': (a) => openBankAcct(a.dataset.k),
+  'bank-acct-ops': (a) => bankGo(() => { S.bankTab = 'ops'; S.bankAcc = a.dataset.k; S.bankCat = 'all'; S.bankQ = ''; }),
+  'bank-person': (a) => openBankPerson(a.dataset.pid),
+  'bank-lbc': () => openLbc(),
+  'bank-lbc-save': async () => { const v = parseNum(val('lbc-v')); if (v == null || v < 0) { toast('Écris le solde de ton porte-monnaie', 'bad'); return; } const ok = await write(() => commit((d) => { d.settings.lbcWallet = { v: Math.round(v * 100) / 100, at: today() }; }, `Leboncoin : porte-monnaie ${eur(v)}`)); if (ok) { closeSheet(); toast('Porte-monnaie corrigé', 'good'); } },
+  'bank-lbc-del': async () => { const ok = await write(() => commit((d) => { delete d.settings.lbcWallet; }, 'Leboncoin : correctif du porte-monnaie enlevé')); if (ok) { closeSheet(); toast('Correctif enlevé', 'good'); } },
+  'bank-pp-yes': (a) => { const g = bSuggest()[+a.dataset.i]; if (g) bankPeopleSet(g.c, true).then((ok) => { if (ok) toast(`${bFirst(g.c.nm)} : ses virements ne comptent plus dans ton budget`, 'good'); }); },
+  'bank-pp-no': (a) => { const g = bSuggest()[+a.dataset.i]; if (g) bankPeopleSet(g.c, false); },
+  'bank-pp-yes-cl': async (a) => { const r = bRows().find((x) => x.id === a.dataset.id); if (!r || !r.cl) return; const ok = await bankPeopleSet(r.cl, true); if (ok) { closeSheet(); toast(`${bFirst(r.cl.nm)} : ses virements ne comptent plus dans ton budget`, 'good'); } },
+  'bank-pp-del': async (a) => { const ok = await bankPeopleDel(a.dataset.pid); if (ok) closeSheet(); },
+  'bank-pp-cash': async (a) => { const r = bRows().find((x) => x.id === a.dataset.id); if (!r) return; const pid = S.sheet && S.sheet.kind === 'bpers' ? S.sheet.id : null;
+    const ok = await bankTag(r.id, 'proche', { cash: r.amount < 0 ? 'back' : 'given', msg: `Banque · ${r.nm} ${bEur(r.amount)} : ${r.amount < 0 ? 'rendu en espèces' : 'donné en espèces avant'}` });
+    if (ok) { if (pid) openBankPerson(pid); else closeSheet(); toast(r.amount < 0 ? 'Rendu en espèces : ne compte pas' : 'C’était ton argent : ne compte pas', 'good'); } },
+  'bank-pp-keep': async (a) => { const r = bRows().find((x) => x.id === a.dataset.id); if (!r) return; const pid = S.sheet && S.sheet.kind === 'bpers' ? S.sheet.id : null;
+    const ok = await bankTag(r.id, r.amount < 0 ? 'virperso' : 'entree', { msg: `Banque · ${r.nm} ${bEur(r.amount)} : ${r.amount < 0 ? 'pas rendu (dépense)' : 'entrée'}` });
+    if (ok) { if (pid) openBankPerson(pid); else closeSheet(); toast(r.amount < 0 ? 'Compté dans tes dépenses' : 'Compté dans tes entrées', 'good'); } },
+  'bank-untag': async (a) => { const ok = await bankUntag(a.dataset.id); if (ok) closeSheet(); },
   'bank-tx': (a) => openBankTx(a.dataset.id),
   'bank-quick': (a) => { const r = bRows().find((x) => x.id === a.dataset.id); if (!r) return; bankTag(r.id, a.dataset.c, { always: !BAMBIG.test(bText(r)) }); },
   'bank-pick': (a) => { if (!S.btx) return; S.btx.cat = a.dataset.c; $$('#bk-cats button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.c === S.btx.cat))); const w = $('#bk-noted-w'); if (w) { const r = bRows().find((x) => x.id === S.btx.id); w.hidden = !(BCAT[S.btx.cat].pro && r && r.amount < 0); } },
@@ -5825,9 +6360,9 @@ const BANK_ACT = {
 };
 function bankStrip() {
   const A = bAccounts(); if (!A.length) return '';
-  const rows = bRows(), n = rows.filter((r) => r.cat === 'atrier').length, m = thisMonth();
+  const rows = bRows(), n = rows.filter((r) => r.cat === 'atrier').length, m = thisMonth(), po = sum(bProches(), (p) => p.open.length), lw = lbcWallet();
   const over = rows.length ? bCatLines(rows, m, bMonth(rows, m), bAvg(rows, m)).filter((x) => x.st === 'over') : [];
-  return `<button class="strip bank ${over.length ? 'slow' : ''}" data-act="view" data-view="banque"><span>🏦 En banque <b>${eur(bTotal())}</b></span><span>${[...new Set(A.filter((a) => a.cur === 'EUR').map((a) => a.bank))].map((k) => `${esc(k)} ${eur(sum(A.filter((a) => a.bank === k && a.cur === 'EUR'), (a) => num(a.amount)))}`).join(' · ')}</span>${n ? `<span><b>${n}</b> à trier</span>` : ''}${over.length ? `<span>🚨 budget dépassé : <b>${over.map((x) => esc(BCAT[x.k].s || BCAT[x.k].l)).join(', ')}</b></span>` : ''}${ic('right')}</button>`;
+  return `<button class="strip bank ${over.length ? 'slow' : ''}" data-act="view" data-view="banque"><span>🏦 En banque <b>${eur(bTotal())}</b></span><span>${[...new Set(A.filter((a) => a.cur === 'EUR').map((a) => a.bank))].map((k) => `${esc(k)} ${eur(sum(A.filter((a) => a.bank === k && a.cur === 'EUR'), (a) => num(a.amount)))}`).join(' · ')}${lw ? ` · Leboncoin ${eur(lw.v)}` : ''}</span>${n ? `<span><b>${n}</b> à trier</span>` : ''}${po ? `<span><b>${po}</b> à confirmer avec tes proches</span>` : ''}${over.length ? `<span>🚨 budget dépassé : <b>${over.map((x) => esc(BCAT[x.k].s || BCAT[x.k].l)).join(', ')}</b></span>` : ''}${ic('right')}</button>`;
 }
 
 Object.assign(ACT, TOUR_ACT, FUEL_ACT, BANK_ACT);
@@ -5848,6 +6383,9 @@ function bind() {
   window.addEventListener('online', () => { S.offline = false; refresh(true); });
   document.addEventListener('change', (e) => { if (e.target.id !== 'bk-cash') return; const on = e.target.checked; write(() => commit((d) => { d.settings.bankCash = on; }, on ? 'Banque : dépenses pro retirées de la caisse' : 'Banque : dépenses pro plus retirées de la caisse')); });
   document.addEventListener('toggle', (e) => { if (e.target.matches && e.target.matches('details[data-ledger]')) S.ledgerOpen = e.target.open; }, true);
+  document.addEventListener('input', (e) => { if (e.target.id !== 'bk-q') return; S.bankQ = e.target.value; const l = $('#bk-ops-l'); if (l) l.innerHTML = bankOpsList(); const n = $('#bk-ops-nav'); if (n) n.hidden = !!S.bankQ.trim(); });
+  document.addEventListener('pointermove', bChartHover, { passive: true });
+  document.addEventListener('pointerdown', bChartHover, { passive: true });
   document.addEventListener('error', (e) => { if (e.target && e.target.tagName === 'IMG') e.target.classList.add('broken'); }, true);
   $('#q').addEventListener('input', (e) => { S.f.q = e.target.value; renderList(); });
   $('#grp').addEventListener('change', (e) => { S.f.group = e.target.checked; saveFilters(); renderList(); });
@@ -5945,7 +6483,7 @@ async function init() {
 }
 
 // Accès réservé aux tests locaux (jamais actif sur le site en ligne)
-if (location.hostname === 'localhost') window.__app = { S, bRows, bankOut, capital, monthStats, cashLedger, isPaid, paidOn, profit };
+if (location.hostname === 'localhost') window.__app = { S, bRows, bankOut, capital, monthStats, cashLedger, isPaid, paidOn, profit, lbcWallet, bProches, bSuggest, bAccounts, bTotal };
 init();
 })();
 </script>
