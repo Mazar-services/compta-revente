@@ -797,7 +797,7 @@ const APP_VERSION = '9d91f2023556';
 async function checkUpdate() {
   try {
     const r = await fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' });
-    const m = (await r.text()).match(/const APP_VERSION = '9d91f2023556'/);
+    const m = (await r.text()).match(/const APP_VERSION = '([0-9a-f]{12})'/);
     if (!m || m[1] === APP_VERSION || sessionStorage.getItem('compta.tried') === m[1]) return;
     if (PENDING || (typeof SHEET !== 'undefined' && SHEET)) return;
     sessionStorage.setItem('compta.tried', m[1]);
@@ -1148,7 +1148,7 @@ function cashLedger(all) {
     if (isPaid(i)) ev.push({ d: paidOn(i), k: 2, kind: 'vente', label: isShipSale(i.sellChannel) ? 'Paiement de la vente' : 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
   });
   if (all || repInCash()) repPayRows().forEach((r) => { const s = r._src || r, q = repQty(s), by = repMethod(r);
-    ev.push({ d: repPaidOn(r), k: 3, kind: 'client', by, label: esc(s.client || s.type || 'Client Réparo'), note: `${s.client ? s.type || 'Réparo' : 'Réparo'}${q > 1 ? ' ×' + q : ''}${r._src && !r._rest ? ' · payé en partie' : ''}${r._rest ? ' · reste payé' : ''}${by === 'cash' ? ' · 💶 espèces' : by === 'bank' ? ' · 🏦 virement' : ''}`, a: repNet(r) + bPartsBack(r), rep: s }); });
+    ev.push({ d: repPaidOn(r), k: 3, kind: 'client', by, label: esc(s.client || s.type || 'Client Réparo'), note: `${s.client ? s.type || 'Réparo' : 'Réparo'}${q > 1 ? ' ×' + q : ''}${r._src && !r._rest ? ' · payé en partie' : ''}${r._rest ? ' · reste payé' : ''}${by === 'cash' ? ' · 💶 espèces' : by === 'bank' ? ' · 🏦 virement' : ''}`, a: all ? repTotal(r) : repNet(r) + bPartsBack(r), rep: s }); }); // un seul portefeuille : tout ce que le client a payé, les pièces sont comptées quand tu les paies
   bRows().filter((r) => r.cash).forEach((r) => ev.push({ d: r.date, k: 1, kind: 'pro', label: esc(r.nm), note: `${BCAT[r.cat].l} · payé par carte (${r.A.short || bBank(r.bank)})`, a: r.amount, bk: r }));
   ev.forEach((e) => { if (!isDate(e.d)) e.d = ''; });
   ev.sort((x, y) => x.d.localeCompare(y.d) || x.k - y.k);
@@ -1334,7 +1334,8 @@ const money = () => { const R = realMoney(); return R ? R.v : capital().dispo; }
 const cxT = () => (realMoney() ? '' : ' · caisse ' + eur(capital().dispo));
 // Ce que la banque voit en plus de la compta : salaire, autres entrées, dépenses de tous les jours.
 // Jamais les ventes (comptées à l'article), les clients reliés à une réparation, ni les achats et pièces déjà comptés.
-const wExtra = (r) => !BCAT[r.cat].skip && (r.cur || 'EUR') === 'EUR'
+// Les retraits d'espèces passent de la banque à ta poche : ils restent dans ton argent (cagnotte d'espèces), ce n'est pas une dépense.
+const wExtra = (r) => !BCAT[r.cat].skip && r.cat !== 'especes' && (r.cur || 'EUR') === 'EUR'
   && (r.amount > 0 ? r.cat !== 'ventes' && !(r.cat === 'clients' && r.rep) : !r.cash && !r.match && !r.noted);
 function walletLedger() {
   const ev = cashLedger(true).filter((e) => e.k !== 0); // apports et retraits : rien à séparer avec un seul portefeuille
