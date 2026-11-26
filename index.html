@@ -658,6 +658,13 @@ button.bk-a{width:100%;background:none;border:0;border-top:1px solid var(--line)
 .bk-pph .t{min-width:0} .bk-pph .t b{display:block;font-size:14.5px} .bk-pph .t small{display:block;color:var(--muted);font-size:12px;font-weight:600} .bk-pph .t small b{color:var(--ink);font-size:inherit;display:inline}
 .bk-story{margin:0 0 14px}
 .bk-search{margin:0 0 10px}
+#v-banque{grid-template-columns:minmax(0,1fr)}
+.bk-opsw{display:grid;gap:12px;min-width:0}
+@media (min-width:900px){.bk-opsw{width:100%;max-width:760px;margin-inline:auto}}
+.bk-opsw .bk-search{margin:0}
+.bk-flt{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
+.bk-flt .sel{width:100%;height:42px;font-size:14px;color:var(--ink)}
+.bk-io.bk-sum{margin:0 0 8px;padding:0 0 10px;border-top:0;border-bottom:1px solid var(--line)}
 .bk-lw{list-style:none;margin:6px 0 14px;padding:0}
 .bk-lw li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:14px} .bk-lw li:first-child{border-top:0}
 .bk-lw li > span{min-width:0;font-weight:700} .bk-lw small{display:block;font-weight:600;color:var(--muted);font-size:12px}
@@ -766,7 +773,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '63f5298e8969';
+const APP_VERSION = '114f956254b1';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -6055,8 +6062,8 @@ function bankCashHtml(rows) {
     ${bFrom() ? `<button class="btn sm" data-act="bank-from" style="margin-top:8px">Changer la date de départ (${dShort(bFrom())})</button>` : ''}
   </section>`;
 }
-function bTxRow(r, quick) {
-  const c = BCAT[r.cat], sub = [r.town || '', quick && r.cat === 'atrier' ? '' : c.l, r.A.short || bBank(r.bank), dShort(r.date)].filter(Boolean).join(' · ');
+function bTxRow(r, quick, noDate) {
+  const c = BCAT[r.cat], sub = [r.town || '', quick && r.cat === 'atrier' ? '' : c.l, r.A.short || bBank(r.bank), noDate ? '' : dShort(r.date)].filter(Boolean).join(' · ');
   const pills = `${r.st && r.st !== 'BOOK' ? '<span class="pill st-attente">en attente</span>' : ''}${r.match ? `<span class="pill bk-ok">déjà noté ${esc(r.match.ref || '')}</span>` : ''}${r.rep ? `<span class="pill bk-ok">réparation ${esc(r.rep.client || '')}</span>` : ''}${r.sale ? `<span class="pill bk-ok">vente ${esc(r.sale.ref || '')}</span>` : ''}${r.cash ? '<span class="pill bk-c">caisse</span>' : ''}${r.state === 'open' ? '<span class="pill bk-c">à confirmer</span>' : r.state === 'cash' ? '<span class="pill bk-ok">rendu en espèces</span>' : r.cat === 'retour' && r.pair ? `<span class="pill bk-ok">${r.amount < 0 ? 'rendu' : 'rendu par toi'} le ${dShort(r.pair.date)}</span>` : ''}`;
   let q = '';
   if (quick && r.state === 'open') q = r.amount < 0
@@ -6213,13 +6220,16 @@ function bankSubsHtml(rows, m) {
 // ---- Opérations : par mois, par compte, par catégorie ; ou recherche dans tout ----
 function bankOpsHtml() {
   const rows = bRows(), m = S.bankMonth || thisMonth(), c = S.bankCat || 'all', acc = S.bankAcc || 'all';
-  const inM = rows.filter((r) => r.date.startsWith(m)), cats = [...new Set(inM.map((r) => r.cat))], A = bAccounts();
-  const chip = (v, l, cur, act) => `<button class="chip" data-act="${act}" data-c="${esc(v)}" aria-pressed="${cur === v}">${l}</button>`;
-  return `<div class="field bk-search"><label for="bk-q" class="vh">Chercher</label><input id="bk-q" class="inp" type="search" enterkeyhint="search" autocomplete="off" placeholder="Chercher : commerçant, personne, montant…" value="${esc(S.bankQ || '')}"></div>
+  const inM = rows.filter((r) => r.date.startsWith(m)), A = bAccounts(), n = new Map();
+  inM.forEach((r) => n.set(r.cat, (n.get(r.cat) || 0) + 1));
+  if (c !== 'all' && !n.has(c) && BCAT[c]) n.set(c, 0);
+  const cats = [...n.keys()].sort((a, b) => (a === 'atrier' ? -1 : b === 'atrier' ? 1 : BCAT[a].l.localeCompare(BCAT[b].l)));
+  const opt = (v, l, cur) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${l}</option>`;
+  return `<div class="bk-opsw"><div class="field bk-search"><label for="bk-q" class="vh">Chercher</label><input id="bk-q" class="inp" type="search" enterkeyhint="search" autocomplete="off" placeholder="Chercher un nom, un montant…" value="${esc(S.bankQ || '')}"></div>
     <div id="bk-ops-nav" ${(S.bankQ || '').trim() ? 'hidden' : ''}>${bankMonthNav()}
-    <div class="chips">${chip('all', 'Tout', c, 'bank-fcat')}${cats.sort((a, b) => (a === 'atrier' ? -1 : b === 'atrier' ? 1 : BCAT[a].l.localeCompare(BCAT[b].l))).map((k) => chip(k, `${BCAT[k].e} ${esc(BCAT[k].l)}`, c, 'bank-fcat')).join('')}</div>
-    ${A.length > 1 ? `<div class="chips">${chip('all', 'Tous les comptes', acc, 'bank-facc')}${A.map((a) => chip(a.key, esc(a.short), acc, 'bank-facc')).join('')}</div>` : ''}</div>
-    <div id="bk-ops-l">${bankOpsList()}</div>`;
+    <div class="bk-flt"><label class="selw"><span class="vh">Catégorie</span><select id="bk-fcat" class="sel">${opt('all', `Tout voir (${inM.length})`, c)}${cats.map((k) => opt(k, `${BCAT[k].e} ${esc(BCAT[k].l)} (${n.get(k)})`, c)).join('')}</select></label>
+    ${A.length > 1 ? `<label class="selw"><span class="vh">Compte</span><select id="bk-facc" class="sel">${opt('all', 'Tous les comptes', acc)}${A.map((a) => opt(a.key, esc(a.short), acc)).join('')}</select></label>` : ''}</div></div>
+    <div id="bk-ops-l">${bankOpsList()}</div></div>`;
 }
 function bankOpsList() {
   const rows = bRows(), q = bLow((S.bankQ || '').trim()), m = S.bankMonth || thisMonth(), c = S.bankCat || 'all', acc = S.bankAcc || 'all';
@@ -6229,9 +6239,13 @@ function bankOpsList() {
     L = rows.filter((r) => bLow(`${r.nm} ${r.info || ''} ${r.name || ''} ${BCAT[r.cat].l} ${r.A.short || ''} ${r.town || ''}`).includes(q) || (n != null && n > 0 && Math.abs(Math.abs(r.amount) - n) < 0.005));
     const o = L.filter((r) => r.amount < 0 && !BCAT[r.cat].skip), i = L.filter((r) => r.amount > 0 && !BCAT[r.cat].skip), d0 = L.length ? L[L.length - 1].date : '';
     head = L.length ? `<p class="bk-when" style="margin:0 0 6px">${plural(L.length, 'opération')} trouvée${L.length > 1 ? 's' : ''}${d0 ? ` depuis le ${dShort(d0)}` : ''} · sorti <b>${eur(sum(o, (r) => -r.amount))}</b>${o.length > 1 ? ` (en moyenne ${eur(sum(o, (r) => -r.amount) / o.length)})` : ''}${i.length ? ` · entré <b>${eur(sum(i, (r) => r.amount))}</b>` : ''}</p>` : '';
-  } else L = rows.filter((r) => r.date.startsWith(m) && (c === 'all' || r.cat === c) && (acc === 'all' || r.acc === acc || (r.A.card && r.A.parent === acc)));
+  } else {
+    L = rows.filter((r) => r.date.startsWith(m) && (c === 'all' || r.cat === c) && (acc === 'all' || r.acc === acc || (r.A.card && r.A.parent === acc)));
+    const o = L.filter((r) => r.amount < 0 && !BCAT[r.cat].skip), i = L.filter((r) => r.amount > 0 && !BCAT[r.cat].skip), k = L.filter((r) => BCAT[r.cat].skip).length;
+    head = L.length ? `<div class="bk-io bk-sum"><span>Opérations<b>${L.length}</b></span><span>Sorti<b>${eur(sum(o, (r) => -r.amount))}</b></span><span>Entré<b class="in">${eur(sum(i, (r) => r.amount))}</b></span></div>${k ? `<p class="bk-when" style="margin:-2px 0 6px">${plural(k, 'opération')} pas comptée${k > 1 ? 's' : ''} (entre tes comptes, rendus, annulés…)</p>` : ''}` : '';
+  }
   const days = new Map(); L.forEach((r) => { if (!days.has(r.date)) days.set(r.date, []); days.get(r.date).push(r); });
-  return `<section class="card">${head}${L.length ? [...days.entries()].map(([d, list]) => `<div class="bk-day"><span>${esc(cap1(WEEK[weekday(d)]))} ${dShort(d)}</span><span>${bEur(sum(list.filter((r) => !BCAT[r.cat].skip), (r) => r.amount))}</span></div>${list.map((r) => bTxRow(r, r.cat === 'atrier' || r.state === 'open')).join('')}`).join('') : `<p class="muted" style="margin:0">${q ? 'Rien trouvé.' : 'Aucune opération.'}</p>`}</section>`;
+  return `<section class="card">${head}${L.length ? [...days.entries()].map(([d, list]) => `<div class="bk-day"><span>${esc(cap1(WEEK[weekday(d)]))} ${dShort(d)}</span><span>${(() => { const v = sum(list.filter((r) => !BCAT[r.cat].skip), (r) => r.amount); return Math.abs(v) < 0.005 ? '' : bEur(v); })()}</span></div>${list.map((r) => bTxRow(r, r.cat === 'atrier' || r.state === 'open', true)).join('')}`).join('') : `<p class="muted" style="margin:0">${q ? 'Rien trouvé.' : 'Aucune opération.'}</p>`}</section>`;
 }
 // ---- Fiche d'une opération : tout ce que la banque donne + ce que l'appli en comprend ----
 function bTxStory(r) {
@@ -6387,6 +6401,7 @@ function bind() {
   window.addEventListener('online', () => { S.offline = false; refresh(true); });
   document.addEventListener('change', (e) => { if (e.target.id !== 'bk-cash') return; const on = e.target.checked; write(() => commit((d) => { d.settings.bankCash = on; }, on ? 'Banque : dépenses pro retirées de la caisse' : 'Banque : dépenses pro plus retirées de la caisse')); });
   document.addEventListener('toggle', (e) => { if (e.target.matches && e.target.matches('details[data-ledger]')) S.ledgerOpen = e.target.open; }, true);
+  document.addEventListener('change', (e) => { if (e.target.id !== 'bk-fcat' && e.target.id !== 'bk-facc') return; if (e.target.id === 'bk-fcat') S.bankCat = e.target.value; else S.bankAcc = e.target.value; const l = $('#bk-ops-l'); if (l) l.innerHTML = bankOpsList(); });
   document.addEventListener('input', (e) => { if (e.target.id !== 'bk-q') return; S.bankQ = e.target.value; const l = $('#bk-ops-l'); if (l) l.innerHTML = bankOpsList(); const n = $('#bk-ops-nav'); if (n) n.hidden = !!S.bankQ.trim(); });
   document.addEventListener('pointermove', bChartHover, { passive: true });
   document.addEventListener('pointerdown', bChartHover, { passive: true });
