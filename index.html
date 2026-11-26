@@ -766,7 +766,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '6919cc77e714';
+const APP_VERSION = '63f5298e8969';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -5388,6 +5388,7 @@ const BK = { file: 'data/banque.json', req: 'data/banque-demande.json', banks: [
 const BCAT = {
   pieces: { l: 'Pièces et outils Réparo', s: 'Pièces', e: '🔧', pro: 1 },
   revente: { l: 'Achats revente', s: 'Revente', e: '🎮', pro: 1 },
+  pokemon: { l: 'Pokémon', e: '⚡', pro: 1 },
   pro: { l: 'Frais pro (envois, pub…)', e: '📦', pro: 1 },
   essence: { l: 'Essence', e: '⛽' },
   courses: { l: 'Courses', e: '🛒' },
@@ -5424,6 +5425,7 @@ const BPRIO = [
 ];
 // Mots du commerçant ou du libellé → catégorie (dans cet ordre ; minuscules sans accents)
 const BRULES = [
+  ['pokemon', /\b(pokemon|pokemon center|tcg|cardmarket|card market|joue ?club|king ?jouet|la grande recre|toys ?r ?us|smyths)\b/],
   ['maison', /\b(edf|engie|electricite|ekwateur|gaz de|veolia|loyer|opac|actis|sdh|pluralis|foncia|nexity|assurances?|axa|maif|macif|matmut|mma|groupama|allianz|generali|direct assurance|olivier assurance|leocare|impots?|dgfip|tresor public|amendes?|antai|taxe)\b/],
   ['pieces', /\b(utopya|utopia|maxeli|mobilax|phonepartsworld|phone parts|mobile ?sentrix|ifixit|ipartsbuy|aliexpress|alibaba|banggood|lcd ?phone|thermal ?grizzly|conrad|rs components|farnell|mouser|kubii|gotronic)\b/],
   ['revente', /\b(leboncoin|vinted|back ?market|rakuten|cash ?converters|easy ?cash|cash ?express|game ?cash|cex|webuy)\b/],
@@ -5452,7 +5454,7 @@ const BMCC = [
 const BSAL = /\b(salaire|paie|remuneration|logistique|adecco|randstad|manpower|synergie|start people|proman|interim|shopopop|stuart)\b/;
 const BCLI = /\b(wero|lydia|paylib|sumup|zettle|reparo|reparation|manettes?|ps5|ps4|joysticks?|hdmi|iphone|ecran|batterie|console|drift)\b/;
 // Commerçants où chaque achat peut être différent : la règle « toujours » n'est pas proposée par défaut
-const BAMBIG = /\b(amazon|amzn|paypal|ebay|cdiscount|leboncoin|vinted|lydia|wero|sumup|aliexpress|fnac|darty|boulanger|action|carrefour|leclerc|auchan|brico|castorama|leroy merlin)\b/;
+const BAMBIG = /\b(joue ?club|king ?jouet|la grande recre|toys ?r ?us|smyths|amazon|amzn|paypal|ebay|cdiscount|leboncoin|vinted|lydia|wero|sumup|aliexpress|fnac|darty|boulanger|action|carrefour|leclerc|auchan|brico|castorama|leroy merlin)\b/;
 const BGEN = new Set(['boulangerie', 'restaurant', 'pharmacie', 'station', 'sarl', 'sas', 'eurl', 'magasin', 'tabac', 'garage', 'super', 'hyper', 'uber', 'apple', 'google', 'paypal', 'sumup', 'zettle', 'carte', 'boucherie', 'epicerie', 'parking', 'relais', 'total', 'amazon', 'www', 'retrait']);
 const bLow = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const bText = (t) => bLow(`${t.name || ''} ${t.info || ''}`).replace(/[^a-z0-9&]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -5678,13 +5680,15 @@ function bRows() {
     return /leboncoin/i.test(i.buySource || '') && /\bleboncoin\b/.test(bText(r)) && a < num(i.buyPrice) && Math.abs(dayDiff(i.buyDate, bOpDate(r))) <= 3; };
   // 9. Déjà noté dans la compta : achat d'article (même montant à 3 % près, ±5 jours) ou frais d'envoi d'une vente (±7 jours)
   const used = new Set();
-  rows.filter((r) => r.amount < 0 && (r.cat === 'revente' || r.cat === 'pro')).sort(bByDate).forEach((r) => {
-    const a = -r.amount;
-    const c = (r.cat === 'revente'
-      ? S.allItems.filter((i) => isDate(i.buyDate) && Math.abs(dayDiff(i.buyDate, r.date)) <= 5 && (Math.abs(cost(i) - a) <= Math.max(1, a * 0.03) || Math.abs(num(i.buyPrice) - a) <= 1 || bPartCard(i, r, a))).map((i) => ({ id: i.id, ref: i.ref, dd: Math.abs(dayDiff(i.buyDate, r.date)) + (isCancelled(i) ? 0.5 : 0) }))
+  // Un produit Pokémon de ton stock acheté en magasin (Carrefour, Fnac, Amazon…) : même montant, ±3 jours → rangé en Pokémon
+  const PKM_FROM = ['courses', 'shopping', 'loisirs', 'dons', 'autre', 'atrier'];
+  rows.filter((r) => r.amount < 0 && (['revente', 'pokemon', 'pro'].includes(r.cat) || (r.how === 'auto' && PKM_FROM.includes(r.cat)))).sort(bByDate).forEach((r) => {
+    const a = -r.amount, buy = r.cat === 'revente' || r.cat === 'pokemon', store = !buy && r.cat !== 'pro';
+    const c = (buy || store
+      ? S.allItems.filter((i) => isDate(i.buyDate) && (!store || i.category === 'pokemon') && Math.abs(dayDiff(i.buyDate, r.date)) <= (store ? 3 : 5) && (store ? Math.abs(num(i.buyPrice) - a) <= 0.5 || Math.abs(cost(i) - a) <= 0.5 : Math.abs(cost(i) - a) <= Math.max(1, a * 0.03) || Math.abs(num(i.buyPrice) - a) <= 1 || bPartCard(i, r, a))).map((i) => ({ id: i.id, ref: i.ref, pkm: i.category === 'pokemon', dd: Math.abs(dayDiff(i.buyDate, r.date)) + (isCancelled(i) ? 0.5 : 0) }))
       : S.allItems.filter((i) => isSold(i) && num(i.sellFees) > 0 && Math.abs(dayDiff(i.sellDate, r.date)) <= 7 && Math.abs(num(i.sellFees) - a) <= 0.5).map((i) => ({ id: i.id, ref: i.ref, dd: Math.abs(dayDiff(i.sellDate, r.date)) })))
       .filter((x) => !used.has(x.id)).sort((x, y) => x.dd - y.dd)[0];
-    if (c) { used.add(c.id); r.match = c; }
+    if (c) { used.add(c.id); r.match = c; if (c.pkm && r.how === 'auto') r.cat = 'pokemon'; }
   });
   const on = bOn(), from = bFrom();
   rows.forEach((r) => {
@@ -6058,7 +6062,7 @@ function bTxRow(r, quick) {
   if (quick && r.state === 'open') q = r.amount < 0
     ? `<button class="chip" data-act="bank-pp-cash" data-id="${esc(r.id)}">💶 Rendu en espèces</button><button class="chip" data-act="bank-pp-keep" data-id="${esc(r.id)}">Pas rendu</button>`
     : `<button class="chip" data-act="bank-pp-cash" data-id="${esc(r.id)}">💶 Je lui avais donné en espèces</button><button class="chip" data-act="bank-pp-keep" data-id="${esc(r.id)}">C’est pour moi</button>`;
-  else if (quick && r.cat === 'atrier') q = (r.amount < 0 ? ['pieces', 'revente', 'courses', 'resto', 'essence'] : ['clients', 'ventes', 'rembourse', 'interne']).map((k) => `<button class="chip" data-act="bank-quick" data-id="${esc(r.id)}" data-c="${k}">${BCAT[k].e} ${esc(BCAT[k].s || BCAT[k].l)}</button>`).join('') + `<button class="chip" data-act="bank-tx" data-id="${esc(r.id)}">Autre…</button>`;
+  else if (quick && r.cat === 'atrier') q = (r.amount < 0 ? ['pieces', 'revente', 'pokemon', 'courses', 'resto', 'essence'] : ['clients', 'ventes', 'rembourse', 'interne']).map((k) => `<button class="chip" data-act="bank-quick" data-id="${esc(r.id)}" data-c="${k}">${BCAT[k].e} ${esc(BCAT[k].s || BCAT[k].l)}</button>`).join('') + `<button class="chip" data-act="bank-tx" data-id="${esc(r.id)}">Autre…</button>`;
   return `<div class="bk-tx-w"><button class="bk-tx" data-act="bank-tx" data-id="${esc(r.id)}"><span class="e" aria-hidden="true">${c.e}</span><span class="t"><b>${esc(r.nm)}</b><small>${esc(sub)}</small>${pills ? `<span class="bk-pills">${pills}</span>` : ''}</span><span class="a ${r.amount > 0 ? 'in' : ''} ${c.skip ? 'sk' : ''}">${bEur(r.amount)}</span></button>
     ${q ? `<div class="bk-q">${q}</div>` : ''}</div>`;
 }
@@ -6200,7 +6204,7 @@ async function bankBudSet(k, v) {
 // Abonnements : même commerçant, montant proche, au moins 3 des 4 derniers mois (ou 2 sur 2), une ou deux fois par mois
 function bankSubsHtml(rows, m) {
   const ms = monthRange(addMonths(m, -3), m), g = new Map();
-  rows.filter((r) => r.amount < 0 && ms.includes(r.date.slice(0, 7)) && !BCAT[r.cat].skip && !['courses', 'essence', 'resto', 'especes', 'revente', 'virperso', 'atrier'].includes(r.cat) && r.key).forEach((r) => { const x = g.get(r.key) || { nm: r.nm, cat: r.cat, list: [] }; x.list.push(r); g.set(r.key, x); });
+  rows.filter((r) => r.amount < 0 && ms.includes(r.date.slice(0, 7)) && !BCAT[r.cat].skip && !['courses', 'essence', 'resto', 'especes', 'revente', 'pokemon', 'virperso', 'atrier'].includes(r.cat) && r.key).forEach((r) => { const x = g.get(r.key) || { nm: r.nm, cat: r.cat, list: [] }; x.list.push(r); g.set(r.key, x); });
   const subs = [...g.values()].map((x) => { const per = new Map(); x.list.forEach((r) => per.set(r.date.slice(0, 7), (per.get(r.date.slice(0, 7)) || 0) - r.amount)); const v = [...per.values()], a = avg(v); return { ...x, n: per.size, a, ok: per.size >= Math.min(3, ms.length - 1) && x.list.length <= per.size * 2 && v.every((y) => Math.abs(y - a) <= Math.max(2, a * 0.15)) }; })
     .filter((x) => x.ok && x.n >= 2).sort((a, b) => b.a - a.a);
   if (!subs.length) return '';
