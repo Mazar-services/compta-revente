@@ -596,7 +596,7 @@ tr.click{cursor:pointer}
 .bk-total{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px} .bk-total span{font-weight:700;color:var(--ink-2)} .bk-total b{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .bk-a{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
 .bk-a .t{font-weight:800;min-width:0} .bk-a .t small{display:block;color:var(--muted);font-size:12px;font-weight:600;overflow-wrap:anywhere} .bk-a b{font-variant-numeric:tabular-nums;font-size:15.5px}
-.bk-logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:800;color:#fff;background:#1F2328} .bk-logo.b{background:#B0005E}
+.bk-logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:800;color:#fff;background:#1F2328} .bk-logo.b{background:#B0005E} .bk-logo.p{background:#FFC800;color:#14275A}
 .bk-when{font-size:12.5px;color:var(--muted);margin:8px 0}
 .bk-wait,.bk-err,.bk-warn{display:flex;gap:10px;align-items:center;font-size:13.5px;font-weight:700;border-radius:12px;padding:10px 12px;margin:0 0 10px}
 .bk-wait{color:var(--accent);background:var(--accent-soft)} .bk-wait small{font-weight:600;opacity:.8}
@@ -741,7 +741,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'a4c3e9011e3a';
+const APP_VERSION = 'cca3be9cea62';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -5319,10 +5319,10 @@ const ACT = {
     openForm('new', null, { category: a.dataset.cat || 'autre', model: g ? g.name : model, buyPrice: parseNum(val('s-price')), buyCosts: parseNum(val('s-costs')) });
   },
 };
-/* ---------- Banque : Revolut et BoursoBank lus par le robot du dépôt privé (lecture seule, Enable Banking) ---------- */
+/* ---------- Banque : Revolut, BoursoBank et La Banque Postale lus par le robot du dépôt privé (lecture seule, Enable Banking) ---------- */
 // L'appli ne parle jamais à la banque : elle écrit une demande (data/banque-demande.json), le robot GitHub lit les comptes
 // et écrit data/banque.json (soldes + opérations). Le tri (règles, catégories) est rangé dans compta.json (bankRules, bankTags).
-const BK = { file: 'data/banque.json', req: 'data/banque-demande.json', banks: ['Revolut', 'BoursoBank'],
+const BK = { file: 'data/banque.json', req: 'data/banque-demande.json', banks: ['Revolut', 'BoursoBank', 'La Banque Postale'],
   secrets: `https://github.com/${GH.owner}/${GH.repo}/settings/secrets/actions`, eb: 'https://enablebanking.com/cp/applications' };
 const BCAT = {
   pieces: { l: 'Pièces et outils Réparo', s: 'Pièces', e: '🔧', pro: 1 },
@@ -5391,7 +5391,8 @@ function bKey(t) {
   if (!w.length) return '';
   return w[0].length >= 4 && !BGEN.has(w[0]) ? w[0] : w.slice(0, 2).join(' ');
 }
-const bBank = (n) => (/bourso/i.test(n || '') ? 'BoursoBank' : n || '');
+const bBank = (n) => (/bourso/i.test(n || '') ? 'BoursoBank' : /banque postale/i.test(n || '') ? 'La Banque Postale' : n || '');
+const BKRE = { Revolut: /\brevolut\b/, BoursoBank: /\bbourso(rama|bank)?\b/, 'La Banque Postale': /\b(la )?banque postale\b/ };
 const bTown = (p) => { const m = String(p || '').match(/\b\d{5}\s+([^,]+)/); if (!m) return ''; const t = m[1].trim(); return /[a-z]/.test(t) ? t : t.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (x, a, c) => a + c.toUpperCase()).replace(/-(En|Sur|Les|Le|La|De|Du|Des|Lès)-/g, (x) => x.toLowerCase()); };
 function bMcc(m) {
   m = +m || 0; if (!m) return '';
@@ -5401,7 +5402,9 @@ function bMcc(m) {
 function bAuto(t, own) {
   const s = bText(t), out = t.amount < 0, rev = /revolut/i.test(t.bank || ''), m = +t.mcc || 0;
   if (t.oih && own.has(t.oih)) return 'interne';
-  if (out ? (!rev && /\brevolut\b/.test(s)) || (rev && /\bbourso(rama|bank)?\b/.test(s)) : (rev && /\b(top ?up|rechargement|recharge|bourso(rama|bank)?)\b/.test(s)) || (!rev && /\brevolut\b/.test(s))) return 'interne';
+  // Virement vers ou depuis une de tes autres banques (le nom de l'autre banque est dans le libellé)
+  const me = bBank(t.bank);
+  if (Object.keys(BKRE).some((b) => b !== me && BKRE[b].test(s)) || (rev && !out && /\b(top ?up|rechargement|recharge)\b/.test(s))) return 'interne';
   if (out) {
     if ([5541, 5542, 5983].includes(m)) return 'essence';
     if ([6010, 6011].includes(m)) return 'especes';
@@ -5574,7 +5577,7 @@ function bankSetupHtml() {
     <p class="muted" style="margin-top:0">Une seule fois : ensuite le robot lit tes comptes tout seul, en lecture seule (il ne peut rien payer ni virer).</p>
     <ol class="steps"><li>Sur <a href="${BK.eb}" target="_blank" rel="noopener">Enable Banking</a>, ton appli « Compta REPARO » doit être active (mode restreint, gratuit).</li>
       <li>Dans ton dépôt privé, ajoute les 2 secrets <b>EB_APP_ID</b> et <b>EB_KEY</b> : <a href="${BK.secrets}" target="_blank" rel="noopener">ouvrir les secrets GitHub</a>. Ne les envoie jamais dans un message.</li>
-      <li>Touche « Relier Revolut », puis « Relier BoursoBank ».</li></ol>
+      <li>Touche « Relier Revolut », puis « Relier BoursoBank » (et « Relier La Banque Postale »).</li></ol>
     ${L && L.msg ? `<p class="bk-when">Robot : ${esc(L.msg)}${L.at ? ` · ${bAgo(L.at)}` : ''}</p>` : ''}
   </section>`;
 }
@@ -5593,7 +5596,7 @@ function bankHomeHtml() {
     const soon = (B.sessions || []).filter((s) => s.status === 'ok' && s.until && Date.parse(s.until) - now < 14 * 864e5 && Date.parse(s.until) >= now);
     out.push(`<section class="card bk-acc" aria-label="Soldes">
       <div class="bk-total"><span>Sur tes comptes</span><b>${eur(bTotal())}</b></div>
-      ${A.map((a) => `<div class="bk-a"><span class="bk-logo ${a.bank === 'Revolut' ? 'r' : 'b'}" aria-hidden="true">${esc(a.bank.slice(0, 1))}</span><span class="t">${esc(a.bank)}<small>${esc(a.name || 'Compte')}${a.num ? ` · ${esc(a.num)}` : ''}${a.status === 'expired' ? ' · accord expiré' : ''}</small></span><b>${bAmt(a)}</b></div>`).join('')}
+      ${A.map((a) => `<div class="bk-a"><span class="bk-logo ${a.bank === 'Revolut' ? 'r' : a.bank === 'BoursoBank' ? 'b' : 'p'}" aria-hidden="true">${esc(a.bank.slice(0, 1))}</span><span class="t">${esc(a.bank)}<small>${esc(a.name || 'Compte')}${a.num ? ` · ${esc(a.num)}` : ''}${a.status === 'expired' ? ' · accord expiré' : ''}</small></span><b>${bAmt(a)}</b></div>`).join('')}
       <p class="bk-when">${B.fetched ? `Lu ${bAgo(B.fetched)} (${bHour(B.fetched)})` : 'Pas encore lu'} · lecture auto 4 fois par jour</p>
       ${L.ok === false && L.msg ? `<div class="bk-err">${esc(L.msg)}</div>` : ''}
       ${exp.map((s) => `<div class="bk-err">Accord ${esc(bBank(s.bank))} expiré : redonne-le pour continuer à voir tes opérations.</div>`).join('')}
@@ -5824,7 +5827,7 @@ function bankStrip() {
   const A = bAccounts(); if (!A.length) return '';
   const rows = bRows(), n = rows.filter((r) => r.cat === 'atrier').length, m = thisMonth();
   const over = rows.length ? bCatLines(rows, m, bMonth(rows, m), bAvg(rows, m)).filter((x) => x.st === 'over') : [];
-  return `<button class="strip bank ${over.length ? 'slow' : ''}" data-act="view" data-view="banque"><span>🏦 En banque <b>${eur(bTotal())}</b></span><span>${A.filter((a) => a.cur === 'EUR').map((a) => `${esc(a.bank)} ${bAmt(a)}`).join(' · ')}</span>${n ? `<span><b>${n}</b> à trier</span>` : ''}${over.length ? `<span>🚨 budget dépassé : <b>${over.map((x) => esc(BCAT[x.k].s || BCAT[x.k].l)).join(', ')}</b></span>` : ''}${ic('right')}</button>`;
+  return `<button class="strip bank ${over.length ? 'slow' : ''}" data-act="view" data-view="banque"><span>🏦 En banque <b>${eur(bTotal())}</b></span><span>${[...new Set(A.filter((a) => a.cur === 'EUR').map((a) => a.bank))].map((k) => `${esc(k)} ${eur(sum(A.filter((a) => a.bank === k && a.cur === 'EUR'), (a) => num(a.amount)))}`).join(' · ')}</span>${n ? `<span><b>${n}</b> à trier</span>` : ''}${over.length ? `<span>🚨 budget dépassé : <b>${over.map((x) => esc(BCAT[x.k].s || BCAT[x.k].l)).join(', ')}</b></span>` : ''}${ic('right')}</button>`;
 }
 
 Object.assign(ACT, TOUR_ACT, FUEL_ACT, BANK_ACT);
