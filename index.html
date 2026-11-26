@@ -124,7 +124,7 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .tile.c-info{background:var(--accent-soft);border-color:transparent} .tile.c-info .v{color:var(--accent)}
 .tile.c-warn{background:var(--warn-soft);border-color:transparent} .tile.c-warn .v{color:var(--warn)}
 .tile.c-good .s,.tile.c-bad .s,.tile.c-info .s,.tile.c-warn .s{color:var(--ink-2)}
-.cashc{display:grid;gap:12px}
+.cashc{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
 .cl{display:grid;grid-template-columns:46px 36px minmax(0,1fr) auto;gap:8px 10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
 .cl .mini{width:36px;height:36px;border-radius:8px}
 .cl .d{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
@@ -158,6 +158,21 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .sum-line{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--ink-2);border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
 .cash-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .cc-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.cc small{font-size:11px;font-weight:600;color:var(--muted);line-height:1.25} .cc:not(.g):not(.r):not(.i):not(.y){background:var(--surface-2,rgba(127,127,127,.08))}
+.cx-sub{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-top:1px}
+.cx-hero{border-radius:16px;padding:14px 16px;display:grid;gap:2px} .cx-hero span{font-size:12.5px;font-weight:800;color:var(--ink-2)}
+.cx-hero b{font-size:32px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1} .cx-hero small{font-size:12.5px;color:var(--ink-2)}
+.cx-hero.g{background:var(--good-soft)} .cx-hero.g b{color:var(--good)} .cx-hero.r{background:var(--bad-soft)} .cx-hero.r b{color:var(--bad)}
+.cx-real{display:grid;grid-template-columns:minmax(0,1fr);gap:7px} .cx-real .btn{white-space:normal;height:auto;min-height:38px;line-height:1.25;padding:7px 12px} .cx-real .lnk{white-space:normal} .cx-real p{margin:0;font-size:14px} .cx-real p small{color:var(--muted);font-weight:600}
+.cx-bar{display:flex;height:12px;border-radius:99px;overflow:hidden;background:var(--line)} .cx-bar i{display:block;height:100%} .cx-bar i.a{background:var(--good)} .cx-bar i.p{flex:1;background:var(--accent);opacity:.35}
+.cx-leg{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:13px;color:var(--ink-2)} .cx-leg span{display:inline-flex;align-items:center;gap:6px} .cx-leg b{color:var(--ink);font-variant-numeric:tabular-nums}
+.cx-leg i{width:10px;height:10px;border-radius:3px;display:inline-block} .cx-leg i.a{background:var(--good)} .cx-leg i.p{background:var(--accent);opacity:.35}
+.cx-month{display:grid;gap:6px} .cx-mt{margin:0;font-size:12.5px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em}
+.btns.cx-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px} .cx-btns .btn{justify-content:center;white-space:normal;text-align:center;line-height:1.2;min-height:40px;height:auto;padding:6px 10px}
+.cashc .cc b{font-size:clamp(14px,4.2vw,17px);white-space:nowrap}
+.cx-hist{display:grid;gap:4px} .cx-hh{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px} .cx-ht{margin:0;font-size:15px;font-weight:800}
+.cx-f{margin:0;padding:1px 0 2px} .cx-tot{margin:2px 0 4px;font-size:13px;color:var(--ink-2)}
+@media (max-width:340px){.btns.cx-btns{grid-template-columns:1fr}}
 .cc{border-radius:12px;padding:10px 12px;display:grid;gap:2px;min-width:0}
 .cc span{font-size:11.5px;font-weight:800;color:var(--ink-2)}
 .cc b{font-size:17px;font-weight:800;letter-spacing:-.02em;overflow-wrap:anywhere}
@@ -777,7 +792,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'cbe1d129506d';
+const APP_VERSION = '56491e6ff509';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -1123,17 +1138,18 @@ function breakEvenHtml(small) {
 }
 function cashLedger() {
   const ev = [];
-  S.cash.forEach((c) => ev.push({ d: c.date || '', k: 0, label: c.type === 'retrait' ? 'Retrait' : 'Entrée d’argent', note: c.note || '', a: c.type === 'retrait' ? -num(c.amount) : num(c.amount), cash: c }));
+  S.cash.forEach((c) => ev.push({ d: c.date || '', k: 0, kind: c.type === 'retrait' ? 'retrait' : 'apport', label: c.type === 'retrait' ? 'Versé pour toi' : 'Argent ajouté', note: c.note || '', a: c.type === 'retrait' ? -num(c.amount) : num(c.amount), cash: c }));
   S.cancelled.forEach((i) => {
-    ev.push({ d: isDate(i.buyDate) ? i.buyDate : '', k: 1, label: 'Achat', a: -cost(i), i });
-    if (!refundPending(i)) ev.push({ d: i.refundDate || i.cancelDate || i.buyDate || '', k: 2, label: 'Achat annulé, remboursé', a: cost(i), i });
+    ev.push({ d: isDate(i.buyDate) ? i.buyDate : '', k: 1, kind: 'achat', label: 'Achat', a: -cost(i), i });
+    if (!refundPending(i)) ev.push({ d: i.refundDate || i.cancelDate || i.buyDate || '', k: 2, kind: 'rembourse', label: 'Achat annulé, remboursé', a: cost(i), i });
   });
   S.items.forEach((i) => {
-    ev.push({ d: isDate(i.buyDate) ? i.buyDate : '', k: 1, label: 'Achat', a: -cost(i), i });
-    if (isPaid(i)) ev.push({ d: paidOn(i), k: 2, label: isShipSale(i.sellChannel) ? 'Paiement de la vente' : 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
+    ev.push({ d: isDate(i.buyDate) ? i.buyDate : '', k: 1, kind: 'achat', label: 'Achat', a: -cost(i), i });
+    if (isPaid(i)) ev.push({ d: paidOn(i), k: 2, kind: 'vente', label: isShipSale(i.sellChannel) ? 'Paiement de la vente' : 'Vente', a: num(i.sellPrice) - num(i.sellFees), i });
   });
-  if (repInCash()) repPayRows().forEach((r) => { const q = repQty(r._src || r); ev.push({ d: repPaidOn(r), k: 3, label: r._rest ? 'Réparo, reste payé' : 'Réparo', note: `${r.type}${q > 1 ? ' ×' + q : ''}${r._src && !r._rest ? ' · payé en partie' : ''}${r._rest && r.client ? ' · ' + r.client : ''}`, a: repNet(r) + bPartsBack(r) }); });
-  bRows().filter((r) => r.cash).forEach((r) => ev.push({ d: r.date, k: 1, label: 'Banque', note: `${r.nm} · ${BCAT[r.cat].l}`, a: r.amount }));
+  if (repInCash()) repPayRows().forEach((r) => { const s = r._src || r, q = repQty(s), by = repMethod(r);
+    ev.push({ d: repPaidOn(r), k: 3, kind: 'client', by, label: esc(s.client || s.type || 'Client Réparo'), note: `${s.client ? s.type || 'Réparo' : 'Réparo'}${q > 1 ? ' ×' + q : ''}${r._src && !r._rest ? ' · payé en partie' : ''}${r._rest ? ' · reste payé' : ''}${by === 'cash' ? ' · 💶 espèces' : by === 'bank' ? ' · 🏦 virement' : ''}`, a: repNet(r) + bPartsBack(r), rep: s }); });
+  bRows().filter((r) => r.cash).forEach((r) => ev.push({ d: r.date, k: 1, kind: 'pro', label: esc(r.nm), note: `${BCAT[r.cat].l} · payé par carte (${r.A.short || bBank(r.bank)})`, a: r.amount, bk: r }));
   ev.forEach((e) => { if (!isDate(e.d)) e.d = ''; });
   ev.sort((x, y) => x.d.localeCompare(y.d) || x.k - y.k);
   let bal = 0;
@@ -1295,40 +1311,80 @@ function salesCard(m, ms) {
   </section>`;
 }
 
+// ---- Caisse de ton activité : l'argent de la revente et de Réparo, comparé à ton argent réel ----
+const LEDGER_F = [['in', 'Rentrées clients'], ['all', 'Tout'], ['out', 'Sorties']];
+const ledgerF = () => (LEDGER_F.some((x) => x[0] === S.ledgerF) ? S.ledgerF : (S.ledgerF = LS.get('ledgerF', 'in') || 'in'));
+const ledgerKeep = (e, f) => (f === 'all' ? true : f === 'in' ? ['client', 'vente'].includes(e.kind) && e.a > 0.004 : e.a < -0.004);
+// Ton argent réel (banques en euros, porte-monnaie Leboncoin, espèces) : null si la banque n'est pas encore lue
+function realMoney() {
+  if (!bAccounts().length) return null;
+  const lw = lbcWallet(), cb = cashBox();
+  return { v: bTotal() + (lw ? lw.v : 0) + (cb ? cb.v : 0), lw, cb };
+}
+function cashMonth(ym) {
+  const ev = cashLedger().filter((e) => (e.d || '').slice(0, 7) === ym && e.k !== 0);
+  const inn = ev.filter((e) => e.a > 0), out = ev.filter((e) => e.a < 0);
+  return { inn: sum(inn, (e) => e.a), out: -sum(out, (e) => e.a), cli: sum(ev.filter((e) => e.kind === 'client'), (e) => e.a), ven: sum(ev.filter((e) => e.kind === 'vente'), (e) => e.a),
+    buy: -sum(ev.filter((e) => e.kind === 'achat'), (e) => e.a), pro: -sum(ev.filter((e) => e.kind === 'pro'), (e) => e.a) };
+}
 function cashCard() {
-  const K = capital(), mv = S.cash.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  return `<section class="card cashc" aria-label="Caisse">
-    <div class="cash-top"><h2 class="sec">Caisse</h2><div class="btns"><button class="btn sm primary" data-act="cash-add" data-type="apport">${ic('plus')} Argent</button><button class="btn sm" data-act="cash-add" data-type="retrait">Retrait</button></div></div>
+  const K = capital(), R = realMoney(), m = thisMonth(), M = cashMonth(m), owe = repWait(), worth = K.total + owe, f = ledgerF();
+  const perso = R ? Math.round((R.v - K.dispo) * 100) / 100 : null;
+  const pa = R && R.v > 0 ? Math.min(100, Math.max(0, K.dispo / R.v * 100)) : 0;
+  const L = cashLedger(), LF = L.filter((e) => ledgerKeep(e, f)), shown = LF.slice(0, S.ledgerAll ? 400 : 8);
+  const meth = (e) => (e.by === 'cash' ? '<span class="cx-m c">💶</span>' : e.by === 'bank' ? '<span class="cx-m b">🏦</span>' : '');
+  const icon = (e) => (e.i ? mini(e.i) : `<span class="cl-ic ${e.a >= 0 ? 'in' : 'out'}" aria-hidden="true">${e.kind === 'client' ? '🔧' : e.kind === 'pro' ? (BCAT[e.bk.cat] || BCAT.pro).e : e.kind === 'retrait' ? '👤' : e.a >= 0 ? '+' : '−'}</span>`);
+  return `<section class="card cashc" aria-label="Caisse de ton activité">
+    <div class="cash-top"><div><h2 class="sec">Caisse de ton activité</h2><small class="cx-sub">Revente + Réparo${bOn() ? ', à jour avec tes comptes' : ''}</small></div></div>
+    <div class="cx-hero ${K.dispo < -0.004 ? 'r' : 'g'}"><span>Argent disponible</span><b>${eur(K.dispo)}</b><small>Ce que ton activité peut dépenser aujourd’hui (achats, pièces)</small></div>
     <div class="cc-row">
-      <div class="cc ${K.dispo < -0.004 ? 'r' : 'g'}"><span>Argent disponible</span><b>${eur(K.dispo)}</b></div>
-      <div class="cc i"><span>En stock</span><b>${eur(K.stock)}</b></div>
-      <div class="cc y"><span>Capital</span><b>${eur(K.total)}</b></div>
+      <div class="cc i"><span>En stock</span><b>${eur(K.stock)}</b><small>au prix d’achat</small></div>
+      <div class="cc y"><span>On te doit</span><b>${eur(owe + K.toCome)}</b><small>${owe ? 'clients Réparo' : ''}${owe && K.toCome ? ' + ' : ''}${K.toCome ? 'ventes à payer' : ''}${!owe && !K.toCome ? 'rien' : ''}</small></div>
+      <div class="cc"><span>Valeur totale</span><b>${eur(worth)}</b><small>argent + stock + dû</small></div>
     </div>
-    ${(() => { const L = S.lastMove; if (!L || Date.now() - L.at > 15 * 60000) return ''; const d = L.after - L.before;
-      return `<div class="lastmove ${d < 0 ? 'out' : 'in'}" role="status"><span>${esc(L.label.replace(/ · .*$/, '').replace(/^Ajout /, 'Achat '))}</span><b>${eur(L.before)} → ${eur(L.after)}</b><em>${eurS(d)}</em></div>`; })()}
+    ${R ? `<div class="cx-real" aria-label="Comparé à ton argent réel">
+      <p><b>Ton argent réel : ${eur(R.v)}</b> <small>(banques, Leboncoin${R.cb ? ', espèces' : ''})</small></p>
+      ${!R.cb ? '' : perso >= -0.5 ? `<div class="cx-bar" aria-hidden="true"><i class="a" style="width:${pa.toFixed(1)}%"></i><i class="p"></i></div>
+      <div class="cx-leg"><span><i class="a"></i>Activité <b>${eur(K.dispo)}</b></span><span><i class="p"></i>À toi <b>${eur(Math.max(0, perso))}</b></span></div>
+      <small class="muted">« À toi » : ton salaire et ton argent perso, ce qui n’appartient pas à ton activité.</small>`
+      : `<div class="bk-warn">Ta caisse dit ${eur(K.dispo)} mais tu n’as que ${eur(R.v)} en tout : <b>${eur(-perso)}</b> de ton activité ont servi pour toi sans être notés.
+        <div class="btns" style="margin-top:8px"><button class="btn sm primary" data-act="cash-add" data-type="retrait" data-v="${(-perso).toFixed(2)}">Noter que je me suis versé ${eur(-perso)}</button></div></div>`}
+      ${R.cb ? '' : '<button class="lnk" data-act="bank-cash-box">Dis combien tu as en espèces : je compare ta caisse à ton argent réel</button>'}
+    </div>` : ''}
+    <div class="cx-month">
+      <p class="cx-mt">${cap1(monthName(m))}</p>
+      <div class="bk-io"><span>Entré<b class="in">+${eur(M.inn)}</b></span><span>Sorti<b class="out">${M.out ? '−' : ''}${eur(M.out)}</b></span><span>Bilan du mois<b class="${M.inn - M.out >= 0 ? 'in' : 'out'}">${eurS(M.inn - M.out)}</b></span></div>
+      <small class="muted">Entré : clients Réparo ${eur(M.cli)}${M.ven ? `, ventes ${eur(M.ven)}` : ''}. Sorti : ${M.buy ? `achats ${eur(M.buy)}` : 'aucun achat'}${M.pro ? `, pièces et frais pro ${eur(M.pro)}` : ''}.</small>
+    </div>
+    ${(() => { const X = S.lastMove; if (!X || Date.now() - X.at > 15 * 60000) return ''; const d = X.after - X.before;
+      return `<div class="lastmove ${d < 0 ? 'out' : 'in'}" role="status"><span>${esc(X.label.replace(/ · .*$/, '').replace(/^Ajout /, 'Achat '))}</span><b>${eur(X.before)} → ${eur(X.after)}</b><em>${eurS(d)}</em></div>`; })()}
     ${S.items.filter(awaitingPay).map((i) => `<div class="refund-wait pay"><span>${tag(i)} vendu ${eur(num(i.sellPrice) - num(i.sellFees))} · ${isDate(i.buyerRecvDate) ? (payLate(i) ? `<b>paiement attendu depuis le ${dShort(autoPayDate(i))}</b> : vérifie ton compte` : `reçu par l’acheteur, paiement attendu vers le ${dShort(autoPayDate(i))}`) : 'colis en route vers l’acheteur'} · pas encore compté</span><span class="btns">${isDate(i.buyerRecvDate) ? '' : `<button class="btn sm" data-act="buyer-recv" data-id="${esc(i.id)}">Reçu par l’acheteur</button>`}<button class="btn sm primary" data-act="pay-ok" data-id="${esc(i.id)}">Argent reçu</button></span></div>`).join('')}
     ${S.cancelled.filter(refundPending).map((i) => `<div class="refund-wait"><span>${tag(i)} annulé le ${dShort(i.cancelDate)} · <b>${eur(cost(i))}</b> pas encore remboursés</span><button class="btn sm primary" data-act="refund-ok" data-id="${esc(i.id)}">Remboursement reçu</button></div>`).join('')}
+    <div class="btns cx-btns"><button class="btn sm" data-act="cash-add" data-type="apport">${ic('plus')} J’ajoute de l’argent</button><button class="btn sm" data-act="cash-add" data-type="retrait">👤 Je me verse de l’argent</button></div>
+    <div class="cx-hist">
+      <div class="cx-hh"><h3 class="cx-ht">Historique</h3><div class="chips cx-f" role="tablist" aria-label="Historique de la caisse">${LEDGER_F.map(([v, l]) => `<button class="chip" role="tab" data-act="ledger-f" data-v="${v}" aria-selected="${f === v}" aria-pressed="${f === v}">${l}</button>`).join('')}</div></div>
+      ${f === 'in' && LF.length ? `<p class="cx-tot">${plural(LF.filter((e) => (e.d || '').startsWith(m)).length, 'rentrée')} en ${monthName(m)} : <b>${eur(sum(LF.filter((e) => (e.d || '').startsWith(m)), (e) => e.a))}</b></p>` : ''}
+      ${shown.length ? shown.map((e) => `<div class="cl"${e.i ? ` role="button" tabindex="0" data-act="open" data-id="${esc(e.i.id)}"` : e.bk ? ` role="button" tabindex="0" data-act="bank-tx" data-id="${esc(e.bk.id)}"` : ''}>
+        <span class="d">${dShort(e.d)}</span>
+        ${icon(e)}
+        <span class="t">${e.label}${e.i ? ` ${tag(e.i)}` : ''}<small>${e.i ? esc(e.i.model) : esc(e.note)}${e.cash ? ` · <button class="xbtn ${S.confirmCash === e.cash.id ? 'on' : ''}" data-act="cash-del" data-id="${esc(e.cash.id)}">${S.confirmCash === e.cash.id ? 'Confirmer la suppression' : 'Supprimer'}</button>` : ''}</small></span>
+        <span class="a"><b class="${e.a >= 0 ? 'in' : 'out'}">${eurS(e.a)}</b><small>caisse ${eur(e.bal)}</small></span>
+      </div>`).join('') + (LF.length > shown.length ? `<button class="btn sm" data-act="ledger-all" style="margin-top:8px">Voir tout (${LF.length})</button>` : '') : `<p class="hint" style="margin:6px 0 0">${f === 'in' ? 'Aucune rentrée pour l’instant.' : 'Aucun mouvement.'}</p>`}
+    </div>
+    <details class="tview" style="margin:0"><summary>Comment ta caisse est calculée</summary>
     <div class="cc-calc" aria-label="Calcul de l’argent disponible">
-      <span>Argent apporté</span><b class="in">+${eur(K.apports)}</b>
+      <span>Argent que tu as mis dans l’activité</span><b class="in">+${eur(K.apports)}</b>
       <span>Ventes encaissées <small>bénéfice des ventes payées : ${eurS(K.profit)}</small></span><b class="in">+${eur(K.cashed)}</b>
-      ${K.reparo ? `<span>Réparo${bOn() && repInCash() && sum(repPayRows(), bPartsBack) ? ' <small>pièces comptées à l’achat par carte</small>' : ''}</span><b class="in">+${eur(K.reparo)}</b>` : ''}
-      <span>Achats</span><b class="out">−${eur(K.invested)}</b>
+      ${K.reparo ? `<span>Clients Réparo${bOn() && repInCash() && sum(repPayRows(), bPartsBack) ? ' <small>pièces comptées à l’achat par carte</small>' : ''}</span><b class="in">+${eur(K.reparo)}</b>` : ''}
+      <span>Achats d’articles</span><b class="out">−${eur(K.invested)}</b>
       ${K.pending ? `<span>Annulés, remboursement en attente</span><b class="out">−${eur(K.pending)}</b>` : ''}
-      ${K.bank ? `<span role="button" tabindex="0" data-act="bank-tab" data-v="apercu">Dépenses pro vues sur ta banque <small>pas encore notées dans ta compta</small></span><b class="out">−${eur(K.bank)}</b>` : ''}
-      ${K.retraits ? `<span>Retraits</span><b class="out">−${eur(K.retraits)}</b>` : ''}
+      ${K.bank ? `<span role="button" tabindex="0" data-act="bank-tab" data-v="apercu">Pièces et frais pro payés par carte <small>vus sur ta banque depuis le ${dShort(bFrom())}, pas notés ailleurs</small></span><b class="out">−${eur(K.bank)}</b>` : ''}
+      ${K.retraits ? `<span>Versé pour toi</span><b class="out">−${eur(K.retraits)}</b>` : ''}
       <span class="tot">Argent disponible</span><b class="tot">${eur(K.dispo)}</b>
       ${K.toCome ? `<span class="muted">À venir, pas compté : ventes en livraison pas encore payées</span><b class="muted">${eur(K.toCome)}</b>` : ''}
     </div>
-    ${breakEvenHtml(true)}
-    ${!K.apports ? '<p class="hint" style="margin:0">Ajoute ton argent de départ avec « Argent » pour voir ce qu’il te reste à investir.</p>' : ''}
-    <details class="tview" ${S.confirmCash || S.ledgerOpen !== false ? 'open' : ''} style="margin:0" data-ledger><summary>Historique de la caisse (achats, ventes, apports)</summary>
-      ${(() => { const L = cashLedger(); return L.length ? L.slice(0, S.ledgerAll ? 400 : 8).map((e) => `<div class="cl"${e.i ? ` role="button" tabindex="0" data-act="open" data-id="${esc(e.i.id)}"` : ''}>
-        <span class="d">${dShort(e.d)}</span>
-        ${e.i ? mini(e.i) : `<span class="cl-ic ${e.a >= 0 ? 'in' : 'out'}" aria-hidden="true">${e.a >= 0 ? '+' : '−'}</span>`}
-        <span class="t">${e.label}${e.i ? ` ${tag(e.i)}` : ''}<small>${e.i ? esc(e.i.model) : esc(e.note)}${e.cash ? ` · <button class="xbtn ${S.confirmCash === e.cash.id ? 'on' : ''}" data-act="cash-del" data-id="${esc(e.cash.id)}">${S.confirmCash === e.cash.id ? 'Confirmer la suppression' : 'Supprimer'}</button>` : ''}</small></span>
-        <span class="a"><b class="${e.a >= 0 ? 'in' : 'out'}">${eurS(e.a)}</b><small>caisse ${eur(e.bal)}</small></span>
-      </div>`).join('') + (L.length > 8 && !S.ledgerAll ? `<button class="btn sm" data-act="ledger-all" style="margin-top:8px">Voir tout l’historique (${L.length})</button>` : '') : '<p class="hint">Aucun mouvement.</p>'; })()}
-    </details>
+    ${breakEvenHtml(true)}</details>
+    ${!K.apports ? '<p class="hint" style="margin:0">Ajoute ton argent de départ avec « J’ajoute de l’argent » pour voir ce qu’il te reste à investir.</p>' : ''}
   </section>`;
 }
 
@@ -5281,6 +5337,7 @@ const ACT = {
   },
   'f-month-clear': () => { S.f.month = null; renderArticles(); },
   'ledger-all': () => { S.ledgerAll = true; S.ledgerOpen = true; renderAccueil(); },
+  'ledger-f': (a) => { S.ledgerF = a.dataset.v; LS.set('ledgerF', S.ledgerF); S.ledgerAll = false; renderAccueil(); },
   goto: (a) => { S.f.month = null; if (a.dataset.st) S.f.st = a.dataset.st; if (a.dataset.sort) S.f.sort = a.dataset.sort; S.f.cat = 'all'; saveFilters(); setView(a.dataset.view); },
   open: (a) => openDetail(a.dataset.id),
   sell: (a) => openQuick('sell', a.dataset.id),
@@ -5361,12 +5418,12 @@ const ACT = {
   'f-st': (a) => { S.f.st = a.dataset.v; S.f.cat = 'all'; if (S.f.st === 'vendu' && S.f.sort === 'ancien') S.f.sort = 'recent'; saveFilters(); renderArticles(); },
   'f-cat': (a) => { S.f.cat = a.dataset.v; saveFilters(); renderArticles(); },
   'cash-add': (a) => {
-    const ret = a.dataset.type === 'retrait';
-    openSheet({ kind: 'cash', title: ret ? 'Retrait de caisse' : 'Entrée d’argent', body: `
-      <p class="hint">${ret ? 'Argent que tu sors de l’activité (pour toi, pas pour un achat d’article).' : 'Argent que tu mets dans l’activité pour acheter des articles. Il s’ajoute à ce qui est disponible pour investir.'}</p>
-      ${radios('c-type', [['apport', 'Entrée d’argent'], ['retrait', 'Retrait']], ret ? 'retrait' : 'apport')}
-      <div class="row2">${moneyF('c-amount', 'Montant', null)}${dateF('c-date', 'Date', today())}</div>
-      ${textF('c-note', 'Note <span class="opt-l">(facultatif)</span>', '', 'ex. économies, réinvestissement des ventes…')}`,
+    const ret = a.dataset.type === 'retrait', pre = parseNum(a.dataset.v || '');
+    openSheet({ kind: 'cash', title: ret ? '👤 Je me verse de l’argent' : 'J’ajoute de l’argent', body: `
+      <p class="hint">${ret ? 'De l’argent de ton activité que tu prends pour toi (ton « salaire » : courses, sorties, factures). Il sort de ta caisse et passe dans « À toi ».' : 'De ton argent perso que tu mets dans l’activité pour acheter du stock ou des pièces. Il s’ajoute à ta caisse.'}</p>
+      ${radios('c-type', [['apport', 'J’ajoute de l’argent'], ['retrait', 'Je me verse de l’argent']], ret ? 'retrait' : 'apport')}
+      <div class="row2">${moneyF('c-amount', 'Montant', pre > 0 ? pre : null)}${dateF('c-date', 'Date', today())}</div>
+      ${textF('c-note', 'Note <span class="opt-l">(facultatif)</span>', '', ret ? 'ex. pour mes courses, mon loyer…' : 'ex. économies, salaire…')}`,
       foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="cash-save">Enregistrer</button>` });
   },
   'cash-save': async (a) => {
@@ -5379,7 +5436,7 @@ const ACT = {
     a.disabled = true;
     const ok = await write(() => addCash({ type, amount, date, note: val('c-note') }));
     a.disabled = false;
-    if (ok) { closeSheet(); toast(`${type === 'retrait' ? 'Retrait' : 'Entrée'} de ${eur(amount)} enregistré${type === 'retrait' ? '' : 'e'}`); }
+    if (ok) { closeSheet(); toast(`${type === 'retrait' ? `Versé pour toi : ${eur(amount)}` : `Ajouté à ta caisse : ${eur(amount)}`} · caisse ${eur(capital().dispo)}`, 'good'); }
   },
   'cash-del': async (a) => {
     const id = a.dataset.id;
@@ -5875,7 +5932,7 @@ function cashRows() {
     mk({ id: 'c:s:' + i.id, date: paidOn(i), amount: Math.round((num(i.sellPrice) - num(i.sellFees)) * 100) / 100, cat: 'ventes', nm: bItemNm(i), info: 'Vente en main propre', sale: i, by: 'auto' });
   });
   out.sort((x, y) => y.date.localeCompare(x.date));
-  CMEMO = { k, rows: out, bankK, S0, all: out.length ? B.concat(out).sort((x, y) => y.date.localeCompare(x.date)) : B };
+  CMEMO = { k, rows: out, bankK, cashK: new Set(out.filter((r) => r.ck).map((r) => r.ck)), S0, all: out.length ? B.concat(out).sort((x, y) => y.date.localeCompare(x.date)) : B };
   return out;
 }
 // Banque + espèces, pour le budget et la liste des opérations
@@ -5912,6 +5969,13 @@ function cashEvTxt(e) {
   if (e.k === 'retrait') return [`Retrait ${r.A.short || bBank(r.bank)}`, dShort(e.d)];
   if (e.k === 'depot') return [`Déposé sur ${r.A.short || bBank(r.bank)}`, dShort(e.d)];
   return [r.amount < 0 ? `${r.nm} t’a rendu en espèces` : `Donné en espèces à ${r.nm}`, dShort(e.d)];
+}
+// Moyen de paiement d'un paiement Réparo : ton choix, sinon ce que montrent tes comptes ('' si l'appli ne peut pas savoir)
+function repMethod(x) {
+  const by = repByOf(x); if (by) return by;
+  if (!bRows().length) return '';
+  cashRows(); const k = repPayKey(x);
+  return CMEMO.bankK && CMEMO.bankK.has(k) ? 'bank' : CMEMO.cashK && CMEMO.cashK.has(k) ? 'cash' : '';
 }
 // Sur la fiche d'une réparation : comment elle a été payée, et si un virement annoncé n'arrive pas
 function repPayHow(s, rest) {
