@@ -1413,8 +1413,12 @@ function actMonth(ym) {
   const cli = s('client'), ven = s('vente'), rem = s('rembourse'), buy = -s('achat');
   // Dépenses pro vues sur ta banque, jamais celles déjà notées (achat relié, « déjà notée »)
   const B = bRows().filter((r) => inM(r.date) && (r.cur || 'EUR') === 'EUR' && !BCAT[r.cat].skip);
-  const pro = B.filter((r) => BCAT[r.cat].pro && !r.match && !r.noted), ps = (f) => -sum(pro.filter(f), (r) => r.amount);
-  const parts = ps((r) => r.cat === 'pieces'), fees = ps((r) => r.cat === 'pro'), cardBuy = ps((r) => r.cat === 'revente' || r.cat === 'pokemon');
+  const pro = B.filter((r) => BCAT[r.cat].pro && !r.match), ps = (f) => -sum(pro.filter(f), (r) => r.amount);
+  // Pièces : la banque fait foi dès qu'elle est lue (même une opération « déjà notée » : la pièce notée sur une réparation n'est pas recomptée).
+  // Avant le début de ta banque, on prend les pièces notées sur les réparations.
+  const S0 = bRows().length ? bRows()[bRows().length - 1].date : '9999';
+  const repParts = sum(repPayRows().filter((r) => inM(repPaidOn(r)) && repPaidOn(r) < S0), (r) => num(r.partsCost));
+  const parts = ps((r) => r.cat === 'pieces') + repParts, fees = ps((r) => r.cat === 'pro' && !r.noted), cardBuy = ps((r) => (r.cat === 'revente' || r.cat === 'pokemon') && !r.noted);
   const fb = -sum(B.filter((r) => r.cat === 'essence'), (r) => r.amount), FT = fuelSum(fuelMonth(ym)), ft = FT.eur || 0;
   const fuel = actFuelMode() === 'tour' ? ft : fb;
   const sold = S.items.filter((i) => isPaid(i) && inM(paidOn(i))), saleP = sum(sold, profit);
@@ -1427,7 +1431,7 @@ function actCard() {
   const nz = (L) => L.filter((x) => Math.abs(x[1]) > 0.004);
   const inL = nz([['🔧 Clients Réparo', X.cli], ['🏷️ Ventes', X.ven], ['↩️ Achats annulés remboursés', X.rem]]);
   const outL = nz([['🎮 Achats revente', X.buy + X.cardBuy], ['🔩 Pièces et outils Réparo', X.parts], ['⛽ Essence', X.fuel], ['📦 Frais pro', X.fees]]);
-  const first = bRows()[bRows().length - 1].date.slice(0, 7);
+  const first = [bRows()[bRows().length - 1].date, ...S.allItems.map((i) => i.buyDate), ...repPayRows().map(repPaidOn)].filter(isDate).sort()[0].slice(0, 7);
   return `<section class="card actc" aria-label="Ton activité">
     <div class="cash-top"><div><h2 class="sec">Ton activité</h2><small class="cx-sub">Revente + Réparo, sans ton salaire ni tes autres entrées</small></div></div>
     <div class="monthnav act-nav"><button class="iconbtn" data-act="act-month" data-d="-1" aria-label="Mois précédent" ${m <= first ? 'disabled' : ''}>${ic('left')}</button><div class="mn-c"><b>${cap1(monthName(m))}</b></div><button class="iconbtn" data-act="act-month" data-d="1" aria-label="Mois suivant" ${m >= cur ? 'disabled' : ''}>${ic('right')}</button></div>
