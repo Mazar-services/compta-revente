@@ -167,6 +167,10 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .cx-bar{display:flex;height:12px;border-radius:99px;overflow:hidden;background:var(--line)} .cx-bar i{display:block;height:100%} .cx-bar i.a{background:var(--good)} .cx-bar i.p{flex:1;background:var(--accent);opacity:.35}
 .cx-leg{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:13px;color:var(--ink-2)} .cx-leg span{display:inline-flex;align-items:center;gap:6px} .cx-leg b{color:var(--ink);font-variant-numeric:tabular-nums}
 .cx-leg i{width:10px;height:10px;border-radius:3px;display:inline-block} .cx-leg i.a{background:var(--good)} .cx-leg i.p{background:var(--accent);opacity:.35}
+.actc{display:grid;grid-template-columns:minmax(0,1fr);gap:10px} .act-nav{justify-content:space-between} .act-nav .mn-c{flex:1;text-align:center;font-size:15px}
+.act-b{border-radius:14px;padding:12px 14px;display:grid;gap:2px} .act-b span{font-size:12.5px;font-weight:800;color:var(--ink-2)} .act-b b{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15} .act-b small{font-size:12.5px;color:var(--ink-2);line-height:1.35}
+.act-b.g{background:var(--good-soft)} .act-b.g b{color:var(--good)} .act-b.r{background:var(--bad-soft)} .act-b.r b{color:var(--bad)}
+.act-l{font-size:14px} .act-f{display:grid;gap:6px} .act-f>span{font-size:12.5px;font-weight:800;color:var(--ink-2)} .act-f .chips{margin-inline:0;padding-inline:0;flex-wrap:wrap}
 .cx-month{display:grid;gap:6px} .cx-mt{margin:0;font-size:12.5px;font-weight:800;color:var(--ink-2);text-transform:uppercase;letter-spacing:.04em}
 .btns.cx-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px} .cx-btns .btn{justify-content:center;white-space:normal;text-align:center;line-height:1.2;min-height:40px;height:auto;padding:6px 10px}
 .cashc .cc b{font-size:clamp(14px,4.2vw,17px);white-space:nowrap}
@@ -792,7 +796,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '9d91f2023556';
+const APP_VERSION = 'd051fef668b5';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -1258,6 +1262,7 @@ function renderAccueil() {
         </section>
         <div class="tiles">${tiles.map(tileHtml).join('')}</div>
         ${cashCard()}
+        ${actCard()}
         ${salesCard(m, ms)}
         ${reparoStrip(m)}
         ${(() => { const sl = autoSlot(today()), st = tourStops(today(), sl); if (!st.length) return ''; const n = st[st.length - 1].n; return `<button class="strip tour" data-act="tour-open" data-v="${sl}"><span><b>Tournée ${momentTxt(today(), sl)}</b></span><span><b>${n}</b> arrêt${n > 1 ? 's' : ''}</span><span>${st.filter((x) => x.kind === 'pick').length} à récupérer · ${st.filter((x) => x.kind === 'ret').length} à rendre</span>${ic('right')}</button>`; })()}
@@ -1397,6 +1402,50 @@ function walletCard(R) {
     </div>
     <p class="hint" style="margin:6px 0 0">Tes banques sont lues automatiquement environ 4 fois par jour : un virement reçu apparaît à la lecture suivante. Les espèces bougent tout de suite quand un client paie en espèces.</p>
     ${breakEvenHtml(true)}</details>
+  </section>`;
+}
+// ---- Ton activité : ce que la revente et Réparo rapportent vraiment, sans ton salaire ni tes autres entrées ----
+// Essence : « bank » = tous tes pleins payés par carte, « tour » = l'essence calculée de tes tournées
+const actFuelMode = () => (S.settings.actFuel === 'tour' ? 'tour' : 'bank');
+function actMonth(ym) {
+  const inM = (d) => (d || '').startsWith(ym);
+  const L = cashLedger(true).filter((e) => e.k !== 0 && e.kind !== 'pro' && inM(e.d)), s = (k) => sum(L.filter((e) => e.kind === k), (e) => e.a);
+  const cli = s('client'), ven = s('vente'), rem = s('rembourse'), buy = -s('achat');
+  // Dépenses pro vues sur ta banque, jamais celles déjà notées (achat relié, « déjà notée »)
+  const B = bRows().filter((r) => inM(r.date) && (r.cur || 'EUR') === 'EUR' && !BCAT[r.cat].skip);
+  const pro = B.filter((r) => BCAT[r.cat].pro && !r.match), ps = (f) => -sum(pro.filter(f), (r) => r.amount);
+  // Pièces : la banque fait foi dès qu'elle est lue (même une opération « déjà notée » : la pièce notée sur une réparation n'est pas recomptée).
+  // Avant le début de ta banque, on prend les pièces notées sur les réparations.
+  const S0 = bRows().length ? bRows()[bRows().length - 1].date : '9999';
+  const repParts = sum(repPayRows().filter((r) => inM(repPaidOn(r)) && repPaidOn(r) < S0), (r) => num(r.partsCost));
+  const parts = ps((r) => r.cat === 'pieces') + repParts, fees = ps((r) => r.cat === 'pro' && !r.noted), cardBuy = ps((r) => (r.cat === 'revente' || r.cat === 'pokemon') && !r.noted);
+  const fb = -sum(B.filter((r) => r.cat === 'essence'), (r) => r.amount), FT = fuelSum(fuelMonth(ym)), ft = FT.eur || 0;
+  const fuel = actFuelMode() === 'tour' ? ft : fb;
+  const sold = S.items.filter((i) => isPaid(i) && inM(paidOn(i))), saleP = sum(sold, profit);
+  const inn = cli + ven + rem, out = buy + cardBuy + parts + fees + fuel;
+  return { cli, ven, rem, buy, cardBuy, parts, fees, fuel, fb, ft, nTour: FT.n, inn, out, kept: inn - out, nSold: sold.length, saleP, benef: saleP + cli - parts - fees - fuel - cardBuy };
+}
+function actCard() {
+  if (!bRows().length) return '';
+  const cur = thisMonth(), m = S.actMonth && S.actMonth <= cur ? S.actMonth : cur, X = actMonth(m), fm = actFuelMode();
+  const nz = (L) => L.filter((x) => Math.abs(x[1]) > 0.004);
+  const inL = nz([['🔧 Clients Réparo', X.cli], ['🏷️ Ventes', X.ven], ['↩️ Achats annulés remboursés', X.rem]]);
+  const outL = nz([['🎮 Achats revente', X.buy + X.cardBuy], ['🔩 Pièces et outils Réparo', X.parts], ['⛽ Essence', X.fuel], ['📦 Frais pro', X.fees]]);
+  const first = [bRows()[bRows().length - 1].date, ...S.allItems.map((i) => i.buyDate), ...repPayRows().map(repPaidOn)].filter(isDate).sort()[0].slice(0, 7);
+  return `<section class="card actc" aria-label="Ton activité">
+    <div class="cash-top"><div><h2 class="sec">Ton activité</h2><small class="cx-sub">Revente + Réparo, sans ton salaire ni tes autres entrées</small></div></div>
+    <div class="monthnav act-nav"><button class="iconbtn" data-act="act-month" data-d="-1" aria-label="Mois précédent" ${m <= first ? 'disabled' : ''}>${ic('left')}</button><div class="mn-c"><b>${cap1(monthName(m))}</b></div><button class="iconbtn" data-act="act-month" data-d="1" aria-label="Mois suivant" ${m >= cur ? 'disabled' : ''}>${ic('right')}</button></div>
+    <div class="bk-io"><span>Rentré<b class="in">+${eur(X.inn)}</b></span><span>Sorti<b class="out">${X.out ? '−' : ''}${eur(X.out)}</b></span><span>Gardé<b class="${X.kept >= 0 ? 'in' : 'out'}">${eurS(X.kept)}</b></span></div>
+    <div class="cc-calc act-l" aria-label="Détail de ${esc(monthName(m))}">
+      ${inL.length ? inL.map(([l, v]) => `<span>${l}</span><b class="in">+${eur(v)}</b>`).join('') : '<span class="muted">Aucune rentrée</span><b></b>'}
+      ${outL.length ? outL.map(([l, v]) => `<span>${l}</span><b class="out">${v < 0 ? '+' : '−'}${eur(Math.abs(v))}</b>`).join('') : '<span class="muted">Aucune sortie</span><b></b>'}
+    </div>
+    <div class="act-b ${X.benef >= 0 ? 'g' : 'r'}"><span>Ton vrai bénéfice</span><b>${eurS(X.benef)}</b>
+      <small>${X.nSold ? `Ventes : ${eurS(X.saleP)} de bénéfice sur ${plural(X.nSold, 'article')}` : 'Aucune vente payée'} · Réparo ${eur(X.cli)} − pièces, essence et frais pro${X.cardBuy ? ' − achats carte pas notés' : ''}</small></div>
+    <p class="hint" style="margin:0">« Gardé » : l’argent qui t’est vraiment resté. « Vrai bénéfice » : ce que tu as gagné, même si une partie dort encore en stock (tes achats reviennent quand tu vends).</p>
+    <div class="act-f"><span>Essence comptée</span><div class="chips" role="tablist" aria-label="Essence comptée">
+      <button class="chip" role="tab" data-act="act-fuel" data-v="bank" aria-selected="${fm === 'bank'}" aria-pressed="${fm === 'bank'}">Tous mes pleins ${eur(X.fb)}</button>
+      <button class="chip" role="tab" data-act="act-fuel" data-v="tour" aria-selected="${fm === 'tour'}" aria-pressed="${fm === 'tour'}">Mes tournées ${eur(X.ft)}</button></div></div>
   </section>`;
 }
 function cashCard() {
@@ -5415,6 +5464,8 @@ const ACT = {
   },
   'f-month-clear': () => { S.f.month = null; renderArticles(); },
   'ledger-all': () => { S.ledgerAll = true; S.ledgerOpen = true; renderAccueil(); },
+  'act-month': (a) => { const n = addMonths(S.actMonth || thisMonth(), +a.dataset.d); if (n <= thisMonth()) { S.actMonth = n; renderAccueil(); } },
+  'act-fuel': async (a) => { const v = a.dataset.v === 'tour' ? 'tour' : 'bank'; if (v === actFuelMode()) return; if (await write(() => saveSettingsData({ ...S.settings, actFuel: v }))) toast(v === 'tour' ? 'Essence : celle de tes tournées' : 'Essence : tous tes pleins payés par carte'); },
   'ledger-f': (a) => { S.ledgerF = a.dataset.v; LS.set('ledgerF', S.ledgerF); S.ledgerAll = false; renderAccueil(); },
   goto: (a) => { S.f.month = null; if (a.dataset.st) S.f.st = a.dataset.st; if (a.dataset.sort) S.f.sort = a.dataset.sort; S.f.cat = 'all'; saveFilters(); setView(a.dataset.view); },
   open: (a) => openDetail(a.dataset.id),
@@ -6799,7 +6850,7 @@ async function init() {
 }
 
 // Accès réservé aux tests locaux (jamais actif sur le site en ligne)
-if (location.hostname === 'localhost') window.__app = { S, walletLedger, walletMonth, realMoney, money, bRows, bankOut, capital, monthStats, cashLedger, isPaid, paidOn, profit, lbcWallet, bProches, bSuggest, bAccounts, bTotal, cashRows, cashEvents, cashBox, bAll };
+if (location.hostname === 'localhost') window.__app = { S, actMonth, walletLedger, walletMonth, realMoney, money, bRows, bankOut, capital, monthStats, cashLedger, isPaid, paidOn, profit, lbcWallet, bProches, bSuggest, bAccounts, bTotal, cashRows, cashEvents, cashBox, bAll };
 init();
 })();
 </script>
