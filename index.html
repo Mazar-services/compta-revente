@@ -5657,7 +5657,7 @@ const ACT = {
       gotDate: picked ? val('r-got') : '', done, result: done ? radioVal('r-res') || 'ok' : '', returned: ret, returnDate: ret ? val('r-retDate') : '', paid, paidDate: paid ? val('r-paidDate') : '' };
     if (done && $('#r-atl') && $('#r-atl').checked) r.atl = true; else if (old && old.atl) r.atl = false;
     // Récupéré ou rendu depuis la fiche : l'adresse juste pour ce passage ne sert plus
-    if (old && old.tmp && ((old.picked === false && picked) || (old.returned === false && ret))) drop.push('tmp');
+    const tmpGone = !!(old && old.tmp && ((old.picked === false && picked) || (old.returned === false && ret)));
     const loan = $('#r-loan').checked; if (loan || (old && old.loan)) { r.loan = loan; if (loan) r.loanDate = old && old.loan && isDate(old.loanDate) ? old.loanDate : today(); }
     r.date = done ? val('r-date') : picked ? r.gotDate : (old && isDate(old.planDate) ? old.planDate : today());
     if (!picked && !(old && isDate(old.planDate))) r.planDate = planDateNow();
@@ -5672,7 +5672,7 @@ const ACT = {
     if (ret && r.returnDate < r.date) return fieldErr('r-retDate', 'Rendu avant la réparation ?');
     if (paid && !isDate(r.paidDate)) return fieldErr('r-paidDate', 'Date requise.');
     // Pas tout payé : ce qu'il doit encore, et pour quand
-    const drop = [];
+    const drop = tmpGone ? ['tmp'] : [];
     if (paid && $('#r-part').checked) {
       const x = parseNum(val('r-rest')), by = val('r-restBy'), got = $('#r-restok').checked, rp = val('r-restPaid');
       if (!(x > 0)) return fieldErr('r-rest', 'Indique combien il te doit encore.');
