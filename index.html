@@ -807,7 +807,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'dcb81639cda2';
+const APP_VERSION = '8b0568b74100';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2752,7 +2752,7 @@ function reparoHtml() {
   const row = (r) => { const st = repStage(r); return `<div class="cl rp">
       <span class="d">${dShort(r.date || r.gotDate)}</span>
       <span class="t">${esc(r.type)}${repQty(r) > 1 ? ` <b>×${repQty(r)}</b>` : ''} <span class="pill rp-${st.k}">${st.t}</span><small>${steps(r) ? steps(r) + ' · ' : ''}${eur(num(r.unitPrice))} l’unité${repTotal(r) < repQty(r) * num(r.unitPrice) - 0.004 ? ` · payé ${eur(repTotal(r))} (remise ${eur(repQty(r) * num(r.unitPrice) - repTotal(r))})` : ''}${num(r.partsCost) ? ` · pièces ${eur(num(r.partsCost))}` : ''}${r.client ? ' · ' + esc(r.client) : ''}${r.note ? ' · ' + esc(r.note) : ''}</small>
-        <span class="rp-act">${st.next ? `<button class="btn sm primary" data-act="${st.next[0]}" data-id="${esc(r.id)}">${st.next[1]}</button>` : ''}${st.k === 'pay' ? `<button class="btn sm" data-act="part-open" data-id="${esc(r.id)}">💶 Pas tout payé</button>` : ''}<button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button>${smsBtn(r, 'btn sm', '💬 SMS')}${r.client ? `<button class="btn sm" data-act="rep-more" data-id="${esc(r.id)}">➕ Autre réparation</button>` : ''}<button class="btn sm" data-act="rep-copy" data-id="${esc(r.id)}">Dupliquer</button><button class="xbtn ${S.confirmRep === r.id ? 'on' : ''}" data-act="rep-del" data-id="${esc(r.id)}">${S.confirmRep === r.id ? 'Confirmer la suppression' : 'Supprimer'}</button></span></span>
+        <span class="rp-act">${st.next ? `<button class="btn sm primary" data-act="${st.next[0]}" data-id="${esc(r.id)}">${st.next[1]}</button>` : ''}${st.k === 'ret' ? `<button class="btn sm" data-act="rep-atlpay" data-id="${esc(r.id)}">${atlBtnTxt(r)}</button>` : ''}${st.k === 'pay' ? `<button class="btn sm" data-act="part-open" data-id="${esc(r.id)}">💶 Pas tout payé</button>` : ''}<button class="btn sm" data-act="rep-edit" data-id="${esc(r.id)}">Modifier</button>${smsBtn(r, 'btn sm', '💬 SMS')}${r.client ? `<button class="btn sm" data-act="rep-more" data-id="${esc(r.id)}">➕ Autre réparation</button>` : ''}<button class="btn sm" data-act="rep-copy" data-id="${esc(r.id)}">Dupliquer</button><button class="xbtn ${S.confirmRep === r.id ? 'on' : ''}" data-act="rep-del" data-id="${esc(r.id)}">${S.confirmRep === r.id ? 'Confirmer la suppression' : 'Supprimer'}</button></span></span>
       <span class="a"><b class="${repPaid(r) && !restOwed(r) ? 'in' : ''}">${eurS(repNet(r))}</b>${!repPaid(r) ? '<small>à encaisser</small>' : restOwed(r) ? `<small>dont ${eur(restOwed(r))} pas encore payé</small>` : num(r.partsCost) ? `<small>facturé ${eur(repTotal(r))}</small>` : ''}</span>
     </div>`; };
   return head + `
@@ -3710,7 +3710,8 @@ function tourStops(D, slot) {
     const sub = groups.every((g) => { while (p < seq.length && seq[p] !== g.k) p++; return p++ < seq.length; });
     if (sub) {
       state = 'ok';
-      const done = (k) => (opt.ids && opt.ids[k] || []).some(([id, kind]) => { const r = S.repairs.find((x) => x.id === id); return !!r && (kind === 'pick' ? r.picked !== false : r.returned !== false); });
+      // Venu le chercher à l'atelier : ce n'est pas un arrêt fait, il sort du trajet (pas de trajet fantôme dans les heures des suivants)
+      const done = (k) => (opt.ids && opt.ids[k] || []).some(([id, kind]) => { const r = S.repairs.find((x) => x.id === id); return !!r && (kind === 'pick' ? r.picked !== false : r.returned !== false && !r.atl); });
       // (tournée en cours : on repart du dernier arrêt fait, donc les arrêts faits ne comptent plus)
       full = seq.filter((k) => byK[k] || (!lv && done(k))).map((k) => byK[k] || { k, fix: (opt.fix || {})[k] ?? null, ghost: true });
     } else state = 'manual';
@@ -4602,6 +4603,7 @@ function openPart(r) {
     ${moneyF('p-rest', 'Il te doit encore', null, 'Ce qu’il ne t’a pas encore payé')}
     ${dueF('p-by', 'Il doit te payer le reste le', '', today())}
     <div class="field"><span class="lbl">Ce qu’il te donne maintenant</span>${radios('p-how', PAY_OPTS.slice(0, 2), '')}<small class="hint">Espèces : ajouté à ta cagnotte d’espèces. Rien de coché : je regarde sur tes comptes.</small></div>
+    ${ret && !r.atl ? '<label class="sw"><span class="sw-t"><b>🏠 Il est venu le chercher à l’atelier</b><small>Pas de trajet, pas d’essence pour ce rendu</small></span><input type="checkbox" id="p-atl" role="switch"><span class="sw-ui" aria-hidden="true"></span></label>' : ''}
     <p class="preview" id="p-prev" style="display:block;line-height:1.7"></p>`,
     foot: `<button class="btn" data-act="close">Annuler</button><button class="btn primary grow" data-act="part-save" data-id="${esc(r.id)}">${ret ? 'Rendu, il me doit le reste' : 'Enregistrer'}</button>` });
   partPrev(); setTimeout(() => { const i = $('#p-rest'); if (i) i.focus(); }, 60);
@@ -4633,6 +4635,7 @@ function xpAlarmGo(r) {
   location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(XP_SHORTCUT)}&input=text&text=${encodeURIComponent(hhmm(xpAlarmMin(r)))}`;
 }
 // Réparé, et le client passe le chercher à l'atelier : hors tournée, pas d'essence pour le rendre
+const atlBtnTxt = (r) => ((repPaid(r) ? restOwed(r) : repTotal(r)) > 0 ? '🏠 Venu à l’atelier + payé' : '🏠 Venu à l’atelier');
 const atlOpen = () => S.repairs.filter((r) => r.atl && !r.xp && r.picked !== false && repDone(r) && r.returned === false);
 function atlCard() {
   const L = atlOpen(); if (!L.length) return '';
@@ -4864,14 +4867,14 @@ function renderTournee() {
         <small class="muted"> · ${esc(r.type)}${r.note ? ' · ' + esc(r.note) : ''}</small></div>
       ${!pick && r.loan ? '<p class="stop-loan">🎮 Il a ta manette de prêt : reprends-la en lui rendant la sienne.</p>' : ''}
       ${r._tmp ? `<p class="stop-i tmp-l">📍 <b>Adresse juste pour ce passage.</b> Son adresse habituelle revient après « ${pick ? 'Récupéré' : 'Rendu'} ».</p>` : ''}
-      <div class="stop-mv">${loanChip(r)} ${j2Chip(r)} <button class="chip" data-act="tmp-open" data-id="${esc(r.id)}" aria-pressed="${!!r._tmp}">📍 ${r._tmp ? 'Adresse du passage' : 'Autre adresse pour ce passage'}</button>${pick ? '' : ` <button class="chip" data-act="atl-on" data-id="${esc(r.id)}">🏠 Il vient le chercher à l’atelier</button>`}</div>
+      <div class="stop-mv">${loanChip(r)} ${j2Chip(r)} <button class="chip" data-act="tmp-open" data-id="${esc(r.id)}" aria-pressed="${!!r._tmp}">📍 ${r._tmp ? 'Adresse du passage' : 'Autre adresse pour ce passage'}</button></div>
       <div class="stop-a">
         ${s.lateBy > 0 ? `<button class="btn sm danger" data-act="tour-msg" data-k="late" data-id="${esc(r.id)}">Prévenir du retard</button>` : `<button class="btn sm" data-act="tour-msg" data-k="${s.kind}" data-id="${esc(r.id)}">${s.sent ? 'Heure envoyée ✓' : 'Envoyer l’heure'}</button>`}
         <a class="btn sm" href="${esc(wazeUrl(r))}" target="_blank" rel="noopener">🚗 Waze</a>
         <button class="btn sm" data-act="tour-msg" data-k="eta" data-id="${esc(r.id)}">J'arrive</button>
         ${smsBtn(r)}
         ${!pick && r.result !== 'ko' ? `<button class="btn sm" data-act="tour-msg" data-k="ready" data-id="${esc(r.id)}">${(LS.get('readySent', {}) || {})[r.id] ? 'Réparé prévenu ✓' : '📩 C’est réparé'}</button>` : ''}
-        ${pick ? `<button class="btn sm primary grow" data-act="rep-pick" data-id="${esc(r.id)}">Récupéré</button>` : `<button class="btn sm" data-act="part-open" data-id="${esc(r.id)}">💶 Pas tout payé</button><button class="btn sm primary grow" data-act="rep-retpay" data-id="${esc(r.id)}">Rendu + payé</button>`}
+        ${pick ? `<button class="btn sm primary grow" data-act="rep-pick" data-id="${esc(r.id)}">Récupéré</button>` : `<button class="btn sm" data-act="part-open" data-id="${esc(r.id)}">💶 Pas tout payé</button><button class="btn sm primary grow" data-act="rep-retpay" data-id="${esc(r.id)}">Rendu + payé</button><button class="btn sm" data-act="rep-atlpay" data-id="${esc(r.id)}">${atlBtnTxt(r)}</button>`}
       </div>
       <div class="stop-mv"><span class="muted">Passer à :</span>${moveTargets(D, slot).map(([v, l]) => `<button class="chip" data-act="${v === 'demain' ? 'tour-later' : 'tour-move'}" data-s="${v}" data-id="${esc(r.id)}">${l}</button>`).join('')}<button class="chip" data-act="fix-open" data-id="${esc(r.id)}" aria-pressed="${s.own != null}">⏰ ${s.own != null ? hm(s.own) : 'Heure fixe'}</button></div>
       <details class="stop-more"><summary>Plus</summary><div class="stop-a">
@@ -5580,12 +5583,12 @@ const ACT = {
     if (x > T + 0.004) return fieldErr('p-rest', `C’est plus que le prix total (${eur(T)}).`);
     if (!isDate(by)) return fieldErr('p-by', 'Choisis le jour où il doit te payer le reste.');
     if (by < today()) return fieldErr('p-by', 'Ce jour est déjà passé.');
-    const how = radioVal('p-how');
+    const how = radioVal('p-how'), ret = r.returned === false, atl = ret && (!!r.atl || !!($('#p-atl') && $('#p-atl').checked));
     closeSheet();
-    const had = !!r.loan, ret = r.returned === false, D = today();
-    const patch = { paid: true, paidDate: D, rest: Math.round(x * 100) / 100, restBy: by, ...payPatch('payBy', how, r), ...(ret ? { returned: true, returnDate: D, ...loanBack(r) } : {}) };
-    const go = () => repFast(r.id, patch, (y) => `${ret ? 'Rendu' : 'Noté'} : +${eur(repGot(y))} reçu${how === 'cash' ? ' en espèces' : ''} · ${y.client || 'il'} te doit encore ${eur(restOwed(y))} pour ${dayWord(by)}${cashMsg(how)}${ret ? loanMsg(had) : ''}`);
-    if (ret) await stopDone(r.id, go); else await go();
+    const had = !!r.loan, D = today();
+    const patch = { paid: true, paidDate: D, rest: Math.round(x * 100) / 100, restBy: by, ...payPatch('payBy', how, r), ...(ret ? { returned: true, returnDate: D, ...loanBack(r) } : {}), ...(atl && !r.atl ? { atl: true } : {}) };
+    const go = () => repFast(r.id, patch, (y) => `${ret ? (atl ? 'Venu à l’atelier, rendu' : 'Rendu') : 'Noté'} : +${eur(repGot(y))} reçu${how === 'cash' ? ' en espèces' : ''} · ${y.client || 'il'} te doit encore ${eur(restOwed(y))} pour ${dayWord(by)}${cashMsg(how)}${ret ? loanMsg(had) : ''}`);
+    if (ret && !atl) await stopDone(r.id, go); else await go();
   },
   'rest-got': async (a) => {
     const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r || !restOwed(r)) return;
@@ -5644,7 +5647,11 @@ const ACT = {
     if (ok) closeSheet();
   },
   'tmp-off': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; if (await repFast(r.id, { tmp: null }, `${r.client || 'Client'} : adresse habituelle remise`)) closeSheet(); },
-  'atl-on': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; await repFast(r.id, { atl: true }, `${r.client || 'Client'} vient le chercher à l’atelier : plus dans la tournée, pas d’essence`); },
+  // Le client est venu le chercher à l'atelier (décidé au dernier moment) : rendu + payé, sans trajet ni essence
+  'rep-atlpay': (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r || r.returned !== false) return; const owe = restOwed(r), was = repPaid(r) && !owe;
+    const run = async (by) => { const had = !!r.loan, pay = owe ? { restPaid: today(), ...payPatch('restPayBy', by, r) } : was ? {} : { paid: true, paidDate: today(), ...payPatch('payBy', by, r) };
+      await repFast(r.id, { atl: true, returned: true, returnDate: today(), ...pay, ...loanBack(r) }, (x) => `${x.client || 'Client'} venu à l’atelier · ${was ? 'rendu (déjà payé)' : `rendu et payé : +${eur(owe || repNet(x))}`} · pas d’essence${repInCash() && !was ? cxT() : ''}${cashMsg(by)}${loanMsg(had)}`); };
+    if (was) run(''); else payAsk(r, owe || repTotal(r), run); },
   'atl-off': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; await repFast(r.id, { atl: false, ...readyPlan() }, (x) => `${x.client || 'Client'} : remis dans la tournée, ${momentTxt(x.planDate, x.planSlot || 'soir')}`); },
   'cli-pick': (a) => { const px = a.dataset.px, c = (CSUG[px] || [])[+a.dataset.i]; if (!c) return; cliFill(px, c); toast(`Infos de ${c.client} reprises`); },
   'rep-save': async (a) => {
