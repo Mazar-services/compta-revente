@@ -176,6 +176,7 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .day-ok{margin:8px 0 0;font-weight:800;color:var(--good)} .day-ko{margin-top:8px;display:grid;gap:4px;padding:10px 12px;border-radius:12px;background:var(--bad-soft)} .day-ko b{color:var(--bad);font-size:16px} .day-ko small{font-size:12.5px;color:var(--ink-2)} .day-ko .btn{justify-self:start}
 .day-by{margin:0 0 6px}
 .btn.more-b{width:100%;margin-top:4px;white-space:normal;height:auto;min-height:44px;padding-top:8px;padding-bottom:8px;line-height:1.3;text-align:left} .btn.more-b svg{flex:none}
+.tmp-l{margin:6px 0 0;font-size:12.5px;color:var(--accent-ink,var(--ink-2))}
 .csug{margin:-4px 0 10px;gap:6px;font-size:12.5px;min-width:0} .csug .muted{flex:1 0 100%} .csug .chip{display:block;flex:0 1 auto;min-width:0;height:auto;line-height:30px;font-size:12.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .actc{display:grid;grid-template-columns:minmax(0,1fr);gap:10px} .act-nav{justify-content:space-between} .act-nav .mn-c{flex:1;text-align:center;font-size:15px}
 .act-b{border-radius:14px;padding:12px 14px;display:grid;gap:2px} .act-b span{font-size:12.5px;font-weight:800;color:var(--ink-2)} .act-b b{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15} .act-b small{font-size:12.5px;color:var(--ink-2);line-height:1.35}
@@ -806,7 +807,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '3f94e72d4857';
+const APP_VERSION = 'dcb81639cda2';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -3580,6 +3581,9 @@ function effSlot(r, D) {
   return L[i];
 }
 const grpKey = (r) => normC(mapsPt(r)) || r.id;
+// Adresse juste pour ce passage (ex. chez un collègue) : la tournée l'utilise à la place de l'adresse habituelle, jusqu'à « Récupéré » ou « Rendu »
+const hasTmp = (r) => !!(r && r.tmp && (r.tmp.address || (r.tmp.geo && r.tmp.geo.lat)));
+const tv = (r) => (hasTmp(r) ? { ...r, address: r.tmp.address || '', city: r.tmp.city || '', geo: r.tmp.geo && r.tmp.geo.lat ? r.tmp.geo : null, meet: !!r.tmp.meet, meetTxt: r.tmp.meetTxt || '', _tmp: 1 } : r);
 // Waze, un client à la fois : coordonnées si le lieu est vérifié, sinon l'adresse écrite
 const wazeUrl = (r) => (r.geo && r.geo.lat ? `https://waze.com/ul?ll=${r.geo.lat.toFixed(6)},${r.geo.lon.toFixed(6)}&navigate=yes` : `https://waze.com/ul?q=${encodeURIComponent([r.address, r.city].filter(Boolean).join(', '))}&navigate=yes`);
 // Tournée en cours : d'où tu repars (le dernier arrêt fait, ou ta position) et à quelle heure. Une par tournée, gardée 3 jours.
@@ -3653,8 +3657,9 @@ function planRound(G, o) {
 function tourStops(D, slot) {
   if (!slot || !slotsOf(D).includes(slot)) slot = tourSlot(D);
   const mk = (r, kind) => { const f = fixOf(r, D), own = f != null && slotForTime(D, f) === slot ? f : null; return { r, kind, own, missed: f != null && own == null ? f : null }; };
-  const pick = S.repairs.filter((r) => r.picked === false && !r.xp && effSlot(r, D) === slot).map((r) => mk(r, 'pick'));
-  const ret = S.repairs.filter((r) => r.picked !== false && !r.xp && repDone(r) && r.returned === false && effSlot(r, D) === slot).map((r) => mk(r, 'ret'));
+  const pick = S.repairs.filter((r) => r.picked === false && !r.xp && effSlot(r, D) === slot).map((r) => mk(tv(r), 'pick'));
+  // Il vient le chercher à l'atelier : pas d'arrêt dans la tournée (donc pas d'essence pour le lui rendre)
+  const ret = S.repairs.filter((r) => r.picked !== false && !r.xp && !r.atl && repDone(r) && r.returned === false && effSlot(r, D) === slot).map((r) => mk(tv(r), 'ret'));
   const K = roundKey(D, slot), ord = LS.get('tourOrd', {})[K] || [];
   const all = [...pick, ...ret];
   all.sort((a, b) => {
@@ -3923,9 +3928,11 @@ function bestOrderTW(n, costOf) {
 async function geoFixRepairs(ids) {
   const patches = {};
   for (const id of ids) await (async () => {
-    const r = S.repairs.find((x) => x.id === id); if (!r || !(r.address || r.city)) return;
+    const r0 = S.repairs.find((x) => x.id === id); if (!r0) return;
+    const r = tv(r0); if (!(r.address || r.city)) return;
     const x = (await geoSearch([r.address, r.city].filter(Boolean).join(' ')))[0]; if (!x || !x.conf || x.amb) return;
     const pl = x.kind === 'place';
+    if (r._tmp) { patches[id] = { tmp: { ...r0.tmp, geo: { lat: x.lat, lon: x.lon, label: x.label, name: x.name || '' }, ...(pl && !r0.tmp.meet ? { meet: true, meetTxt: r0.tmp.meetTxt || 'devant ' + x.name } : {}) } }; return; }
     patches[id] = { geo: { lat: x.lat, lon: x.lon, label: x.label, name: x.name || '' }, ...(pl && !r.meet ? { meet: true, meetTxt: r.meetTxt || 'devant ' + x.name } : {}), ...(!r.city && x.city ? { city: findCity(x.city) || x.city } : {}) };
   })();
   const found = Object.keys(patches);
@@ -4446,7 +4453,7 @@ const MSG_DEF = {
 const MSG_NAMES = { confirm: 'Confirmation de la demande', pick: 'Heure précise (récupération)', ret: 'Heure précise (retour)', retko: 'Retour sans réparation possible', late: 'Retard', eta: "J'arrive (10 min)", ready: 'C’est réparé (prévenir le client)', slow: 'Retard de réparation (excuses)', slowd: 'Retard de réparation (excuses + « demain »)', follow: 'Suivi après le retour (satisfait ? + merci)', rest: 'Rappel : reste à payer', restl: 'Relance : reste à payer, date dépassée', thanks: 'Remerciement' };
 // list : tout ce que ce client donne ou récupère à cet arrêt (« tes manettes », un seul prix total)
 function tourMsg(kind, r, s, list) {
-  r = r || {}; list = list && list.length ? list : [r];
+  r = tv(r || {}); list = list && list.length ? list.map(tv) : [r];
   const c = tourCfg(), nm = firstName(r), hi = nm ? `Salut ${nm} ! ` : 'Salut ! ', tot = sum(list, (x) => restOwed(x) || repTotal(x)), amt = tot > 0 ? eur(tot) : 'sur devis';
   // Heure fixe : l'heure exacte (« à 15h30 ») ; retard : « vers » l'heure d'arrivée
   const fx = !!s && s.at != null;
@@ -4624,6 +4631,18 @@ function xpAlarmState(r) {
 function xpAlarmGo(r) {
   const M = LS.get('xpAlSet', {}) || {}; M[r.id] = `${r.planDate} ${r.xpT}`; LS.set('xpAlSet', M);
   location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(XP_SHORTCUT)}&input=text&text=${encodeURIComponent(hhmm(xpAlarmMin(r)))}`;
+}
+// Réparé, et le client passe le chercher à l'atelier : hors tournée, pas d'essence pour le rendre
+const atlOpen = () => S.repairs.filter((r) => r.atl && !r.xp && r.picked !== false && repDone(r) && r.returned === false);
+function atlCard() {
+  const L = atlOpen(); if (!L.length) return '';
+  const row = (r) => { const n = isDate(r.date) ? ago(r.date) : 0, owe = repPaid(r) ? restOwed(r) : repTotal(r);
+    return `<div class="xp-r"><div class="stop-m"><b>${esc(r.client || 'Client')}</b>${r.phone ? ` · <a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''}<br><small class="muted">${esc(r.type)} ×${repQty(r)} · ${owe > 0 ? `${eur(owe)} à payer` : 'déjà payé'}${isDate(r.date) ? ` · ${r.result === 'ko' ? 'pas réparable' : 'réparé'} ${n === 0 ? 'aujourd’hui' : n === 1 ? 'hier' : `il y a ${n} jours`}` : ''}</small>${r.loan ? '<br><small class="neg">🎮 Il a ta manette de prêt : reprends-la</small>' : ''}</div>
+      <div class="btns"><button class="btn sm primary grow" data-act="rep-retpay" data-id="${esc(r.id)}">${owe > 0 ? '✅ Rendu + payé' : '✅ Rendu'}</button>${owe > 0 ? `<button class="btn sm" data-act="part-open" data-id="${esc(r.id)}">💶 Pas tout payé</button>` : ''}${smsBtn(r)}</div>
+      <div class="btns" style="margin-top:6px">${owe > 0 ? `<button class="chip" data-act="rep-ret" data-id="${esc(r.id)}">Rendu, pas encore payé</button>` : ''}<button class="chip" data-act="atl-off" data-id="${esc(r.id)}">🚗 Finalement je lui ramène</button></div></div>`; };
+  return `<section class="card"><div class="card-h"><h2 class="sec">🏠 À récupérer à l’atelier</h2><span class="muted" style="font-size:12.5px">${plural(L.length, 'client')}</span></div>
+    ${L.map(row).join('')}
+    <p class="hint" style="margin:6px 0 0">Il passe le chercher à ton atelier : pas d’arrêt dans la tournée, pas d’essence pour le lui rendre. Quand il est venu, touche « Rendu + payé ».</p></section>`;
 }
 function xpCard() {
   const L = xpOpen(); if (!L.length) return '';
@@ -4844,7 +4863,8 @@ function renderTournee() {
         ${adr ? `<a href="${esc(wazeUrl(r))}" target="_blank" rel="noopener">${r.geo ? '📍 ' : ''}${esc(adr)}</a>${r.meet ? ` <small class="muted">· RDV : ${esc(lieuTxt(r))}</small>` : ''}${r.geo ? '' : ` <button class="chip warn" data-act="geo-fix" data-id="${esc(r.id)}">📍 Trouver ce lieu</button>`}` : '<span class="neg">Adresse manquante : touche Modifier</span>'}${cityRank(r.city) === 50 && r.city ? ' <small class="muted">(commune hors trajet : placée à la fin)</small>' : ''}
         <small class="muted"> · ${esc(r.type)}${r.note ? ' · ' + esc(r.note) : ''}</small></div>
       ${!pick && r.loan ? '<p class="stop-loan">🎮 Il a ta manette de prêt : reprends-la en lui rendant la sienne.</p>' : ''}
-      <div class="stop-mv">${loanChip(r)} ${j2Chip(r)}</div>
+      ${r._tmp ? `<p class="stop-i tmp-l">📍 <b>Adresse juste pour ce passage.</b> Son adresse habituelle revient après « ${pick ? 'Récupéré' : 'Rendu'} ».</p>` : ''}
+      <div class="stop-mv">${loanChip(r)} ${j2Chip(r)} <button class="chip" data-act="tmp-open" data-id="${esc(r.id)}" aria-pressed="${!!r._tmp}">📍 ${r._tmp ? 'Adresse du passage' : 'Autre adresse pour ce passage'}</button>${pick ? '' : ` <button class="chip" data-act="atl-on" data-id="${esc(r.id)}">🏠 Il vient le chercher à l’atelier</button>`}</div>
       <div class="stop-a">
         ${s.lateBy > 0 ? `<button class="btn sm danger" data-act="tour-msg" data-k="late" data-id="${esc(r.id)}">Prévenir du retard</button>` : `<button class="btn sm" data-act="tour-msg" data-k="${s.kind}" data-id="${esc(r.id)}">${s.sent ? 'Heure envoyée ✓' : 'Envoyer l’heure'}</button>`}
         <a class="btn sm" href="${esc(wazeUrl(r))}" target="_blank" rel="noopener">🚗 Waze</a>
@@ -4891,6 +4911,7 @@ function renderTournee() {
     ${stops.map(card).join('')}
     ${isT ? dayCard() : ''}
     ${fuCard()}
+    ${atlCard()}
     ${xpCard()}
     ${fuelCard()}
     ${loanCard()}
@@ -5114,6 +5135,7 @@ function openTourCfg() {
 // Changement instantané à l'écran, puis enregistrement ; en cas d'échec, on remet comme avant
 async function repFast(id, patch, msg) {
   const r = S.repairs.find((x) => x.id === id); if (!r) return false;
+  if (r.tmp && ((patch.picked === true && r.picked === false) || (patch.returned === true && r.returned === false))) patch = { ...patch, tmp: null };
   const old = {}; Object.keys(patch).forEach((k) => { old[k] = r[k]; });
   Object.assign(r, patch); render();
   if (msg) toast(typeof msg === 'function' ? msg(r) : msg);
@@ -5212,7 +5234,9 @@ const TOUR_ACT = {
   'geo-fix': async (a) => {
     a.disabled = true; a.textContent = 'Recherche…';
     const fx = await geoFixRepairs([a.dataset.id]);
-    if (fx.found.length) toast(`📍 ${fx.patches[a.dataset.id].geo.label} · pas le bon ? Plus → Modifier`);
+    const P = fx.patches[a.dataset.id], tmp = P && P.tmp;
+    if (fx.found.length) toast(`📍 ${(tmp || P).geo.label} · pas le bon ? ${tmp ? 'Touche « Adresse pour ce passage »' : 'Plus → Modifier'}`);
+    else if (hasTmp(S.repairs.find((x) => x.id === a.dataset.id))) { toast('Pas sûr du lieu : choisis-le', 'bad'); openTmp(a.dataset.id); setTimeout(() => placeFind('p', false), 300); }
     else { toast('Pas sûr du lieu : choisis-le dans la fiche', 'bad'); openRep(a.dataset.id); setTimeout(() => placeFind('r', false), 300); }
   },
   'geo-pick': (a) => placePick(a.dataset.px, Number(a.dataset.i)),
@@ -5435,6 +5459,18 @@ function cliFill(px, c) {
 }
 const cliBox = (px) => `<div class="csug btns" id="${px}-csug" hidden></div>`;
 const cliOf = (r) => r && { client: r.client || '', phone: r.phone || '', address: r.address || '', city: r.city || '', geo: r.geo && r.geo.lat ? r.geo : null, meet: !!r.meet, meetTxt: r.meetTxt || '' };
+function openTmp(id) {
+  const r = S.repairs.find((x) => x.id === id); if (!r) return;
+  const t = hasTmp(r) ? r.tmp : {}, home = [r.address, r.city].filter(Boolean).join(', ');
+  openSheet({ kind: 'tmp', id, title: `📍 Adresse pour ce passage · ${r.client || 'Client'}`, body: `
+    <p class="hint" style="margin:0 0 8px">Seulement pour ${r.picked === false ? 'aller récupérer' : 'rendre'} ${r.picked === false ? 'son objet' : 'son objet'} cette fois (ex. il est chez un collègue). Son adresse habituelle${home ? ` (<b>${esc(home)}</b>)` : ''} reste sur sa fiche et revient toute seule après « ${r.picked === false ? 'Récupéré' : 'Rendu'} ».</p>
+    ${textF('p-addr', 'Adresse ou lieu pour ce passage', t.address || '', 'n° et rue, ou un lieu')}
+    <div class="field"><label for="p-city">Commune</label><input id="p-city" class="inp" list="dl-city-p" autocomplete="off" value="${esc(t.city || '')}"><datalist id="dl-city-p">${CITIES.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></div>
+    ${placeBox('p', t)}`,
+    foot: `<button class="btn" data-act="close">Annuler</button>${hasTmp(r) ? `<button class="btn" data-act="tmp-off" data-id="${esc(id)}">Remettre son adresse</button>` : ''}<button class="btn primary grow" data-act="tmp-save" data-id="${esc(id)}">Enregistrer</button>` });
+  placeShow('p');
+  setTimeout(() => { const x = $('#p-addr'); if (x && !x.value) x.focus(); }, 60);
+}
 function openRep(id, copyOf, forC) {
   const T = repTypes(), last = [...T.keys()].pop(), r = id ? S.repairs.find((x) => x.id === id) : null;
   const src = copyOf ? S.repairs.find((x) => x.id === copyOf) : null;
@@ -5455,7 +5491,7 @@ function openRep(id, copyOf, forC) {
       <div id="r-sec-pick" class="sub">${dateF('r-got', 'Objet récupéré le', isDate(v.gotDate) ? v.gotDate : isDate(v.date) ? v.date : today())}</div>
       <div id="r-wrap-done">${sw('r-done', done, 'Réparation terminée', 'Coche quand tu as fini (réussie ou non)')}
       <div id="r-sec-done" class="sub">${radios('r-res', [['ok', 'Réussie'], ['ko', 'Échec']], v.result === 'ko' ? 'ko' : 'ok')}${dateF('r-date', 'Réparé le', done && isDate(v.date) ? v.date : today())}</div>
-      <div id="r-wrap-ret">${sw('r-ret', ret && done, 'Rendu au client', 'L’objet est reparti chez le client')}
+      <div id="r-wrap-ret">${sw('r-atl', !!v.atl && !src, '🏠 Il vient le chercher à l’atelier', 'Pas d’arrêt dans la tournée, pas d’essence pour le lui rendre')}${sw('r-ret', ret && done, 'Rendu au client', 'L’objet est reparti chez le client')}
       <div id="r-sec-ret" class="sub">${dateF('r-retDate', 'Rendu le', isDate(v.returnDate) ? v.returnDate : today())}</div></div></div>
       ${sw('r-paid', paid, 'Argent reçu', 'L’argent entre dans la caisse à cette date')}
       <div id="r-sec-paid" class="sub">${dateF('r-paidDate', 'Payé le', isDate(v.paidDate) ? v.paidDate : r && repPaid(r) ? v.date : today())}
@@ -5598,6 +5634,18 @@ const ACT = {
   },
   'rep-copy': (a) => openRep(null, a.dataset.id),
   'rep-more': (a) => openRep(null, null, a.dataset.id),
+  'tmp-open': (a) => openTmp(a.dataset.id),
+  'tmp-save': async (a) => {
+    clearErrs(); const id = a.dataset.id, r = S.repairs.find((x) => x.id === id); if (!r) return;
+    const address = val('p-addr').trim(), city = val('p-city').trim(), pl = placeVal('p');
+    if (!address && !pl.geo) return fieldErr('p-addr', 'Écris l’adresse ou le lieu où il est.');
+    const tmp = { address, city, ...pl, at: today() };
+    a.disabled = true; const ok = await repFast(id, { tmp }, `${r.client || 'Client'} : ${address || pl.geo.label}${city ? ', ' + city : ''}, juste pour ce passage${pl.geo ? '' : ' · lieu à vérifier (📍 Trouver ce lieu)'}`); a.disabled = false;
+    if (ok) closeSheet();
+  },
+  'tmp-off': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; if (await repFast(r.id, { tmp: null }, `${r.client || 'Client'} : adresse habituelle remise`)) closeSheet(); },
+  'atl-on': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; await repFast(r.id, { atl: true }, `${r.client || 'Client'} vient le chercher à l’atelier : plus dans la tournée, pas d’essence`); },
+  'atl-off': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; await repFast(r.id, { atl: false, ...readyPlan() }, (x) => `${x.client || 'Client'} : remis dans la tournée, ${momentTxt(x.planDate, x.planSlot || 'soir')}`); },
   'cli-pick': (a) => { const px = a.dataset.px, c = (CSUG[px] || [])[+a.dataset.i]; if (!c) return; cliFill(px, c); toast(`Infos de ${c.client} reprises`); },
   'rep-save': async (a) => {
     clearErrs();
@@ -5607,6 +5655,9 @@ const ACT = {
     const r = { type: val('r-type').trim(), qty: Number(val('r-qty')) || 1, unitPrice: parseNum(val('r-price')), total: parseNum(val('r-total')), partsCost: parseNum(val('r-parts')) || 0, client: val('r-client').trim(), note: val('r-note').trim(),
       phone: val('r-phone').trim(), address: val('r-addr').trim(), city: val('r-city').trim(), picked, ...placeVal('r'),
       gotDate: picked ? val('r-got') : '', done, result: done ? radioVal('r-res') || 'ok' : '', returned: ret, returnDate: ret ? val('r-retDate') : '', paid, paidDate: paid ? val('r-paidDate') : '' };
+    if (done && $('#r-atl') && $('#r-atl').checked) r.atl = true; else if (old && old.atl) r.atl = false;
+    // Récupéré ou rendu depuis la fiche : l'adresse juste pour ce passage ne sert plus
+    const tmpGone = !!(old && old.tmp && ((old.picked === false && picked) || (old.returned === false && ret)));
     const loan = $('#r-loan').checked; if (loan || (old && old.loan)) { r.loan = loan; if (loan) r.loanDate = old && old.loan && isDate(old.loanDate) ? old.loanDate : today(); }
     r.date = done ? val('r-date') : picked ? r.gotDate : (old && isDate(old.planDate) ? old.planDate : today());
     if (!picked && !(old && isDate(old.planDate))) r.planDate = planDateNow();
@@ -5621,7 +5672,7 @@ const ACT = {
     if (ret && r.returnDate < r.date) return fieldErr('r-retDate', 'Rendu avant la réparation ?');
     if (paid && !isDate(r.paidDate)) return fieldErr('r-paidDate', 'Date requise.');
     // Pas tout payé : ce qu'il doit encore, et pour quand
-    const drop = [];
+    const drop = tmpGone ? ['tmp'] : [];
     if (paid && $('#r-part').checked) {
       const x = parseNum(val('r-rest')), by = val('r-restBy'), got = $('#r-restok').checked, rp = val('r-restPaid');
       if (!(x > 0)) return fieldErr('r-rest', 'Indique combien il te doit encore.');
@@ -6967,14 +7018,14 @@ function bind() {
     if (e.target.id === 'd-paste') demFill();
     if (e.target.id === 'd-fix') demFixSync();
     if (e.target.id === 'fx-t') fixInfo();
-    { const m = e.target.id.match(/^(d|r)-(addr|city)$/); if (m && PLACE[m[1]]) { PLACE[m[1]].geo = null; placeShow(m[1]); if (m[2] === 'city') e.target.dataset.touched = '1'; clearTimeout(placeFind.t); placeFind.t = setTimeout(() => placeFind(m[1], true), 900); } }
-    { const m = e.target.id.match(/^(d|r)-meettxt$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meetTxt = e.target.value; delete e.target.dataset.auto; } }
+    { const m = e.target.id.match(/^(d|r|p)-(addr|city)$/); if (m && PLACE[m[1]]) { PLACE[m[1]].geo = null; placeShow(m[1]); if (m[2] === 'city') e.target.dataset.touched = '1'; clearTimeout(placeFind.t); placeFind.t = setTimeout(() => placeFind(m[1], true), 900); } }
+    { const m = e.target.id.match(/^(d|r|p)-meettxt$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meetTxt = e.target.value; delete e.target.dataset.auto; } }
     if (/^d-(name|phone|addr|city|total)$/.test(e.target.id) || e.target.id === 'x-total') e.target.dataset.touched = '1';
     if (e.target.id === 'x-time') xpSync();
     if (e.target.id === 'r-client' || e.target.id === 'd-name') cliSuggest(e.target.id === 'd-name' ? 'd' : 'r');
     if (e.target.id === 'r-total') e.target.dataset.touched = '1'; if (/^r-(qty|price|parts|total|rest)$/.test(e.target.id)) repPreview(); if (/^p-(rest|by)$/.test(e.target.id)) partPrev(); if (e.target.id === 'ad-title') adCount(); });
   document.addEventListener('change', (e) => {
-    { const m = (e.target.name || '').match(/^(d|r)-meet$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meet = e.target.value === 'meet'; PLACE[m[1]].autoMeet = false; placeShow(m[1]); } }
+    { const m = (e.target.name || '').match(/^(d|r|p)-meet$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meet = e.target.value === 'meet'; PLACE[m[1]].autoMeet = false; placeShow(m[1]); } }
     if (e.target.id === 'd-shot' && e.target.files && e.target.files.length) demShot(e.target);
     if (e.target.id === 'd-fix' || e.target.name === 'd-when') demFixSync();
     if (e.target.id === 'fx-t' || e.target.name === 'fx-d') fixInfo();
@@ -7041,7 +7092,7 @@ async function init() {
 }
 
 // Accès réservé aux tests locaux (jamais actif sur le site en ligne)
-if (location.hostname === 'localhost') window.__app = { S, dayRecap, actMonth, walletLedger, walletMonth, realMoney, money, bRows, bankOut, capital, monthStats, cashLedger, isPaid, paidOn, profit, lbcWallet, bProches, bSuggest, bAccounts, bTotal, cashRows, cashEvents, cashBox, bAll, tourPrice, replyMsg, closeSheet };
+if (location.hostname === 'localhost') window.__app = { S, dayRecap, actMonth, walletLedger, walletMonth, realMoney, money, bRows, bankOut, capital, monthStats, cashLedger, isPaid, paidOn, profit, lbcWallet, bProches, bSuggest, bAccounts, bTotal, cashRows, cashEvents, cashBox, bAll, tourPrice, replyMsg, closeSheet, tourStops, tourMsg, fuelRound };
 init();
 })();
 </script>
