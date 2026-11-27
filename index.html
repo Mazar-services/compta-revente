@@ -806,7 +806,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'c37e2d358b75';
+const APP_VERSION = '3f94e72d4857';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -3331,7 +3331,9 @@ function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el
 /* ---------- Tournée : demandes clients, ordre de passage (semaine : boucle Crolles → Crolles ; week-end : Saint-Égrève → Crolles), messages prêts ---------- */
 const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', wdFrom: 'Crolles', wdTo: 'Crolles', wdStart: '18:00', wdEnd: '21:00', wd2: true, midStart: '12:00', midEnd: '14:00', apStart: '15:00', apEnd: '17:00', send: 'sms', ocrLeft: true, msgs: {}, stop: 7, autoLate: true, formUrl: '', ntfy: '', fuelL100: 6, fuelPx: '', slowDays: 2, pj2: 40,
   services: 'Joystick drift (manette PS5) : 25 € la manette\nJoystick drift (manette Xbox) : 25 € (mêmes tarifs que PS5)\nJoysticks à effet Hall (plus jamais de drift) : 45 € la manette\nManette PS5 : 25 € (bouton, gâchette, port de charge, batterie : à partir de 20 €)\nPS5 nettoyage simple : 40 € (poussière, ventilateur)\nPS5 nettoyage liquide métal : 80 € (surchauffe, bruit, nettoyage complet)\nHDMI PS5 : 75 € (port HDMI remplacé)\nTéléphone (batterie, écran, vitre arrière) : sur devis\nDiagnostic : gratuit si tu répares, 15 € sinon', p1: 25, p2: 50, delai: '24-48 h', garantie: '30 jours' };
-const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
+// Ancien tarif dégressif (20 € la manette à partir de la 3e) : retiré même d'une liste de prix enregistrée avant
+const OLD_DRIFT = ' (50 € les deux, 20 € la manette à partir de la 3e)';
+const tourCfg = () => { const c = { ...TOUR_DEF, ...(S.settings.tour || {}) }; if (typeof c.services === 'string' && c.services.includes(OLD_DRIFT)) c.services = c.services.split(OLD_DRIFT).join(' la manette'); return c; };
 // Temps sur place (donner / récupérer, encaisser) : la route est comptée à part. Sans trajet calculé, 10 min de route estimées entre deux arrêts.
 const stopOf = (c) => Math.max(1, num(c.stop) || TOUR_DEF.stop);
 const EST_DRIVE = 10;
