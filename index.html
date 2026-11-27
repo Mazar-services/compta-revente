@@ -3710,7 +3710,8 @@ function tourStops(D, slot) {
     const sub = groups.every((g) => { while (p < seq.length && seq[p] !== g.k) p++; return p++ < seq.length; });
     if (sub) {
       state = 'ok';
-      const done = (k) => (opt.ids && opt.ids[k] || []).some(([id, kind]) => { const r = S.repairs.find((x) => x.id === id); return !!r && (kind === 'pick' ? r.picked !== false : r.returned !== false); });
+      // Venu le chercher à l'atelier : ce n'est pas un arrêt fait, il sort du trajet (pas de trajet fantôme dans les heures des suivants)
+      const done = (k) => (opt.ids && opt.ids[k] || []).some(([id, kind]) => { const r = S.repairs.find((x) => x.id === id); return !!r && (kind === 'pick' ? r.picked !== false : r.returned !== false && !r.atl); });
       // (tournée en cours : on repart du dernier arrêt fait, donc les arrêts faits ne comptent plus)
       full = seq.filter((k) => byK[k] || (!lv && done(k))).map((k) => byK[k] || { k, fix: (opt.fix || {})[k] ?? null, ghost: true });
     } else state = 'manual';
