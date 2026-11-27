@@ -167,6 +167,14 @@ main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px))}
 .cx-bar{display:flex;height:12px;border-radius:99px;overflow:hidden;background:var(--line)} .cx-bar i{display:block;height:100%} .cx-bar i.a{background:var(--good)} .cx-bar i.p{flex:1;background:var(--accent);opacity:.35}
 .cx-leg{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:13px;color:var(--ink-2)} .cx-leg span{display:inline-flex;align-items:center;gap:6px} .cx-leg b{color:var(--ink);font-variant-numeric:tabular-nums}
 .cx-leg i{width:10px;height:10px;border-radius:3px;display:inline-block} .cx-leg i.a{background:var(--good)} .cx-leg i.p{background:var(--accent);opacity:.35}
+.day-c.done{border-color:var(--good)} .day-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.day-tiles>div{border-radius:14px;padding:10px 12px;background:var(--surface-2,rgba(127,127,127,.08));display:grid;gap:2px;min-width:0} .day-tiles span{font-size:12px;font-weight:800;color:var(--ink-2)} .day-tiles b{font-size:clamp(17px,5vw,22px);font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap} .day-tiles small{font-size:11.5px;color:var(--muted);line-height:1.25}
+.day-s{border:1px solid var(--line,rgba(127,127,127,.25));border-radius:14px;padding:10px 12px;margin-bottom:10px} .day-s.cash{border-color:var(--good);background:var(--good-soft)} .day-s.unk{border-color:var(--warn,#d97706)} .day-s summary{font-weight:800;cursor:pointer}
+.day-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px} .day-h h4{margin:0;font-size:15px} .day-h b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.day-r{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--line,rgba(127,127,127,.18))} .day-r .t{min-width:0;display:grid} .day-r .t small{color:var(--muted);font-size:12px} .day-r>b{font-variant-numeric:tabular-nums;white-space:nowrap} .day-r .in{color:var(--good)} .day-r .out{color:var(--bad)}
+.day-tot{margin:8px 0 6px;font-size:14px} .day-count{display:flex;flex-wrap:wrap;align-items:center;gap:8px} .day-count label{font-weight:700;font-size:14px} .day-count .affix{flex:1;min-width:110px}
+.day-ok{margin:8px 0 0;font-weight:800;color:var(--good)} .day-ko{margin-top:8px;display:grid;gap:4px;padding:10px 12px;border-radius:12px;background:var(--bad-soft)} .day-ko b{color:var(--bad);font-size:16px} .day-ko small{font-size:12.5px;color:var(--ink-2)} .day-ko .btn{justify-self:start}
+.day-by{margin:0 0 6px}
 .actc{display:grid;grid-template-columns:minmax(0,1fr);gap:10px} .act-nav{justify-content:space-between} .act-nav .mn-c{flex:1;text-align:center;font-size:15px}
 .act-b{border-radius:14px;padding:12px 14px;display:grid;gap:2px} .act-b span{font-size:12.5px;font-weight:800;color:var(--ink-2)} .act-b b{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15} .act-b small{font-size:12.5px;color:var(--ink-2);line-height:1.35}
 .act-b.g{background:var(--good-soft)} .act-b.g b{color:var(--good)} .act-b.r{background:var(--bad-soft)} .act-b.r b{color:var(--bad)}
@@ -796,7 +804,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = 'd051fef668b5';
+const APP_VERSION = 'd81cec4289f7';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -4691,6 +4699,123 @@ function openXpAlarm(r) {
     <p class="hint" style="margin:0">Pas encore de raccourci ? Réglages de la tournée, « Réveil des clients express » : 1 minute à créer, une seule fois.</p>`,
     foot: `<button class="btn" data-act="close">Plus tard</button><button class="btn primary grow" data-act="xp-alarm" data-id="${esc(r.id)}">⏰ Créer le réveil de ${hm(xpAlarmMin(r))}</button>` });
 }
+// ---- 🏁 Fin de journée : ce que tu as rendu, récupéré et encaissé aujourd'hui, espèces et virements séparés, pour tout recompter ----
+const dayEnds = () => (DATA && Array.isArray(DATA.days) ? DATA.days.filter((x) => x && isDate(x.d)) : []);
+const dayEndOf = (D) => dayEnds().find((x) => x.d === D) || null;
+// Le genre d'objet, pour dire « 3 manettes et 1 console »
+const DEV = [['manette', 'manettes', /manette|joystick|drift|dualsense|edge|gâchette|gachette|controller/i], ['téléphone', 'téléphones', /iphone|t[ée]l[ée]phone|samsung|smartphone|android|xiaomi|redmi|pixel/i], ['console', 'consoles', /ps5|ps4|ps3|console|switch|xbox|playstation/i]];
+const devOf = (t) => (DEV.find((x) => x[2].test(t || '')) || ['appareil', 'appareils'])[0];
+function devTxt(L) {
+  const by = new Map(); L.forEach((r) => { const k = devOf(r.type); by.set(k, (by.get(k) || 0) + repQty(r)); });
+  const n = (k, q) => { const x = DEV.find((y) => y[0] === k); return `${q} ${q > 1 ? (x ? x[1] : 'appareils') : k}`; };
+  return joinFr([...by.entries()].sort((a, b) => b[1] - a[1]).map(([k, q]) => n(k, q)));
+}
+function dayRecap(D) {
+  const B = bRows(); if (B.length) cashRows();
+  const seen = (x) => !!(CMEMO.bankK && CMEMO.bankK.has(repPayKey(x)));
+  const ret = S.repairs.filter((r) => r.returned !== false && r.returnDate === D && r.picked !== false);
+  const got = S.repairs.filter((r) => r.picked !== false && r.gotDate === D);
+  const pay = repPayRows().filter((x) => (x._rest ? x.restPaid : repPaidOn(x)) === D && repTotal(x) > 0).map((x) => {
+    const s = x._src || x, ex = repByOf(x), sn = B.length ? seen(x) : false;
+    return { x, s, a: repTotal(x), by: ex || (sn ? 'bank' : ''), seen: sn, rest: !!x._rest, nm: s.client || s.type || 'Client Réparo', t: `${s.type || 'Réparo'}${repQty(s) > 1 ? ' ×' + repQty(s) : ''}${x._rest ? ' · reste payé' : x._src ? ' · payé en partie' : ''}` };
+  });
+  const saleSeen = (i) => B.some((r) => r.sale && r.sale.id === i.id), buySeen = (i) => B.some((r) => r.match && r.match.id === i.id);
+  const sales = S.items.filter((i) => !i.example && !isCancelled(i) && isPaid(i) && paidOn(i) === D && !isShipSale(i.sellChannel) && num(i.sellPrice) > 0)
+    .map((i) => ({ i, a: num(i.sellPrice) - num(i.sellFees), by: saleSeen(i) ? 'bank' : 'cash', seen: saleSeen(i), nm: bItemNm(i), t: 'Vente en main propre' }));
+  const buys = S.items.filter((i) => !i.example && !isCancelled(i) && i.buyDate === D && i.buyMode === 'main_propre' && num(i.buyPrice) > 0 && !buySeen(i))
+    .map((i) => ({ i, a: -num(i.buyPrice), nm: bItemNm(i), t: 'Achat en main propre' }));
+  const cash = pay.filter((p) => p.by === 'cash').concat(sales.filter((p) => p.by === 'cash')), bank = pay.filter((p) => p.by === 'bank').concat(sales.filter((p) => p.by === 'bank')), unk = pay.filter((p) => !p.by);
+  const owed = S.repairs.filter((r) => r.returnDate === D && r.returned !== false && (!repPaid(r) || restOwed(r))).map((r) => ({ r, a: repPaid(r) ? restOwed(r) : repTotal(r) }));
+  const cIn = sum(cash, (p) => p.a), cOut = -sum(buys, (p) => p.a);
+  return { D, ret, got, pay, sales, buys, cash, bank, unk, owed, cIn, cOut, expCash: Math.round((cIn - cOut) * 100) / 100, bankT: sum(bank, (p) => p.a), unkT: sum(unk, (p) => p.a), total: sum(pay, (p) => p.a) + sum(sales, (p) => p.a) };
+}
+function dayCard() {
+  const D = today(), X = dayRecap(D), E = dayEndOf(D);
+  if (!E && !X.ret.length && !X.got.length && !X.pay.length && !X.sales.length) return '';
+  const st = E && E.counted != null ? (Math.abs(E.counted - E.exp) < 0.01 ? ' · espèces recomptées ✓' : Math.abs(E.counted - E.exp - (+E.fix || 0)) < 0.01 ? ' · espèces corrigées ✓' : ` · <b class="neg">écart de ${eurS(E.counted - E.exp)} sur les espèces</b>`) : '';
+  return `<section class="card day-c${E ? ' done' : ''}"><div class="card-h"><h2 class="sec">🏁 Fin de journée</h2>${E ? `<span class="pill bk-ok">Finie à ${esc(hm(toMin(new Date(E.at).toTimeString().slice(0, 5))))}</span>` : ''}</div>
+    <p style="margin:0">Aujourd’hui : <b>${X.ret.length ? `${sum(X.ret, repQty)} rendu${sum(X.ret, repQty) > 1 ? 's' : ''}` : 'rien rendu'}</b> · <b>${X.got.length ? `${sum(X.got, repQty)} récupéré${sum(X.got, repQty) > 1 ? 's' : ''}` : 'rien récupéré'}</b> · <b>${eur(X.total)}</b> reçus (💶 ${eur(X.cIn)} · 🏦 ${eur(X.bankT)}${X.unkT ? ` · ❓ ${eur(X.unkT)}` : ''})${st}</p>
+    <div class="btns" style="margin-top:8px"><button class="btn ${E ? '' : 'primary'} grow" data-act="day-end">${E ? 'Voir le récap de ma journée' : '🏁 J’ai fini ma tournée'}</button></div>
+  </section>`;
+}
+function dayRow(p, extra) {
+  return `<div class="day-r"><span class="t"><b>${esc(p.nm)}</b><small>${esc(p.t)}${extra || ''}</small></span><b class="${p.a < 0 ? 'out' : 'in'}">${p.a < 0 ? '−' : '+'}${eur(Math.abs(p.a))}</b></div>`;
+}
+function openDayEnd(D = today()) {
+  const X = dayRecap(D), E = dayEndOf(D), B = bRows().length;
+  const nR = sum(X.ret, repQty), nG = sum(X.got, repQty);
+  const check = E && E.counted != null ? (() => { const g = Math.round((E.counted - X.expCash) * 100) / 100, done = +E.fix || 0, rem = Math.round((g - done) * 100) / 100;
+    if (Math.abs(g) < 0.01 && Math.abs(done) < 0.01) return `<p class="day-ok">✅ Tu as compté ${eur(E.counted)} : le compte est bon.</p>`;
+    if (Math.abs(rem) < 0.01) return `<p class="day-ok">✅ Tu as compté ${eur(E.counted)} pour ${eur(X.expCash)} attendus. Tes espèces sont déjà corrigées de ${eurS(done)}.</p>`;
+    return `<div class="day-ko"><b>${g < 0 ? `⚠ Il manque ${eur(-g)}` : `${eur(g)} en trop`}</b><small>Tu as compté ${eur(E.counted)} pour ${eur(X.expCash)} attendus. ${g < 0 ? 'Regarde les clients payés en espèces ci-dessus : un client a peut-être donné moins, ou un paiement noté en espèces est arrivé par virement.' : 'Un client a peut-être payé en espèces alors que c’est noté autrement, ou il te restait de la monnaie.'}</small>
+      ${Math.abs(done) >= 0.01 ? `<small>Déjà corrigé : ${eurS(done)}.</small>` : ''}
+      ${cashBox() ? `<button class="btn sm" data-act="day-fix">Corriger mes espèces de ${eurS(rem)}</button>` : ''}</div>`; })() : '';
+  openSheet({ kind: 'day', id: D, title: `🏁 Ta journée · ${cap1(new Date(D + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }))}`, body: `
+    <div class="day-tiles">
+      <div><span>Rendus</span><b>${nR}</b><small>${nR ? esc(devTxt(X.ret)) : 'rien'}</small></div>
+      <div><span>Récupérés</span><b>${nG}</b><small>${nG ? esc(devTxt(X.got)) : 'rien'}</small></div>
+      <div><span>Argent reçu</span><b>${eur(X.total)}</b><small>${plural(X.pay.length + X.sales.length, 'paiement')}</small></div>
+    </div>
+    <section class="day-s cash"><div class="day-h"><h4>💶 Espèces</h4><b>${eur(X.expCash)}</b></div>
+      ${X.cash.length || X.buys.length ? X.cash.map((p) => dayRow(p)).join('') + X.buys.map((p) => dayRow(p, ' · payé en espèces')).join('') : '<p class="muted" style="margin:0">Aucun paiement en espèces aujourd’hui.</p>'}
+      ${X.unk.length ? `<p class="hint" style="margin:6px 0 0">+ ${eur(X.unkT)} pas précisés plus bas : si c’était en espèces, touche « 💶 Espèces » pour les compter ici.</p>` : ''}
+      ${X.cash.length || X.buys.length ? `<p class="day-tot">Tu dois avoir <b>${eur(X.expCash)}</b> en espèces de ta journée${X.buys.length ? ` (${eur(X.cIn)} reçus − ${eur(X.cOut)} d’achats)` : ''}.</p>
+      <div class="day-count"><label for="day-n">Je recompte : j’ai</label><div class="affix"><input id="day-n" class="inp money" inputmode="decimal" autocomplete="off" placeholder="0" value="${E && E.counted != null ? esc(numIn(E.counted)) : ''}"></div><button class="btn primary" data-act="day-count">Vérifier</button></div>${errSlot('day-n')}
+      ${check}` : ''}
+    </section>
+    <section class="day-s"><div class="day-h"><h4>🏦 Virement, Wero, carte</h4><b>${eur(X.bankT)}</b></div>
+      ${X.bank.length ? X.bank.map((p) => dayRow(p, B ? (p.seen ? ' · ✅ arrivé sur ton compte' : ' · ⏳ pas encore vu sur ton compte') : '')).join('') + (B && X.bank.some((p) => !p.seen) ? '<p class="hint" style="margin:4px 0 0">Ta banque est lue environ 4 fois par jour : un virement d’aujourd’hui peut apparaître ce soir ou demain. S’il n’arrive pas, l’appli te le signale sur la fiche du client.</p>' : '') : '<p class="muted" style="margin:0">Aucun virement aujourd’hui.</p>'}
+    </section>
+    ${X.unk.length ? `<section class="day-s unk"><div class="day-h"><h4>❓ Pas précisé</h4><b>${eur(X.unkT)}</b></div>
+      <p class="hint" style="margin:0 0 4px">Aucun choix noté${B ? ' et pas encore vu sur ta banque' : ''}. Dis comment il t’a payé :</p>
+      ${X.unk.map((p) => `${dayRow(p)}<div class="btns day-by"><button class="btn sm" data-act="day-by" data-id="${esc(p.s.id)}" data-r="${p.rest ? 1 : 0}" data-v="cash">💶 Espèces</button><button class="btn sm" data-act="day-by" data-id="${esc(p.s.id)}" data-r="${p.rest ? 1 : 0}" data-v="bank">🏦 Virement</button></div>`).join('')}</section>` : ''}
+    ${X.owed.length ? `<section class="day-s owe"><div class="day-h"><h4>💸 Pas encore payé</h4><b>${eur(sum(X.owed, (o) => o.a))}</b></div>
+      ${X.owed.map((o) => `<div class="day-r"><span class="t"><b>${esc(o.r.client || 'Client')}</b><small>${esc(o.r.type || 'Réparo')}${repPaid(o.r) && isDate(o.r.restBy) ? ` · promis pour le ${dShort(o.r.restBy)}` : ''}</small></span><b class="out">${eur(o.a)}</b></div>`).join('')}</section>` : ''}
+    <details class="day-s"><summary>🎮 Rendus (${nR}) et 📦 récupérés (${nG})</summary>
+      ${X.ret.map((r) => `<div class="day-r"><span class="t"><b>${esc(r.client || 'Client')}</b><small>Rendu · ${esc(r.type || 'Réparo')}</small></span><b>×${repQty(r)}</b></div>`).join('')}
+      ${X.got.map((r) => `<div class="day-r"><span class="t"><b>${esc(r.client || 'Client')}</b><small>Récupéré · ${esc(r.type || 'Réparo')}</small></span><b>×${repQty(r)}</b></div>`).join('')}
+      ${!nR && !nG ? '<p class="muted" style="margin:0">Rien aujourd’hui.</p>' : ''}
+    </details>`,
+    foot: `${D === today() && !fuelAll().some((x) => x.d === D && x.car) ? '<button class="btn" data-act="fuel-car">⛽ Km et litres</button>' : ''}<button class="btn primary grow" data-act="close">Fermer</button>` });
+}
+const DAY_ACT = {
+  'day-end': async (a) => {
+    const D = today();
+    if (!dayEndOf(D)) {
+      a.disabled = true;
+      const ok = await write(() => commit((d) => { const L = Array.isArray(d.days) ? d.days : []; if (!L.some((x) => x && x.d === D)) L.push({ d: D, at: new Date().toISOString() }); d.days = L.slice(-400); }, 'Tournée finie'));
+      a.disabled = false; if (!ok) return;
+      if (S.view === 'tournee') renderTournee();
+    }
+    openDayEnd(D);
+  },
+  'day-count': async (a) => {
+    clearErrs(); const v = parseNum(val('day-n'));
+    if (v == null || v < 0) return fieldErr('day-n', 'Écris combien tu as compté en espèces.');
+    const D = SHEET && SHEET.id || today(), X = dayRecap(D), x = Math.round(v * 100) / 100;
+    a.disabled = true;
+    const ok = await write(() => commit((d) => { const L = Array.isArray(d.days) ? d.days : []; let e = L.find((y) => y && y.d === D); if (!e) { e = { d: D, at: new Date().toISOString() }; L.push(e); } e.counted = x; e.exp = X.expCash; e.cAt = new Date().toISOString(); d.days = L.slice(-400); }, `Fin de journée : ${eur(x)} recomptés`));
+    a.disabled = false; if (!ok) return;
+    openDayEnd(D); if (S.view === 'tournee') renderTournee();
+    toast(Math.abs(x - X.expCash) < 0.01 ? 'Le compte est bon ✅' : x < X.expCash ? `Il manque ${eur(X.expCash - x)}` : `${eur(x - X.expCash)} en trop`, Math.abs(x - X.expCash) < 0.01 ? 'good' : undefined);
+  },
+  'day-by': async (a) => {
+    const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return;
+    const k = a.dataset.r === '1' ? 'restPayBy' : 'payBy', v = a.dataset.v === 'bank' ? 'bank' : 'cash', D = SHEET && SHEET.id || today();
+    if (await repFast(r.id, { [k]: v }, () => `${r.client || 'Réparo'} : payé ${v === 'cash' ? 'en espèces' : 'par virement'}`)) openDayEnd(D);
+  },
+  // L'écart vient de ta poche : la cagnotte d'espèces suit ce que tu as vraiment
+  'day-fix': async (a) => {
+    const T = today(), D = SHEET && SHEET.id || T, E = dayEndOf(D), cb = cashBox(); if (!cb || !E || E.counted == null) return;
+    // Seulement ce qui n'a pas encore été corrigé : deux clics ne retirent pas deux fois le même écart
+    const done = +E.fix || 0, g = Math.round((E.counted - dayRecap(D).expCash - done) * 100) / 100; if (!isFinite(g) || Math.abs(g) < 0.01) { openDayEnd(D); return; }
+    const seen = cashEvents().filter((e) => e.d === T).map((e) => e.id), x = Math.round((cb.v + g) * 100) / 100;
+    a.disabled = true;
+    const ok = await write(() => commit((d) => { d.settings.cashBox = { v: x, at: T, seen, was: cb.v }; const y = (Array.isArray(d.days) ? d.days : []).find((z) => z && z.d === D); if (y) y.fix = Math.round((done + g) * 100) / 100; }, `Espèces corrigées après la fin de journée : ${eur(x)}`));
+    a.disabled = false; if (!ok) return;
+    openDayEnd(D); toast(`Espèces corrigées : ${eur(x)}`);
+  },
+};
 function renderTournee() {
   const el = $('#v-tournee');
   if (S.status !== 'ok') { el.innerHTML = stateBlock(); return; }
@@ -4760,6 +4885,7 @@ function renderTournee() {
       : (() => { const other = slotsOf(D).filter((x) => x !== slot && tourStops(D, x).length); return `<p style="margin:0">Aucun arrêt ${momentTxt(D, slot)}.${other.length ? '' : ' Ajoute une demande dès qu’un client t’écrit : elle va dans la tournée que tu choisis, à la bonne place sur ton trajet.'}</p>${other.length ? `<div class="btns">${other.map((x) => `<button class="btn sm primary" data-act="tour-slot" data-v="${x}">Voir la tournée ${SLOT_NAMES[x] === 'Soir' ? 'du soir' : SLOT_NAMES[x] === 'Midi' ? 'de midi' : 'de l’après-midi'} (${tourStops(D, x).slice(-1)[0].n})</button>`).join('')}</div>` : ''}`; })()}
     </section>
     ${stops.map(card).join('')}
+    ${isT ? dayCard() : ''}
     ${fuCard()}
     ${xpCard()}
     ${fuelCard()}
@@ -6731,7 +6857,7 @@ function bankStrip() {
   return `<button class="strip bank ${over.length ? 'slow' : ''}" data-act="view" data-view="banque"><span>🏦 En banque <b>${eur(bTotal())}</b></span><span>${[...new Set(A.filter((a) => a.cur === 'EUR').map((a) => a.bank))].map((k) => `${esc(k)} ${eur(sum(A.filter((a) => a.bank === k && a.cur === 'EUR'), (a) => num(a.amount)))}`).join(' · ')}${lw ? ` · Leboncoin ${eur(lw.v)}` : ''}${cb ? ` · Espèces ${eur(cb.v)}` : ''}</span>${n ? `<span><b>${n}</b> à trier</span>` : ''}${po ? `<span><b>${po}</b> à confirmer avec tes proches</span>` : ''}${over.length ? `<span>🚨 budget dépassé : <b>${over.map((x) => esc(BCAT[x.k].s || BCAT[x.k].l)).join(', ')}</b></span>` : ''}${ic('right')}</button>`;
 }
 
-Object.assign(ACT, TOUR_ACT, FUEL_ACT, BANK_ACT);
+Object.assign(ACT, TOUR_ACT, FUEL_ACT, BANK_ACT, DAY_ACT);
 
 function bind() {
   document.addEventListener('click', (e) => {
@@ -6850,7 +6976,7 @@ async function init() {
 }
 
 // Accès réservé aux tests locaux (jamais actif sur le site en ligne)
-if (location.hostname === 'localhost') window.__app = { S, actMonth, walletLedger, walletMonth, realMoney, money, bRows, bankOut, capital, monthStats, cashLedger, isPaid, paidOn, profit, lbcWallet, bProches, bSuggest, bAccounts, bTotal, cashRows, cashEvents, cashBox, bAll };
+if (location.hostname === 'localhost') window.__app = { S, dayRecap, actMonth, walletLedger, walletMonth, realMoney, money, bRows, bankOut, capital, monthStats, cashLedger, isPaid, paidOn, profit, lbcWallet, bProches, bSuggest, bAccounts, bTotal, cashRows, cashEvents, cashBox, bAll };
 init();
 })();
 </script>
