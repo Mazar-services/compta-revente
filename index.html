@@ -806,7 +806,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '2d2292f4c2eb';
+const APP_VERSION = 'c37e2d358b75';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -3330,7 +3330,7 @@ function adCount() { const el = $('#ad-tn'), t = $('#ad-title'); if (el && t) el
 
 /* ---------- Tournée : demandes clients, ordre de passage (semaine : boucle Crolles → Crolles ; week-end : Saint-Égrève → Crolles), messages prêts ---------- */
 const TOUR_DEF = { from: 'Saint-Égrève', to: 'Crolles', start: '19:45', end: '21:00', wdFrom: 'Crolles', wdTo: 'Crolles', wdStart: '18:00', wdEnd: '21:00', wd2: true, midStart: '12:00', midEnd: '14:00', apStart: '15:00', apEnd: '17:00', send: 'sms', ocrLeft: true, msgs: {}, stop: 7, autoLate: true, formUrl: '', ntfy: '', fuelL100: 6, fuelPx: '', slowDays: 2, pj2: 40,
-  services: 'Joystick drift (manette PS5) : 25 € (50 € les deux, 20 € la manette à partir de la 3e)\nJoystick drift (manette Xbox) : 25 € (mêmes tarifs que PS5)\nJoysticks à effet Hall (plus jamais de drift) : 45 € la manette\nManette PS5 : 25 € (bouton, gâchette, port de charge, batterie : à partir de 20 €)\nPS5 nettoyage simple : 40 € (poussière, ventilateur)\nPS5 nettoyage liquide métal : 80 € (surchauffe, bruit, nettoyage complet)\nHDMI PS5 : 75 € (port HDMI remplacé)\nTéléphone (batterie, écran, vitre arrière) : sur devis\nDiagnostic : gratuit si tu répares, 15 € sinon', p1: 25, p2: 50, delai: '24-48 h', garantie: '30 jours' };
+  services: 'Joystick drift (manette PS5) : 25 € la manette\nJoystick drift (manette Xbox) : 25 € (mêmes tarifs que PS5)\nJoysticks à effet Hall (plus jamais de drift) : 45 € la manette\nManette PS5 : 25 € (bouton, gâchette, port de charge, batterie : à partir de 20 €)\nPS5 nettoyage simple : 40 € (poussière, ventilateur)\nPS5 nettoyage liquide métal : 80 € (surchauffe, bruit, nettoyage complet)\nHDMI PS5 : 75 € (port HDMI remplacé)\nTéléphone (batterie, écran, vitre arrière) : sur devis\nDiagnostic : gratuit si tu répares, 15 € sinon', p1: 25, p2: 50, delai: '24-48 h', garantie: '30 jours' };
 const tourCfg = () => ({ ...TOUR_DEF, ...(S.settings.tour || {}) });
 // Temps sur place (donner / récupérer, encaisser) : la route est comptée à part. Sans trajet calculé, 10 min de route estimées entre deux arrêts.
 const stopOf = (c) => Math.max(1, num(c.stop) || TOUR_DEF.stop);
@@ -3524,8 +3524,8 @@ const tourPrice0 = (q, type) => {
   const c = tourCfg(), sv = services().find((s) => s.name === type), drift = !type || (/drift|joystick/i.test(type) && !/hall/i.test(type));
   if (sv && /diagnostic/i.test(sv.name)) return 0;
   if (sv && !drift) return sv.price != null ? sv.price * q : 0; // « sur devis » : à remplir
-  // Drift : 1 = tarif 1, 2 = tarif 2, puis 20 € par manette à partir de la 3e
-  return q === 1 ? num(c.p1) : q === 2 ? num(c.p2) : num(c.p2) + (q - 2) * Math.max(0, num(c.p1) - 5);
+  // Drift : le même prix pour chaque manette, sans remise à partir de la 2e ou de la 3e
+  return q * num(c.p1);
 };
 const hm = (m) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}h${String(m % 60).padStart(2, '0')}`;
 const toMin = (s) => { const [h, m] = String(s || '19:45').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
@@ -5073,7 +5073,7 @@ function openTourCfg() {
       <div class="field"><label for="t-fuel-px">Prix du gazole (€/L)</label><input id="t-fuel-px" class="inp" inputmode="decimal" placeholder="auto" value="${fuelPxSet() ? esc(decTxt(fuelPxSet(), 3)) : ''}">${errSlot('t-fuel-px')}<small class="hint">Vide : prix du jour des stations à 20 km de chez toi (site officiel prix-carburants). Sinon ton prix, pour les prochaines tournées.</small></div></div>
     </div>
     <div class="row2"><div class="field"><label for="t-stop">Minutes sur place par arrêt</label><input id="t-stop" class="inp" inputmode="numeric" value="${esc(String(c.stop))}"><small class="hint">Le temps de donner ou récupérer et d’encaisser. La route est comptée à part.</small></div>${textF('t-delai', 'Délai annoncé', c.delai)}</div>
-    <div class="row2">${moneyF('t-p1', 'Drift : 1 manette', c.p1)}${moneyF('t-p2', 'Drift : 2 manettes', c.p2)}</div>
+    ${moneyF('t-p1', 'Drift : prix par manette', c.p1, 'Le même prix pour chaque manette, sans remise quand il y en a plusieurs')}
     ${moneyF('t-pj2', 'Drift : une manette avec les 2 joysticks', j2Price(), 'Le bouton « 🕹️🕹️ Les 2 joysticks » met ce prix pour cette manette')}
     ${textF('t-gar', 'Garantie', c.garantie)}
     <div class="field"><label for="t-serv">Tes prestations et prix (une par ligne, « Nom : prix »)</label><textarea id="t-serv" class="inp" rows="5">${esc(c.services || '')}</textarea><small class="hint">Leurs prix sont repris dans les réponses aux nouveaux clients et dans la liste « Prestation » des demandes.</small></div>
@@ -5220,7 +5220,7 @@ const TOUR_ACT = {
       wdFrom: val('t-wd-from').trim() || TOUR_DEF.wdFrom, wdTo: val('t-wd-to').trim() || TOUR_DEF.wdTo, wdStart: val('t-wd-start') || TOUR_DEF.wdStart, wdEnd: val('t-wd-end') || TOUR_DEF.wdEnd,
       wd2: !!($('#t-wd2') || {}).checked, midStart: val('t-mid-start') || TOUR_DEF.midStart, midEnd: val('t-mid-end') || TOUR_DEF.midEnd, apStart: val('t-ap-start') || TOUR_DEF.apStart, apEnd: val('t-ap-end') || TOUR_DEF.apEnd,
       send: radioVal('t-send') || 'sms', ocrLeft: !!($('#t-ocrleft') || {}).checked, msgs: (() => { const ta = $('#t-msg'); if (ta) MSG_DRAFT[ta.dataset.k] = ta.value; const o = {}; Object.keys(MSG_DEF).forEach((k) => { const v = (MSG_DRAFT[k] || '').trim(); if (v && v !== MSG_DEF[k]) o[k] = v; }); return o; })(),
-      p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, p2: parseNum(val('t-p2')) ?? TOUR_DEF.p2, pj2: parseNum(val('t-pj2')) || TOUR_DEF.pj2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie, services: $('#t-serv').value.trim() || TOUR_DEF.services, slowDays: Math.min(60, Math.max(1, parseInt(val('t-slow'), 10) || TOUR_DEF.slowDays)) };
+      p1: parseNum(val('t-p1')) ?? TOUR_DEF.p1, pj2: parseNum(val('t-pj2')) || TOUR_DEF.pj2, delai: val('t-delai').trim() || TOUR_DEF.delai, garantie: val('t-gar').trim() || TOUR_DEF.garantie, services: $('#t-serv').value.trim() || TOUR_DEF.services, slowDays: Math.min(60, Math.max(1, parseInt(val('t-slow'), 10) || TOUR_DEF.slowDays)) };
     const fl = parseDec(val('t-fuel-l')), fpx = parseDec(val('t-fuel-px'));
     if (fl == null || fl < 2 || fl > 25) { fieldErr('t-fuel-l', 'Entre 2 et 25 L/100 km, ex. 6,2'); return; }
     if (fpx != null && (fpx < 0.5 || fpx > 5)) { fieldErr('t-fuel-px', 'Un prix au litre, ex. 2,089 (ou vide pour le prix du jour)'); return; }
@@ -7039,7 +7039,7 @@ async function init() {
 }
 
 // Accès réservé aux tests locaux (jamais actif sur le site en ligne)
-if (location.hostname === 'localhost') window.__app = { S, dayRecap, actMonth, walletLedger, walletMonth, realMoney, money, bRows, bankOut, capital, monthStats, cashLedger, isPaid, paidOn, profit, lbcWallet, bProches, bSuggest, bAccounts, bTotal, cashRows, cashEvents, cashBox, bAll };
+if (location.hostname === 'localhost') window.__app = { S, dayRecap, actMonth, walletLedger, walletMonth, realMoney, money, bRows, bankOut, capital, monthStats, cashLedger, isPaid, paidOn, profit, lbcWallet, bProches, bSuggest, bAccounts, bTotal, cashRows, cashEvents, cashBox, bAll, tourPrice, replyMsg, closeSheet };
 init();
 })();
 </script>
