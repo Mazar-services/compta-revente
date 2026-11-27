@@ -806,7 +806,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '8954ee981d9d';
+const APP_VERSION = '2d2292f4c2eb';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -5421,7 +5421,10 @@ function cliFill(px, c) {
   const ids = px === 'd' ? [['d-name', c.client], ['d-phone', c.phone], ['d-addr', c.address], ['d-city', c.city]] : [['r-client', c.client], ['r-phone', c.phone], ['r-addr', c.address], ['r-city', c.city]];
   ids.forEach(([id, v]) => { const x = $('#' + id); if (x) { x.value = v || ''; if (px === 'd') x.dataset.touched = '1'; } });
   if (PLACE[px]) {
-    Object.assign(PLACE[px], { geo: c.geo || null, meet: !!c.meet, meetTxt: c.meetTxt || '' });
+    // Une recherche de lieu encore en cours (ancienne adresse) ne doit pas écraser le lieu du client choisi
+    clearTimeout(placeFind.t); clearTimeout(demFill.t);
+    Object.assign(PLACE[px], { geo: c.geo || null, meet: !!c.meet, meetTxt: c.meetTxt || '', seq: (PLACE[px].seq || 0) + 1, cands: [] });
+    const gl = $('#' + px + '-glist'); if (gl) gl.innerHTML = '';
     const m = $(`input[name="${px}-meet"][value="${c.meet ? 'meet' : 'home'}"]`); if (m) m.checked = true;
     const mt = $('#' + px + '-meettxt'); if (mt) mt.value = c.meetTxt || '';
     placeShow(px); if (!c.geo && c.address) placeFind(px, true);
@@ -5629,9 +5632,11 @@ const ACT = {
       const rh = got ? radioVal('r-rhow') : ''; if (rh === 'cash' || rh === 'bank') r.restPayBy = rh; else drop.push('restPayBy');
     } else drop.push('rest', 'restBy', 'restPaid', 'restPayBy');
     const how = paid ? radioVal('r-how') : ''; if (how === 'cash' || how === 'bank') r.payBy = how; else drop.push('payBy');
-    a.disabled = true;
+    // Les deux boutons « Enregistrer » sont bloqués pendant l'enregistrement : jamais deux fiches pour un seul geste
+    const sb = $$('#sheet-root [data-act="rep-save"]'); if (sb.some((b) => b.disabled)) return;
+    sb.forEach((b) => { b.disabled = true; });
     const ok = await write(() => (old ? updRepair(id, r, drop) : addRepair({ ...r, createdAt: new Date().toISOString() })));
-    a.disabled = false;
+    sb.forEach((b) => { b.disabled = false; });
     if (!ok) return;
     if (a.dataset.more && !old) { const c = cliOf(r); closeSheet(); openRep(null, null, c); toast(`Fiche enregistrée : ajoute la suivante${c.client ? ` pour ${c.client}` : ''}`, 'good'); return; }
     closeSheet(); toast(`Réparo : ${repStage(r).t}${paid && repInCash() ? ` · +${eur(repGot(r))}${cxT()}` : ''}`);
