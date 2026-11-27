@@ -804,7 +804,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '21231d40c85a';
+const APP_VERSION = 'd81cec4289f7';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -4720,9 +4720,9 @@ function dayRecap(D) {
     return { x, s, a: repTotal(x), by: ex || (sn ? 'bank' : ''), seen: sn, rest: !!x._rest, nm: s.client || s.type || 'Client Réparo', t: `${s.type || 'Réparo'}${repQty(s) > 1 ? ' ×' + repQty(s) : ''}${x._rest ? ' · reste payé' : x._src ? ' · payé en partie' : ''}` };
   });
   const saleSeen = (i) => B.some((r) => r.sale && r.sale.id === i.id), buySeen = (i) => B.some((r) => r.match && r.match.id === i.id);
-  const sales = S.allItems.filter((i) => !i.example && isPaid(i) && paidOn(i) === D && !isShipSale(i.sellChannel) && num(i.sellPrice) > 0)
+  const sales = S.items.filter((i) => !i.example && !isCancelled(i) && isPaid(i) && paidOn(i) === D && !isShipSale(i.sellChannel) && num(i.sellPrice) > 0)
     .map((i) => ({ i, a: num(i.sellPrice) - num(i.sellFees), by: saleSeen(i) ? 'bank' : 'cash', seen: saleSeen(i), nm: bItemNm(i), t: 'Vente en main propre' }));
-  const buys = S.allItems.filter((i) => !i.example && i.buyDate === D && i.buyMode === 'main_propre' && num(i.buyPrice) > 0 && !buySeen(i))
+  const buys = S.items.filter((i) => !i.example && !isCancelled(i) && i.buyDate === D && i.buyMode === 'main_propre' && num(i.buyPrice) > 0 && !buySeen(i))
     .map((i) => ({ i, a: -num(i.buyPrice), nm: bItemNm(i), t: 'Achat en main propre' }));
   const cash = pay.filter((p) => p.by === 'cash').concat(sales.filter((p) => p.by === 'cash')), bank = pay.filter((p) => p.by === 'bank').concat(sales.filter((p) => p.by === 'bank')), unk = pay.filter((p) => !p.by);
   const owed = S.repairs.filter((r) => r.returnDate === D && r.returned !== false && (!repPaid(r) || restOwed(r))).map((r) => ({ r, a: repPaid(r) ? restOwed(r) : repTotal(r) }));
@@ -4732,7 +4732,7 @@ function dayRecap(D) {
 function dayCard() {
   const D = today(), X = dayRecap(D), E = dayEndOf(D);
   if (!E && !X.ret.length && !X.got.length && !X.pay.length && !X.sales.length) return '';
-  const st = E && E.counted != null ? (Math.abs(E.counted - E.exp) < 0.01 ? ' · espèces recomptées ✓' : ` · <b class="neg">écart de ${eurS(E.counted - E.exp)} sur les espèces</b>`) : '';
+  const st = E && E.counted != null ? (Math.abs(E.counted - E.exp) < 0.01 ? ' · espèces recomptées ✓' : Math.abs(E.counted - E.exp - (+E.fix || 0)) < 0.01 ? ' · espèces corrigées ✓' : ` · <b class="neg">écart de ${eurS(E.counted - E.exp)} sur les espèces</b>`) : '';
   return `<section class="card day-c${E ? ' done' : ''}"><div class="card-h"><h2 class="sec">🏁 Fin de journée</h2>${E ? `<span class="pill bk-ok">Finie à ${esc(hm(toMin(new Date(E.at).toTimeString().slice(0, 5))))}</span>` : ''}</div>
     <p style="margin:0">Aujourd’hui : <b>${X.ret.length ? `${sum(X.ret, repQty)} rendu${sum(X.ret, repQty) > 1 ? 's' : ''}` : 'rien rendu'}</b> · <b>${X.got.length ? `${sum(X.got, repQty)} récupéré${sum(X.got, repQty) > 1 ? 's' : ''}` : 'rien récupéré'}</b> · <b>${eur(X.total)}</b> reçus (💶 ${eur(X.cIn)} · 🏦 ${eur(X.bankT)}${X.unkT ? ` · ❓ ${eur(X.unkT)}` : ''})${st}</p>
     <div class="btns" style="margin-top:8px"><button class="btn ${E ? '' : 'primary'} grow" data-act="day-end">${E ? 'Voir le récap de ma journée' : '🏁 J’ai fini ma tournée'}</button></div>
@@ -4744,10 +4744,12 @@ function dayRow(p, extra) {
 function openDayEnd(D = today()) {
   const X = dayRecap(D), E = dayEndOf(D), B = bRows().length;
   const nR = sum(X.ret, repQty), nG = sum(X.got, repQty);
-  const check = E && E.counted != null ? (() => { const g = Math.round((E.counted - X.expCash) * 100) / 100;
-    if (Math.abs(g) < 0.01) return `<p class="day-ok">✅ Tu as compté ${eur(E.counted)} : le compte est bon.</p>`;
+  const check = E && E.counted != null ? (() => { const g = Math.round((E.counted - X.expCash) * 100) / 100, done = +E.fix || 0, rem = Math.round((g - done) * 100) / 100;
+    if (Math.abs(g) < 0.01 && Math.abs(done) < 0.01) return `<p class="day-ok">✅ Tu as compté ${eur(E.counted)} : le compte est bon.</p>`;
+    if (Math.abs(rem) < 0.01) return `<p class="day-ok">✅ Tu as compté ${eur(E.counted)} pour ${eur(X.expCash)} attendus. Tes espèces sont déjà corrigées de ${eurS(done)}.</p>`;
     return `<div class="day-ko"><b>${g < 0 ? `⚠ Il manque ${eur(-g)}` : `${eur(g)} en trop`}</b><small>Tu as compté ${eur(E.counted)} pour ${eur(X.expCash)} attendus. ${g < 0 ? 'Regarde les clients payés en espèces ci-dessus : un client a peut-être donné moins, ou un paiement noté en espèces est arrivé par virement.' : 'Un client a peut-être payé en espèces alors que c’est noté autrement, ou il te restait de la monnaie.'}</small>
-      ${cashBox() ? `<button class="btn sm" data-act="day-fix" data-g="${g}">Corriger mes espèces de ${eurS(g)}</button>` : ''}</div>`; })() : '';
+      ${Math.abs(done) >= 0.01 ? `<small>Déjà corrigé : ${eurS(done)}.</small>` : ''}
+      ${cashBox() ? `<button class="btn sm" data-act="day-fix">Corriger mes espèces de ${eurS(rem)}</button>` : ''}</div>`; })() : '';
   openSheet({ kind: 'day', id: D, title: `🏁 Ta journée · ${cap1(new Date(D + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }))}`, body: `
     <div class="day-tiles">
       <div><span>Rendus</span><b>${nR}</b><small>${nR ? esc(devTxt(X.ret)) : 'rien'}</small></div>
@@ -4804,10 +4806,12 @@ const DAY_ACT = {
   },
   // L'écart vient de ta poche : la cagnotte d'espèces suit ce que tu as vraiment
   'day-fix': async (a) => {
-    const g = +a.dataset.g, cb = cashBox(); if (!cb || !isFinite(g)) return;
-    const T = today(), seen = cashEvents().filter((e) => e.d === T).map((e) => e.id), x = Math.round((cb.v + g) * 100) / 100, D = SHEET && SHEET.id || T;
+    const T = today(), D = SHEET && SHEET.id || T, E = dayEndOf(D), cb = cashBox(); if (!cb || !E || E.counted == null) return;
+    // Seulement ce qui n'a pas encore été corrigé : deux clics ne retirent pas deux fois le même écart
+    const done = +E.fix || 0, g = Math.round((E.counted - dayRecap(D).expCash - done) * 100) / 100; if (!isFinite(g) || Math.abs(g) < 0.01) { openDayEnd(D); return; }
+    const seen = cashEvents().filter((e) => e.d === T).map((e) => e.id), x = Math.round((cb.v + g) * 100) / 100;
     a.disabled = true;
-    const ok = await write(() => commit((d) => { d.settings.cashBox = { v: x, at: T, seen, was: cb.v }; }, `Espèces corrigées après la fin de journée : ${eur(x)}`));
+    const ok = await write(() => commit((d) => { d.settings.cashBox = { v: x, at: T, seen, was: cb.v }; const y = (Array.isArray(d.days) ? d.days : []).find((z) => z && z.d === D); if (y) y.fix = Math.round((done + g) * 100) / 100; }, `Espèces corrigées après la fin de journée : ${eur(x)}`));
     a.disabled = false; if (!ok) return;
     openDayEnd(D); toast(`Espèces corrigées : ${eur(x)}`);
   },
