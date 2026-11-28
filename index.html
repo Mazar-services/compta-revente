@@ -4633,7 +4633,8 @@ function spUnit(t) {
 function spPrice() {
   const t = $('#sp-total'); if (!t || t.dataset.touched) return;
   const type = val('sp-type').trim(), q = Number(val('sp-qty')) || 1, u = spUnit(type);
-  if (u != null) t.value = numIn(Math.round(u * q * 100) / 100); else if (isDriftType(type)) t.value = numIn(tourPrice(q, type));
+  // Pas de prix connu (nouvelle prestation, « sur devis ») : case vide, jamais le prix d'une autre prestation
+  t.value = u != null ? numIn(Math.round(u * q * 100) / 100) : type && isDriftType(type) ? numIn(tourPrice(q, type)) : '';
 }
 function openSp() {
   const P = spPresets(), T = repTypes(), sv = services();
