@@ -807,7 +807,7 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
 const NB = ' ';
-const APP_VERSION = '8b0568b74100';
+const APP_VERSION = '349135b237b6';
 // Nouvelle version publiée ? Safari garde l'ancienne page en cache jusqu'à 10 min : on recharge sur une adresse neuve.
 async function checkUpdate() {
   try {
@@ -2708,7 +2708,7 @@ function reparoHtml() {
   const cur = thisMonth(), Rm = R.filter((r) => repPaidOn(r).slice(0, 7) === cur);
   const nb = sum(R, repQty), ca = sum(R, repTotal), parts = sum(R, (r) => num(r.partsCost)), net = ca - parts;
   const unpaid = sum(all.filter((r) => !repPaid(r)), repTotal) + sum(all, restOwed), ko = R.filter((r) => r.result === 'ko' && !r._rest).length;
-  const head = `<div class="ttl-row"><div><div class="eyebrow">Prestations de réparation</div><h1 class="h1">Réparo</h1></div><button class="btn sm primary" data-act="rep-add">${ic('plus')} Prestation</button></div>`;
+  const head = `<div class="ttl-row"><div><div class="eyebrow">Prestations de réparation</div><h1 class="h1">Réparo</h1></div><div class="btns" style="margin:0"><button class="btn sm" data-act="sp-add">✅ Fait sur place</button><button class="btn sm primary" data-act="rep-add">${ic('plus')} Prestation</button></div></div>`;
   if (!all.length) return head + `<section class="card"><p style="margin:0">Aucune prestation pour l’instant. Ajoute chaque réparation avec « Prestation » dès que tu récupères l’objet, puis coche réparé, rendu et payé au fil de l’eau.</p></section>`;
   // Période des stats : ce mois-ci, le mois dernier ou depuis le début (date de paiement)
   const per = ['m', 'pm', 'all'].includes(S.repPeriod) ? S.repPeriod : 'all', ym = per === 'pm' ? addMonths(cur, -1) : cur;
@@ -2748,7 +2748,7 @@ function reparoHtml() {
   const types = by((r) => lbl.get(norm(r.type || '?'))).sort((a, b) => b[1].net - a[1].net);
   const months = by((r) => repPaidOn(r).slice(0, 7)).sort((a, b) => b[0].localeCompare(a[0]));
   const table = (rows, first, lab) => `<div class="tbl-wrap"><table><thead><tr><th>${first}</th><th>Nb</th><th>Encaissé</th><th>Gain</th></tr></thead><tbody>${rows.map(([k, x]) => `<tr><td>${esc(lab(k))}</td><td>${x.n}</td><td>${eur(x.ca)}</td><td><b class="${x.net < 0 ? 'neg' : 'pos'}">${eurS(x.net)}</b></td></tr>`).join('')}</tbody></table></div>`;
-  const steps = (r) => [[isDate(r.gotDate) ? `récupéré ${dShort(r.gotDate)}` : '', repDone(r) && isDate(r.date) ? `${r.result === 'ko' ? 'échec' : 'réparé'} ${dShort(r.date)}` : '', r.returned !== false && isDate(r.returnDate) ? `rendu ${dShort(r.returnDate)}` : '', repPaid(r) && isDate(r.paidDate) ? `payé ${dShort(r.paidDate)}${repPayHow(r, false)}` : ''].filter(Boolean).join(' → '), restOwed(r) ? `💶 reste ${eur(restOwed(r))} à payer${isDate(r.restBy) ? ` pour le ${dShort(r.restBy)}` : ''}` : repRest(r) ? `💶 reste ${eur(repRest(r))} payé ${dShort(r.restPaid)}${repPayHow(r, true)}` : '', r.loan ? '🎮 a ta manette de prêt' : '', r.fu === 'sent' ? `💬 suivi envoyé${isDate(r.fuDate) ? ' ' + dShort(r.fuDate) : ''}` : r.fu === 'skip' ? '💬 sans message de suivi' : fuWait(r) ? '💬 à contacter' : ''].filter(Boolean).join(' · ');
+  const steps = (r) => [r.sp ? [`✅ fait sur place ${dShort(r.date)}`, repPaid(r) && isDate(r.paidDate) ? `payé${r.paidDate === r.date ? '' : ' ' + dShort(r.paidDate)}${repPayHow(r, false)}` : ''].filter(Boolean).join(' · ') : [isDate(r.gotDate) ? `récupéré ${dShort(r.gotDate)}` : '', repDone(r) && isDate(r.date) ? `${r.result === 'ko' ? 'échec' : 'réparé'} ${dShort(r.date)}` : '', r.returned !== false && isDate(r.returnDate) ? `rendu ${dShort(r.returnDate)}` : '', repPaid(r) && isDate(r.paidDate) ? `payé ${dShort(r.paidDate)}${repPayHow(r, false)}` : ''].filter(Boolean).join(' → '), restOwed(r) ? `💶 reste ${eur(restOwed(r))} à payer${isDate(r.restBy) ? ` pour le ${dShort(r.restBy)}` : ''}` : repRest(r) ? `💶 reste ${eur(repRest(r))} payé ${dShort(r.restPaid)}${repPayHow(r, true)}` : '', r.loan ? '🎮 a ta manette de prêt' : '', r.fu === 'sent' ? `💬 suivi envoyé${isDate(r.fuDate) ? ' ' + dShort(r.fuDate) : ''}` : r.fu === 'skip' ? '💬 sans message de suivi' : fuWait(r) ? '💬 à contacter' : ''].filter(Boolean).join(' · ');
   const row = (r) => { const st = repStage(r); return `<div class="cl rp">
       <span class="d">${dShort(r.date || r.gotDate)}</span>
       <span class="t">${esc(r.type)}${repQty(r) > 1 ? ` <b>×${repQty(r)}</b>` : ''} <span class="pill rp-${st.k}">${st.t}</span><small>${steps(r) ? steps(r) + ' · ' : ''}${eur(num(r.unitPrice))} l’unité${repTotal(r) < repQty(r) * num(r.unitPrice) - 0.004 ? ` · payé ${eur(repTotal(r))} (remise ${eur(repQty(r) * num(r.unitPrice) - repTotal(r))})` : ''}${num(r.partsCost) ? ` · pièces ${eur(num(r.partsCost))}` : ''}${r.client ? ' · ' + esc(r.client) : ''}${r.note ? ' · ' + esc(r.note) : ''}</small>
@@ -3516,7 +3516,8 @@ const sameCli = (a, b) => a.id === b.id || (!!telKey(a.phone) && telKey(a.phone)
 const cliItems = (st, s, kind) => st.filter((x) => x.key === s.key && sameCli(x.r, s.r) && (kind === 'eta' || kind === 'late' || x.kind === s.kind));
 // Drift : une manette où tu changes les 2 joysticks coûte « pj2 » (40 €) au lieu du tarif d'une manette (25 €)
 // Supplément mémorisé sur la fiche (j2x) : une fiche faite à l'ancien tarif (35 €, donc +10 €) garde son prix quand on décoche
-const isDriftType = (t) => !t || (/drift|joystick/i.test(t) && !/hall/i.test(t));
+// Un capuchon de joystick n'est pas un drift (pas de module à changer) : son propre prix
+const isDriftType = (t) => !t || (/drift|joystick/i.test(t) && !/hall|capuchon/i.test(t));
 const j2Price = () => { const v = num(tourCfg().pj2); return v > 0 ? v : TOUR_DEF.pj2; };
 const j2Extra = () => Math.max(0, j2Price() - num(tourCfg().p1));
 const j2Of = (r) => Math.min(repQty(r), Math.max(0, parseInt(r && r.j2, 10) || 0));
@@ -3524,9 +3525,10 @@ const j2xOf = (r) => (r && r.j2x != null && r.j2x !== '' ? num(r.j2x) : 10);
 const j2Opts = (q, cur) => Array.from({ length: Math.max(1, q) + 1 }, (_, i) => `<option value="${i}" ${i === cur ? 'selected' : ''}>${i ? plural(i, 'manette') : 'aucune'}</option>`).join('');
 const tourPrice = (q, type, j2 = 0) => tourPrice0(q, type) + (isDriftType(type) ? Math.min(q, Math.max(0, j2 || 0)) * j2Extra() : 0);
 const tourPrice0 = (q, type) => {
-  const c = tourCfg(), sv = services().find((s) => s.name === type), drift = !type || (/drift|joystick/i.test(type) && !/hall/i.test(type));
+  const c = tourCfg(), sv = services().find((s) => s.name === type), drift = isDriftType(type);
   if (sv && /diagnostic/i.test(sv.name)) return 0;
   if (sv && !drift) return sv.price != null ? sv.price * q : 0; // « sur devis » : à remplir
+  if (!drift) { const u = repTypes().get(type); if (u != null) return u * q; } // pas dans tes tarifs : le dernier prix que tu as pris
   // Drift : le même prix pour chaque manette, sans remise à partir de la 2e ou de la 3e
   return q * num(c.p1);
 };
@@ -4614,6 +4616,58 @@ function partPrev() {
   el.innerHTML = x > 0 && x <= T + 0.004 ? `Il te donne <b>${eur(T - x)}</b> maintenant · il te doit encore <b>${eur(x)}</b>${isDate(by) && by >= today() ? ` · ${restWhen({ restBy: by })}` : ''}` : `Prix total : <b>${eur(T)}</b>`;
 }
 
+/* ---------- Fait sur place : une petite prestation faite tout de suite devant le client (ex. un capuchon de joystick) ---------- */
+// Réparé, rendu et payé d'un coup (r.sp = 1) : jamais dans la tournée, pas d'essence. Les prestations déjà faites sur place reviennent en raccourcis.
+const SP_DEF = [['Capuchon de joystick (manette PS5)', 15]];
+function spPresets() {
+  const m = new Map();
+  S.repairs.filter((r) => r.sp && r.type).sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || '')).forEach((r) => { if (!m.has(r.type)) m.set(r.type, num(r.unitPrice)); });
+  SP_DEF.forEach(([t, v]) => { if (!m.has(t)) m.set(t, v); });
+  return [...m.entries()].slice(0, 6);
+}
+function spUnit(t) {
+  const P = new Map(spPresets()); if (P.has(t)) return P.get(t);
+  const T = repTypes(); if (T.has(t)) return T.get(t);
+  const x = services().find((y) => norm(y.name) === norm(t)); return x && x.price != null ? x.price : null;
+}
+function spPrice() {
+  const t = $('#sp-total'); if (!t || t.dataset.touched) return;
+  const type = val('sp-type').trim(), q = Number(val('sp-qty')) || 1, u = spUnit(type);
+  // Pas de prix connu (nouvelle prestation, « sur devis ») : case vide, jamais le prix d'une autre prestation
+  t.value = u != null ? numIn(Math.round(u * q * 100) / 100) : type && isDriftType(type) ? numIn(tourPrice(q, type)) : '';
+}
+function openSp() {
+  const P = spPresets(), T = repTypes(), sv = services();
+  openSheet({ kind: 'sp', title: '✅ Prestation faite sur place', body: `
+    <p class="hint" style="margin:0">Faite tout de suite, devant le client : notée réparée, rendue et payée d’un coup. Pas de tournée, pas d’essence.</p>
+    <div class="csug btns sp-ch" style="margin:0">${P.map(([t, v], i) => `<button class="chip" data-act="sp-pick" data-i="${i}" aria-pressed="${i === 0}">${esc(t)} · ${eur(v)}</button>`).join('')}</div>
+    <div class="field"><label for="sp-type">Prestation</label><input id="sp-type" class="inp" list="dl-sp" autocomplete="off" value="${esc(P[0][0])}"><datalist id="dl-sp">${[...new Set([...P.map((x) => x[0]), ...sv.map((x) => x.name), ...T.keys()])].map((t) => `<option value="${esc(t)}">`).join('')}</datalist>${errSlot('sp-type')}</div>
+    <div class="row2"><div class="field"><label for="sp-qty">Nombre</label><span class="selw" style="display:block"><select id="sp-qty" class="inp">${[1, 2, 3, 4, 5, 6].map((n) => `<option value="${n}">${n}</option>`).join('')}</select></span></div>
+      ${moneyF('sp-total', 'Prix total', P[0][1])}</div>
+    <div class="row2">${textF('sp-name', 'Prénom <span class="opt-l">(facultatif)</span>', '', 'Prénom ou pseudo')}${dateF('sp-date', 'Fait le', today())}</div>
+    <p class="fs-t" style="margin:4px 0 8px">Il t’a payé :</p>
+    <div class="pay-by"><button class="btn primary" data-act="sp-save" data-v="cash">💶 En espèces</button><button class="btn primary" data-act="sp-save" data-v="bank">🏦 Virement, Wero ou carte</button></div>
+    <button class="lnk" data-act="sp-save" data-v="auto" style="margin-top:10px">Je ne sais plus : regarde sur mes comptes</button>`,
+    foot: `<button class="btn grow" data-act="close">Annuler</button>` });
+}
+async function spSave(a) {
+  clearErrs();
+  const type = val('sp-type').trim(), qty = Number(val('sp-qty')) || 1, total = parseNum(val('sp-total')), D = val('sp-date'), by = a.dataset.v === 'cash' || a.dataset.v === 'bank' ? a.dataset.v : '';
+  if (!type) return fieldErr('sp-type', 'Indique la prestation.');
+  if (total == null || total < 0) return fieldErr('sp-total', 'Indique le prix.');
+  if (!isDate(D)) return fieldErr('sp-date', 'Choisis le jour.');
+  if (D > today()) return fieldErr('sp-date', 'Ce jour n’est pas encore arrivé.');
+  // Un seul enregistrement par geste, même si on touche deux boutons de paiement d'affilée
+  const bs = $$('#sheet-root [data-act="sp-save"]'); if (bs.some((b) => b.disabled)) return; bs.forEach((b) => { b.disabled = true; });
+  const u = spUnit(type), unitPrice = u != null && total <= u * qty + 0.004 ? u : Math.round((total / qty) * 100) / 100;
+  const r = { type, qty, unitPrice, total, partsCost: 0, client: val('sp-name').trim(), phone: '', note: '', sp: 1, fix: null, planDate: '', planSlot: '', picked: true, gotDate: D, done: true, result: 'ok', date: D, returned: true, returnDate: D, paid: true, paidDate: D, ...(by ? { payBy: by } : {}), createdAt: new Date().toISOString() };
+  const ok = await write(() => addRepair(r));
+  bs.forEach((b) => { b.disabled = false; });
+  if (!ok) return;
+  closeSheet(); render();
+  toast(`Fait sur place : +${eur(repNet(r))}${D === today() ? '' : ` le ${dShort(D)}`}${repInCash() ? cxT() : ''}${cashMsg(by)}`);
+}
+
 /* ---------- Client express : il vient à l'atelier, à Crolles (réparé sur place en 20-25 min) ---------- */
 // r.xp = 1 : jamais dans la tournée ni dans l'essence. RDV prévu : picked false, planDate = jour, xpT = 'HH:MM' (facultatif), xpAl = 1 : réveil 30 min avant.
 const XP_SHORTCUT = 'Réveil REPARO', XP_ALARM_TXT = 'Client arrive dans 30 minutes';
@@ -4889,7 +4943,7 @@ function renderTournee() {
     ${slowCard()}
     ${restCard()}
     <div class="tour-quick">
-      <button class="btn primary grow" data-act="dem-add">${ic('plus')} Nouvelle demande</button><button class="btn" data-act="xp-add">⚡ Client express</button>
+      <button class="btn primary grow" data-act="dem-add">${ic('plus')} Nouvelle demande</button><button class="btn" data-act="xp-add">⚡ Client express</button><button class="btn" data-act="sp-add">✅ Fait sur place</button>
     </div>
     <div class="tour-reply"><span class="muted" style="font-size:12.5px">Répondre à un nouveau client :</span> ${REPLY_KINDS.map(([k, l]) => `<button class="chip" data-act="tour-reply" data-k="${k}">${l}</button>`).join(' ')}</div>
     <div class="stabs" role="tablist">${[['ce-soir', "Aujourd'hui"], ['demain', 'Demain']].map(([v, l]) => `<button role="tab" data-act="tour-day" data-v="${v}" aria-selected="${(S.tourDay || 'ce-soir') === v}">${l}</button>`).join('')}</div>
@@ -4939,7 +4993,7 @@ function whenOpts() {
 function openDemande() {
   const T = repTypes(), sv = services(), last = (sv[0] && sv[0].name) || [...T.keys()].find((t) => /drift/i.test(t)) || [...T.keys()].pop();
   openSheet({ kind: 'dem', title: 'Nouvelle demande', body: `
-    <div class="btns" style="margin:0"><button class="chip" data-act="xp-add">⚡ Il vient à l’atelier ? Client express</button></div>
+    <div class="btns" style="margin:0"><button class="chip" data-act="xp-add">⚡ Il vient à l’atelier ? Client express</button><button class="chip" data-act="sp-add">✅ Déjà fait sur place ?</button></div>
     <div class="field"><label for="d-paste">Colle ici le message du client</label><textarea id="d-paste" class="inp" rows="4" placeholder="Ex. : Yanis, 06 12 34 56 78, 12 rue des Alpes 38400 Saint-Martin-d’Hères, 2 manettes qui driftent"></textarea>
       <div class="btns" style="margin-top:6px"><button class="btn sm" data-act="dem-pastebtn">${ic('copy')} Coller depuis le presse-papiers</button><label class="btn sm primary" for="d-shot">${ic('cam')} Lire une capture d'écran</label><input id="d-shot" type="file" accept="image/*" multiple hidden></div>
       <p class="hint" id="d-shot-st" style="margin:4px 0 0" hidden></p>
@@ -5629,6 +5683,9 @@ const ACT = {
   'rep-j2': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; if (repQty(r) > 1) { openJ2(r); return; } await setJ2(r, j2Of(r) ? 0 : 1); },
   'j2-save': async (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r) return; const n = Math.min(repQty(r), parseInt(radioVal('j2-n'), 10) || 0); closeSheet(); if (n !== j2Of(r)) await setJ2(r, n); },
   'xp-save': (a) => xpSave(a),
+  'sp-add': () => openSp(),
+  'sp-pick': (a) => { const c = spPresets()[+a.dataset.i], t = $('#sp-total'); if (!c || !t) return; $('#sp-type').value = c[0]; delete t.dataset.touched; spPrice(); $$('#sheet-root [data-act="sp-pick"]').forEach((b) => b.setAttribute('aria-pressed', String(b === a))); },
+  'sp-save': (a) => spSave(a),
   'xp-alarm': (a) => { const r = S.repairs.find((x) => x.id === a.dataset.id); if (!r || xpAlarmMin(r) == null) return; xpAlarmGo(r); setTimeout(() => { if (SHEET && SHEET.kind === 'xpal') closeSheet(); if (S.view === 'tournee') renderTournee(); }, 800); },
   'xp-alarm-test': () => { location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(XP_SHORTCUT)}&input=text&text=${encodeURIComponent(hhmm((nowMin() + 2) % 1440))}`; },
   'xp-done': async (a) => {
@@ -7027,7 +7084,7 @@ function bind() {
     if (e.target.id === 'fx-t') fixInfo();
     { const m = e.target.id.match(/^(d|r|p)-(addr|city)$/); if (m && PLACE[m[1]]) { PLACE[m[1]].geo = null; placeShow(m[1]); if (m[2] === 'city') e.target.dataset.touched = '1'; clearTimeout(placeFind.t); placeFind.t = setTimeout(() => placeFind(m[1], true), 900); } }
     { const m = e.target.id.match(/^(d|r|p)-meettxt$/); if (m && PLACE[m[1]]) { PLACE[m[1]].meetTxt = e.target.value; delete e.target.dataset.auto; } }
-    if (/^d-(name|phone|addr|city|total)$/.test(e.target.id) || e.target.id === 'x-total') e.target.dataset.touched = '1';
+    if (/^d-(name|phone|addr|city|total)$/.test(e.target.id) || e.target.id === 'x-total' || e.target.id === 'sp-total') e.target.dataset.touched = '1';
     if (e.target.id === 'x-time') xpSync();
     if (e.target.id === 'r-client' || e.target.id === 'd-name') cliSuggest(e.target.id === 'd-name' ? 'd' : 'r');
     if (e.target.id === 'r-total') e.target.dataset.touched = '1'; if (/^r-(qty|price|parts|total|rest)$/.test(e.target.id)) repPreview(); if (/^p-(rest|by)$/.test(e.target.id)) partPrev(); if (e.target.id === 'ad-title') adCount(); });
@@ -7042,6 +7099,7 @@ function bind() {
     if (e.target.id === 'r-type') { const p = repTypes().get(e.target.value.trim()); if (p != null) { $('#r-price').value = numIn(p); } repPreview(); }
     if (e.target.id === 'r-qty') repPreview();
     if (e.target.id === 'x-now' || e.target.id === 'x-time') xpSync();
+    if (e.target.id === 'sp-type' || e.target.id === 'sp-qty') { spPrice(); if (e.target.id === 'sp-type') $$('#sheet-root [data-act="sp-pick"]').forEach((b) => b.setAttribute('aria-pressed', String(b.textContent.startsWith(e.target.value.trim() + ' · ')))); }
     if (e.target.id === 'x-qty' || e.target.id === 'x-type' || e.target.id === 'x-j2') { const f = $('#x-j2-f'); if (f) f.hidden = !isDriftType(val('x-type')); const t = $('#x-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(val('x-qty')) || 1, val('x-type').trim(), Number(val('x-j2')) || 0)); }
     if (e.target.id === 'd-qty' || e.target.id === 'd-j2') { if (e.target.id === 'd-qty') e.target.dataset.touched = '1'; const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(val('d-qty')) || 1, val('d-type'), Number(val('d-j2')) || 0)); }
     if (e.target.id === 'd-type') { e.target.dataset.touched = '1'; const f = $('#d-j2-f'); if (f) f.hidden = !isDriftType(e.target.value.trim()); const t = $('#d-total'); if (t && !t.dataset.touched) t.value = numIn(tourPrice(Number(val('d-qty')) || 1, e.target.value.trim(), Number(val('d-j2')) || 0)); }
